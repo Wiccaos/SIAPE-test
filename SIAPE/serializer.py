@@ -1,5 +1,9 @@
 from rest_framework import serializers
-from .models import Usuario, Roles, Areas, CategoriasAjustes, Docentes, DirectoresCarreras, Carreras, Estudiantes, AsesoresPedagogicos, Solicitudes, Evidencias, Asignaturas, AsignaturasEnCurso, Entrevistas, AjusteRazonable, AjusteAsignado
+from .models import (
+    Usuario, PerfilUsuario, Roles, Areas, CategoriasAjustes, 
+    Carreras, Estudiantes, Solicitudes, Evidencias, Asignaturas, 
+    AsignaturasEnCurso, Entrevistas, AjusteRazonable, AjusteAsignado
+)
 
 class UsuarioSerializer(serializers.ModelSerializer):
     class Meta:
@@ -36,53 +40,54 @@ class CategoriasAjustesSerializer(serializers.ModelSerializer):
             'nombre_categoria',
         ]
 
-class DocentesSerializer(serializers.ModelSerializer):
-    first_name = serializers.CharField(source='usuarios.first_name', read_only=True, label='Nombre')
-    last_name = serializers.CharField(source='usuarios.last_name', read_only=True, label='Apellido')
-    areas = serializers.CharField(source='areas.nombre_area', read_only=True, label='Área')
-    roles = serializers.CharField(source='roles.nombre_rol', read_only=True, label='Rol')
+class PerfilUsuarioSerializer(serializers.ModelSerializer):
+    # --- Campos de Lectura (Read-only) ---
+    first_name = serializers.CharField(source='usuario.first_name', read_only=True, label='Nombre')
+    last_name = serializers.CharField(source='usuario.last_name', read_only=True, label='Apellido')
+    email = serializers.EmailField(source='usuario.email', read_only=True, label='Email')
+    rol = serializers.CharField(source='rol.nombre_rol', read_only=True, label='Rol')
+    area = serializers.CharField(source='area.nombre', read_only=True, label='Área', allow_null=True)
 
-    class Meta:
-        model = Docentes
-        fields = [
-            'id',
-            'first_name',
-            'last_name',
-            'areas',
-            'roles',
-        ]
-
-class DirectoresCarrerasSerializer(serializers.ModelSerializer):
-    first_name = serializers.CharField(source='usuarios.first_name', read_only=True, label='Nombre')
-    last_name = serializers.CharField(source='usuarios.last_name', read_only=True, label='Apellido')
-    areas = serializers.CharField(source='areas.nombre', read_only=True, label='Área')
-    roles = serializers.CharField(source='roles.nombre_rol', read_only=True, label='Rol')
-    usuarios = serializers.PrimaryKeyRelatedField(
+    # --- Campos de Escritura (Write-only) ---
+    usuario = serializers.PrimaryKeyRelatedField(
         queryset=Usuario.objects.all(),
         write_only=True
     )
+    rol = serializers.PrimaryKeyRelatedField(
+        queryset=Roles.objects.all(),
+        write_only=True
+    )
+    area = serializers.PrimaryKeyRelatedField(
+        queryset=Areas.objects.all(),
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
 
     class Meta:
-        model = DirectoresCarreras
+        model = PerfilUsuario
         fields = [
             'id',
             'first_name',
             'last_name',
-            'areas',
-            'roles',
-            'usuarios',
+            'email',
+            'rol',
+            'area',
+            'usuario',
+            'rol',
+            'area',
         ]
 
 class CarrerasSerializer(serializers.ModelSerializer):
     nombre = serializers.CharField(max_length=100, label='Nombre de la Carrera')
-    # lectura: información anidada del director (opcional)
-    directores_carreras = DirectoresCarrerasSerializer(read_only=True)
-    # lectura simple del id del director (entero)
-    directores_carreras_id = serializers.IntegerField(read_only=True)
-    # escritura: recibir el id del director para asignar la FK
-    id_directores_carreras = serializers.PrimaryKeyRelatedField(
-        queryset=DirectoresCarreras.objects.all(),
-        source='directores_carreras',
+
+    # --- Campo de Lectura ---
+    director = serializers.StringRelatedField(read_only=True)
+
+    # --- Campo de Escritura ---
+    director_id = serializers.PrimaryKeyRelatedField(
+        queryset=PerfilUsuario.objects.filter(rol__nombre_rol='Director de Carrera'), 
+        source='director',
         write_only=True,
         required=False,
         allow_null=True
@@ -93,19 +98,13 @@ class CarrerasSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'nombre',
-            'directores_carreras_id',
-            'id_directores_carreras',
-            'directores_carreras',
+            'director',
+            'director_id',
         ]
 
 class EstudiantesSerializer(serializers.ModelSerializer):
     class Meta:
         model = Estudiantes
-        fields = '__all__'
-
-class AsesoresPedagogicosSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = AsesoresPedagogicos
         fields = '__all__'
 
 class SolicitudesSerializer(serializers.ModelSerializer):
@@ -142,4 +141,3 @@ class AjusteAsignadoSerializer(serializers.ModelSerializer):
     class Meta:
         model = AjusteAsignado
         fields = '__all__'
-

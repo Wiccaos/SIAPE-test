@@ -16,6 +16,7 @@ class Usuario(AbstractUser):
     
     def __str__(self):
         return f'{self.first_name} {self.last_name}'
+    
 
 # --- Modelos Base ---
 
@@ -45,30 +46,46 @@ class CategoriasAjustes(models.Model):
         return self.nombre_categoria
 
 # --- Modelos con dependencias ---
-
-class Docentes(models.Model):
-    usuarios = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    areas = models.ForeignKey(Areas, on_delete=models.CASCADE)
-    roles = models.ForeignKey(Roles, on_delete=models.CASCADE)
+class PerfilUsuario(models.Model):
+    usuario = models.OneToOneField(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE,
+        related_name="perfil"
+    )
+    
+    # Se define el rol del usuario
+    rol = models.ForeignKey(
+        Roles, 
+        on_delete=models.SET_NULL, # Más seguro que CASCADE
+        null=True, 
+        blank=True
+    )
+    
+    area = models.ForeignKey(
+        Areas, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True
+    )
+    
     class Meta:
-        db_table = 'docentes'
+        db_table = 'perfiles_usuario'
 
     def __str__(self):
-        return f"{self.usuarios.first_name} {self.usuarios.last_name}"
-
-class DirectoresCarreras(models.Model):
-    usuarios = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    areas = models.ForeignKey(Areas, on_delete=models.CASCADE)
-    roles = models.ForeignKey(Roles, on_delete=models.CASCADE)
-    class Meta:
-        db_table = 'directores_carreras'
-
-    def __str__(self):
-        return f"{self.usuarios.first_name} {self.usuarios.last_name}"
+        rol_nombre = self.rol.nombre_rol if self.rol else "Sin Rol"
+        return f"{self.usuario.first_name} {self.usuario.last_name} ({rol_nombre})"
 
 class Carreras(models.Model):
     nombre = models.CharField(max_length=191)
-    directores_carreras = models.ForeignKey(DirectoresCarreras, on_delete=models.CASCADE)
+    director = models.ForeignKey(
+            PerfilUsuario, 
+            on_delete=models.SET_NULL,
+            null=True,
+            blank=True,
+            related_name="carreras_dirigidas",
+            limit_choices_to={'rol__nombre_rol': 'Director de Carrera'}
+        )
+
     class Meta:
         db_table = 'carreras'
 
@@ -89,20 +106,16 @@ class Estudiantes(models.Model):
     def __str__(self):
         return f"{self.nombres} {self.apellidos}"
 
-class AsesoresPedagogicos(models.Model):
-    usuarios = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    roles = models.ForeignKey(Roles, on_delete=models.CASCADE)
-    class Meta:
-        db_table = 'asesores_pedagogicos'
-
-    def __str__(self):
-        return f"{self.usuarios.first_name} {self.usuarios.last_name}"
 
 class Solicitudes(models.Model):
     asunto = models.CharField(max_length=191)
     created_at = models.DateTimeField(auto_now_add=True) 
     estudiantes = models.ForeignKey(Estudiantes, on_delete=models.CASCADE)
-    asesores_pedagogicos = models.ForeignKey(AsesoresPedagogicos, on_delete=models.CASCADE)
+    asesor_pedagogico = models.ForeignKey(
+        PerfilUsuario,
+        on_delete=models.CASCADE,
+        limit_choices_to={'rol__nombre_rol': 'Asesor Pedagógico'}
+        )
     class Meta:
         db_table = 'solicitudes'
 
@@ -123,7 +136,11 @@ class Asignaturas(models.Model):
     nombre = models.CharField(max_length=150)
     seccion = models.CharField(max_length=150)
     carreras = models.ForeignKey(Carreras, on_delete=models.CASCADE)
-    docentes = models.ForeignKey(Docentes, on_delete=models.CASCADE)
+    docente = models.ForeignKey(
+            PerfilUsuario, 
+            on_delete=models.CASCADE,
+            limit_choices_to={'rol__nombre_rol': 'Docente'}
+        )
     class Meta:
         db_table = 'asignaturas'
 
@@ -144,8 +161,13 @@ class Entrevistas(models.Model):
     fecha = models.DateTimeField()
     modalidad = models.CharField(max_length=100)
     notas = models.TextField()
-    asesores_pedagogicos = models.ForeignKey(AsesoresPedagogicos, on_delete=models.CASCADE)
     solicitudes = models.ForeignKey(Solicitudes, on_delete=models.CASCADE)
+    asesor_pedagogico = models.ForeignKey(
+        PerfilUsuario,
+        on_delete=models.CASCADE,
+        limit_choices_to={'rol__nombre_rol': 'Asesor Pedagógico'}
+        )
+
     class Meta:
         db_table = 'entrevistas'
 

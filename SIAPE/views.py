@@ -1,7 +1,14 @@
 from django.shortcuts import render
 from rest_framework import viewsets
-from .serializer import UsuarioSerializer, RolesSerializer, AreasSerializer, CategoriasAjustesSerializer, DocentesSerializer, DirectoresCarrerasSerializer, CarrerasSerializer, EstudiantesSerializer, AsesoresPedagogicosSerializer, SolicitudesSerializer, EvidenciasSerializer, AsignaturasSerializer, AsignaturasEnCursoSerializer, EntrevistasSerializer, AjusteRazonableSerializer, AjusteAsignadoSerializer
-from .models import Usuario, Roles, Areas, CategoriasAjustes, Docentes, DirectoresCarreras, Carreras, Estudiantes, AsesoresPedagogicos, Solicitudes, Evidencias, Asignaturas, AsignaturasEnCurso, Entrevistas, AjusteRazonable, AjusteAsignado
+from .serializer import (
+    UsuarioSerializer, PerfilUsuarioSerializer, RolesSerializer, AreasSerializer, CategoriasAjustesSerializer, CarrerasSerializer,
+    EstudiantesSerializer, SolicitudesSerializer, EvidenciasSerializer, AsignaturasSerializer, AsignaturasEnCursoSerializer, 
+    AjusteRazonableSerializer, AjusteAsignadoSerializer, EntrevistasSerializer
+)
+from .models import(
+    Usuario, PerfilUsuario, Roles, Areas, CategoriasAjustes, Carreras, Estudiantes, Solicitudes, Evidencias,
+    Asignaturas, AsignaturasEnCurso, Entrevistas, AjusteRazonable, AjusteAsignado
+)  
 from rest_framework.authentication import SessionAuthentication 
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -65,18 +72,6 @@ class CategoriasAjustesViewSet(viewsets.ModelViewSet):
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
-class DocentesViewSet(viewsets.ModelViewSet):
-    queryset = Docentes.objects.all()
-    serializer_class = DocentesSerializer
-    authentication_classes = [SessionAuthentication]
-    permission_classes = [IsAuthenticated]
-
-class DirectoresCarrerasViewSet(viewsets.ModelViewSet):
-    queryset = DirectoresCarreras.objects.all()
-    serializer_class = DirectoresCarrerasSerializer
-    authentication_classes = [SessionAuthentication]
-    permission_classes = [IsAuthenticated]
-
 class CarrerasViewSet(viewsets.ModelViewSet):
     queryset = Carreras.objects.all()
     serializer_class = CarrerasSerializer
@@ -86,12 +81,6 @@ class CarrerasViewSet(viewsets.ModelViewSet):
 class EstudiantesViewSet(viewsets.ModelViewSet):
     queryset = Estudiantes.objects.all()
     serializer_class = EstudiantesSerializer
-    authentication_classes = [SessionAuthentication]
-    permission_classes = [IsAuthenticated]
-
-class AsesoresPedagogicosViewSet(viewsets.ModelViewSet):
-    queryset = AsesoresPedagogicos.objects.all()
-    serializer_class = AsesoresPedagogicosSerializer
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -137,3 +126,8 @@ class AjusteAsignadoViewSet(viewsets.ModelViewSet):
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
+class PerfilUsuarioViewSet(viewsets.ModelViewSet):
+    queryset = PerfilUsuario.objects.all()
+    serializer_class = PerfilUsuarioSerializer
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAuthenticated]
