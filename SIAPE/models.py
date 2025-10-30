@@ -1,21 +1,74 @@
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.conf import settings
+import uuid
 
 # --- Modelo Usuario ---
+class UsuarioManager(BaseUserManager):
+    """
+    Manager personalizado para el modelo Usuario donde el email es
+    el identificador único en lugar del username.
+    """
+    
+    def create_user(self, email, password=None, **extra_fields):
+        """
+        Crea y guarda un Usuario con el email y password dados.
+        """
+        if not email:
+            raise ValueError('El Email debe ser proporcionado')
+        
+        email = self.normalize_email(email)
+        username = str(uuid.uuid4()) 
+        
+        user = self.model(
+            email=email, 
+            username=username,
+            **extra_fields
+        )
+        
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        """
+        Crea y guarda un Superusuario con el email y password dados.
+        """
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('is_active', True)
+
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser debe tener is_staff=True.')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser debe tener is_superuser=True.')
+        
+        return self.create_user(email, password, **extra_fields)
+
 class Usuario(AbstractUser):
+    username = models.CharField(
+        max_length=150, 
+        unique=True, 
+        default=uuid.uuid4,
+        editable=False
+    )
+
     email = models.EmailField(max_length=191, unique=True)
     rut = models.CharField(max_length=20, unique=True)
     numero = models.IntegerField(null=True, blank=True,)
-    
+
+    # Configuración para usar email como identificador único
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username', 'first_name', 'last_name', 'rut']
+    REQUIRED_FIELDS = ['first_name', 'last_name', 'rut']
+
+    # Asignar el manager personalizado 
+    objects = UsuarioManager()
     
     class Meta:
         db_table = 'usuarios'
     
     def __str__(self):
-        return f'{self.first_name} {self.last_name}'
+        return f'{self.first_name} {self.last_name}, {self.email}'
     
 
 # --- Modelos Base ---
@@ -72,8 +125,7 @@ class PerfilUsuario(models.Model):
         db_table = 'perfiles_usuario'
 
     def __str__(self):
-        rol_nombre = self.rol.nombre_rol if self.rol else "Sin Rol"
-        return f"{self.usuario.first_name} {self.usuario.last_name} ({rol_nombre})"
+        return f"{self.usuario.first_name} {self.usuario.last_name}"
 
 class Carreras(models.Model):
     nombre = models.CharField(max_length=191)

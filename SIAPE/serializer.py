@@ -6,9 +6,24 @@ from .models import (
 )
 
 class UsuarioSerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField(label='Nombre')
+    last_name = serializers.CharField(label='Apellido')
+    email = serializers.EmailField(label='Email')
+    rut = serializers.CharField(label='RUT')
+    numero = serializers.CharField(label='Número Telefónico')
+    password = serializers.CharField(label='Contraseña')
+
     class Meta:
         model = Usuario
-        fields = '__all__'
+        fields = [
+            'id',
+            'first_name',
+            'last_name',
+            'email',
+            'rut',
+            'numero',
+            'password',
+        ]
 
 class RolesSerializer(serializers.ModelSerializer):
     nombre_rol = serializers.CharField(max_length=100, label='Nombre')
@@ -103,9 +118,30 @@ class CarrerasSerializer(serializers.ModelSerializer):
         ]
 
 class EstudiantesSerializer(serializers.ModelSerializer):
+    
+    # --- Campo de Lectura (Read-only) ---
+    carreras = serializers.StringRelatedField(read_only=True)
+    
+    # --- Campo de Escritura (Write-only) ---
+    carrera_id = serializers.PrimaryKeyRelatedField(
+        queryset=Carreras.objects.all(),
+        source='carreras',
+        write_only=True,
+        label='Carrera'
+    )
+
     class Meta:
         model = Estudiantes
-        fields = '__all__'
+        fields = [
+            'id', 
+            'nombres', 
+            'apellidos', 
+            'rut', 
+            'email', 
+            'numero', 
+            'carreras',
+            'carrera_id',
+        ]
 
 class SolicitudesSerializer(serializers.ModelSerializer):
     class Meta:
@@ -118,14 +154,66 @@ class EvidenciasSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class AsignaturasSerializer(serializers.ModelSerializer):
+    # --- Campos de Lectura (Read-only) ---
+    carreras = serializers.StringRelatedField(read_only=True)
+    docente = serializers.StringRelatedField(read_only=True)
+
+    # --- Campos de Escritura (Write-only) ---
+    carrera_id = serializers.PrimaryKeyRelatedField(
+        queryset=Carreras.objects.all(),
+        source='carreras',
+        write_only=True,
+        label='Carrera'
+    )
+    docente_id = serializers.PrimaryKeyRelatedField(
+        queryset=PerfilUsuario.objects.filter(rol__nombre_rol='Docente'),
+        source='docente',
+        write_only=True,
+        label='Docente'
+    )
+
     class Meta:
         model = Asignaturas
-        fields = '__all__'
+        fields = [
+            'id',
+            'nombre',
+            'seccion',
+            'carreras',
+            'docente',
+            'carrera_id',
+            'docente_id',
+        ]
 
 class AsignaturasEnCursoSerializer(serializers.ModelSerializer):
+    # --- Campos de Lectura (Read-only) ---
+    estado = serializers.CharField(max_length=100, label='Estado de la Asignatura')
+    estudiantes = serializers.StringRelatedField(read_only=True)
+    asignaturas = serializers.StringRelatedField(read_only=True)
+
+    # --- Campos de Escritura (Write-only) ---
+    estudiante_id = serializers.PrimaryKeyRelatedField(
+        queryset=Estudiantes.objects.all(),
+        source='estudiantes',
+        write_only=True,
+        label='Estudiante'
+    )
+    asignatura_id = serializers.PrimaryKeyRelatedField(
+        queryset=Asignaturas.objects.all(),
+        source='asignaturas',
+        write_only=True,
+        label='Asignatura'
+    )
+
     class Meta:
         model = AsignaturasEnCurso
-        fields = '__all__'
+        fields = [
+            'id',
+            'estado',
+            'estudiantes',
+            'asignaturas',
+            'estudiante_id',
+            'asignatura_id',
+        ]
 
 class EntrevistasSerializer(serializers.ModelSerializer):
     class Meta:
