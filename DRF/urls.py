@@ -15,10 +15,43 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
+from django.urls import include, path
+from django.contrib.auth import views as auth_views
+from rest_framework import permissions
+from SIAPE import views
+from drf_yasg.views import get_schema_view
+from drf_yasg import openapi
+
+schema_view = get_schema_view(
+    openapi.Info(
+        title="Documentación SIAPE",
+        default_version="v1",
+        description="Sistema Institucional de Apoyos Perzonalizados para Estudiantes",
+        terms_of_service="https://google.com/policies/terms/",
+        contact=openapi.Contact(email="wiccaos.moon@outlook.com"),
+        license=openapi.License(name="BSD License"),
+    ),
+    public=True
+)
+
 
 urlpatterns = [
+    # Admin site
     path('admin/', admin.site.urls),
+    path('', views.pag_inicio, name='home'),
+
+    # URL's de la app SIAPE
+    path('SIAPE/', include('SIAPE.urls')),
+
+    # URLs documentación
+    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+
+    # URL's de autenticación
+    path('accounts/', include('django.contrib.auth.urls')),
+    path('login/', auth_views.LoginView.as_view(), name='login'),
+    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
+    # path('registro/', views.registro, name='registro'),
 ]
 
 from django.conf import settings

@@ -65,7 +65,7 @@ ROOT_URLCONF = 'DRF.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -82,23 +82,6 @@ WSGI_APPLICATION = 'DRF.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
-# DATABASES = {
-#     'default': {
-#         'ENGINE': config('DB_ENGINE'),
-#         'NAME': config('DB_NAME'),
-#         'USER': config('DB_USER'),
-#         'PASSWORD': config('DB_PASSWORD'),
-#         'HOST': config('DB_HOST'),
-#         'PORT': config('DB_PORT'),
-#         'OPTIONS': {
-#             'init_command': {
-#                 'sql_mode': "SET sql_mode='STRICT_TRANS_TABLES'",
-#                 'innodb_settings': "SET innodb_strict_mode=1, innodb_default_row_format='DYNAMIC', innodb_file_format='Barracuda', innodb_file_per_table=ON"
-#             }
-#         }
-#     }
-# }
 
 DATABASES = {
     'default': {
@@ -151,7 +134,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [BASE_DIR / "static"]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -163,3 +147,13 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # URL pulbica para el navegador
 MEDIA_URL = '/media/'
+
+# Redireccionar al inicio despues de login
+LOGIN_REDIRECT_URL = '/' 
+
+# SESSION expira después de 1 hora
+SESSION_COOKIE_AGE = 3600
+# SESSION expira al cerrar el navegador
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+# Usamos la DB para SESSION
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'

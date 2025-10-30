@@ -15,7 +15,7 @@ class Usuario(AbstractUser):
         db_table = 'usuarios'
     
     def __str__(self):
-        return self.email or self.rut
+        return f'{self.first_name} {self.last_name}'
 
 # --- Modelos Base ---
 
@@ -47,7 +47,6 @@ class CategoriasAjustes(models.Model):
 # --- Modelos con dependencias ---
 
 class Docentes(models.Model):
-    rol = models.CharField(max_length=50)
     usuarios = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     areas = models.ForeignKey(Areas, on_delete=models.CASCADE)
     roles = models.ForeignKey(Roles, on_delete=models.CASCADE)
@@ -58,7 +57,6 @@ class Docentes(models.Model):
         return f"{self.usuarios.first_name} {self.usuarios.last_name}"
 
 class DirectoresCarreras(models.Model):
-    rol = models.CharField(max_length=50)
     usuarios = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     areas = models.ForeignKey(Areas, on_delete=models.CASCADE)
     roles = models.ForeignKey(Roles, on_delete=models.CASCADE)
@@ -108,8 +106,8 @@ class Solicitudes(models.Model):
     class Meta:
         db_table = 'solicitudes'
 
-def __str__(self):
-        return f"Solicitud de {self.estudiantes}: {self.asunto}"
+    def __str__(self):
+            return f"Solicitud de {self.estudiantes}: {self.asunto}"
 
 class Evidencias(models.Model):
     archivo = models.FileField(upload_to='evidencias/') 
@@ -169,5 +167,5 @@ class AjusteAsignado(models.Model):
     class Meta:
         db_table = 'ajuste_asignado'
 
-    def __str__(self): # <-- NUEVO
+    def __str__(self):
         return f"Ajuste asignado a {self.solicitudes}"
