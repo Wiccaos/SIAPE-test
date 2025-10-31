@@ -98,6 +98,7 @@ class CarrerasSerializer(serializers.ModelSerializer):
 
     # --- Campo de Lectura ---
     director = serializers.StringRelatedField(read_only=True)
+    area = serializers.StringRelatedField(read_only=True)
 
     # --- Campo de Escritura ---
     director_id = serializers.PrimaryKeyRelatedField(
@@ -107,6 +108,12 @@ class CarrerasSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True
     )
+    area_id = serializers.PrimaryKeyRelatedField(
+        queryset=Areas.objects.all(),
+        source='area',
+        write_only=True,
+        required=True,
+    )
 
     class Meta:
         model = Carreras
@@ -115,6 +122,8 @@ class CarrerasSerializer(serializers.ModelSerializer):
             'nombre',
             'director',
             'director_id',
+            'area',
+            'area_id'
         ]
 
 class EstudiantesSerializer(serializers.ModelSerializer):
@@ -186,33 +195,17 @@ class AsignaturasSerializer(serializers.ModelSerializer):
 
 class AsignaturasEnCursoSerializer(serializers.ModelSerializer):
     # --- Campos de Lectura (Read-only) ---
-    estado = serializers.CharField(max_length=100, label='Estado de la Asignatura')
-    estudiantes = serializers.StringRelatedField(read_only=True)
-    asignaturas = serializers.StringRelatedField(read_only=True)
-
-    # --- Campos de Escritura (Write-only) ---
-    estudiante_id = serializers.PrimaryKeyRelatedField(
-        queryset=Estudiantes.objects.all(),
-        source='estudiantes',
-        write_only=True,
-        label='Estudiante'
-    )
-    asignatura_id = serializers.PrimaryKeyRelatedField(
-        queryset=Asignaturas.objects.all(),
-        source='asignaturas',
-        write_only=True,
-        label='Asignatura'
-    )
+    estudiantes = serializers.StringRelatedField(read_only = True)
+    estado = serializers.StringRelatedField (read_only = True)
+    asignaturas = serializers.StringRelatedField (read_only = True)
 
     class Meta:
         model = AsignaturasEnCurso
         fields = [
             'id',
-            'estado',
             'estudiantes',
+            'estado',
             'asignaturas',
-            'estudiante_id',
-            'asignatura_id',
         ]
 
 class EntrevistasSerializer(serializers.ModelSerializer):
@@ -229,3 +222,92 @@ class AjusteAsignadoSerializer(serializers.ModelSerializer):
     class Meta:
         model = AjusteAsignado
         fields = '__all__'
+
+class PublicaSolicitudSerializer(serializers.Serializer):
+    # --- Campos para el modelo Estudiantes ---
+    nombres = serializers.CharField(max_length=191)
+    apellidos = serializers.CharField(max_length=191)
+    rut = serializers.CharField(max_length=20)
+    email = serializers.EmailField(max_length=191)
+    numero = serializers.IntegerField(required=False, allow_null=True, label="Teléfono (opcional)")
+    carrera_id = serializers.PrimaryKeyRelatedField(
+        queryset=Carreras.objects.all(),
+        label="Carrera"
+    )
+    
+    # --- Campos para el modelo Solicitudes ---
+    asunto = serializers.CharField(max_length=191)
+    descripcion = serializers.CharField(
+        style={'base_template': 'textarea.html'}, 
+        label="Descripción Detallada"
+    )
+    autorizacion_datos = serializers.BooleanField(
+        label="Autorizo el tratamiento de mis datos personales"
+    )
+    
+    # --- Campos para las relaciones ---
+    asignaturas_solicitadas_ids = serializers.ListField(
+        child=serializers.PrimaryKeyRelatedField(queryset=Asignaturas.objects.all()),
+        label="Ramos para los que solicita ajuste (IDs)",
+        required=False,
+        allow_empty=True
+    )
+    documentos_adjuntos = serializers.ListField(
+        child=serializers.FileField(),
+        label="Documentos adjuntos (evidencia)",
+        write_only=True,
+        required=False,
+        allow_empty=True
+    )
+
+    def validate_autorizacion_datos(self, value):
+        """ Valida que el checkbox de autorización esté marcado. """
+        if value is not True:
+            raise serializers.ValidationError(
+                "Debe aceptar las políticas de privacidad y términos de servicio."
+            )
+        return value
+        
+    def validate_rut(self, value):
+        # (Aquí puedes añadir tu lógica de validación de RUT chileno si quieres)
+        rut_limpio = value.strip().replace(".", "").replace("-", "")
+        return rut_limpio
+
+    def create(self, validated_data):
+
+        datos_estudiante = {
+            'nombres': validated_data['nombres'],
+            'apellidos': validated_data['apellidos'],
+            'email': validated_data['email'],
+            'numero': validated_data.get('numero'),
+            'carreras': validated_data['carrera_id']
+        }
+        datos_solicitud = {
+            'asunto': validated_data['asunto'],
+            'descripcion': validated_data['descripcion'],
+            'autorizacion_datos': validated_data['autorizacion_datos'],
+        }
+        archivos = validated_data.get('documentos_adjuntos', [])
+        asignaturas_objs = validated_data.get('asignaturas_solicitadas_ids', []) # Ya son objetos
+
+        estudiante, created = Estudiantes.objects.update_or_create(
+            rut=validated_data['rut'],
+            defaults=datos_estudiante
+        )
+
+        solicitud = Solicitudes.objects.create(
+            estudiantes=estudiante, 
+            **datos_solicitud
+        )
+
+        if asignaturas_objs:
+            solicitud.asignaturas_solicitadas.set(asignaturas_objs)
+            
+        for archivo in archivos:
+            Evidencias.objects.create(
+                solicitudes=solicitud,
+                estudiantes=estudiante,
+                archivo=archivo
+            )
+            
+        return solicitud

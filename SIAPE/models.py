@@ -7,7 +7,7 @@ import uuid
 class UsuarioManager(BaseUserManager):
     """
     Manager personalizado para el modelo Usuario donde el email es
-    el identificador único en lugar del username.
+    el identificador único.
     """
     
     def create_user(self, email, password=None, **extra_fields):
@@ -106,10 +106,9 @@ class PerfilUsuario(models.Model):
         related_name="perfil"
     )
     
-    # Se define el rol del usuario
     rol = models.ForeignKey(
         Roles, 
-        on_delete=models.SET_NULL, # Más seguro que CASCADE
+        on_delete=models.SET_NULL,
         null=True, 
         blank=True
     )
@@ -137,6 +136,13 @@ class Carreras(models.Model):
             related_name="carreras_dirigidas",
             limit_choices_to={'rol__nombre_rol': 'Director de Carrera'}
         )
+    area = models.ForeignKey(
+        Areas, 
+        on_delete=models.SET_NULL,
+        null=True, 
+        blank=True,
+        related_name="carreras"
+    )
 
     class Meta:
         db_table = 'carreras'
@@ -161,13 +167,23 @@ class Estudiantes(models.Model):
 
 class Solicitudes(models.Model):
     asunto = models.CharField(max_length=191)
+    descripcion = models.TextField(blank=True, null=True)
+    autorizacion_datos = models.BooleanField(default=False)
+    asignaturas_solicitadas = models.ManyToManyField(
+        'Asignaturas',
+        related_name="solicitudes_de_ajuste",
+        blank=True
+    )
     created_at = models.DateTimeField(auto_now_add=True) 
-    estudiantes = models.ForeignKey(Estudiantes, on_delete=models.CASCADE)
-    asesor_pedagogico = models.ForeignKey(
-        PerfilUsuario,
-        on_delete=models.CASCADE,
-        limit_choices_to={'rol__nombre_rol': 'Asesor Pedagógico'}
-        )
+    estudiantes = models.ForeignKey('Estudiantes', on_delete=models.CASCADE) 
+    asesores_pedagogicos = models.ForeignKey(
+        'PerfilUsuario', 
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        limit_choices_to={'rol__nombre_rol': 'Asesor Pedagogico'}
+    )
+    
     class Meta:
         db_table = 'solicitudes'
 
@@ -184,6 +200,8 @@ class Evidencias(models.Model):
     def __str__(self):
         return self.archivo.name
 
+
+
 class Asignaturas(models.Model):
     nombre = models.CharField(max_length=150)
     seccion = models.CharField(max_length=150)
@@ -199,15 +217,28 @@ class Asignaturas(models.Model):
     def __str__(self):
         return f"{self.nombre} {self.seccion}"
 
+# estado para las Asignaturas
+ESTADO_CURSO_CHOICES = (
+    (True, 'Activo'),      # True se guarda en la DB, 'Activo' es legible
+    (False, 'Inactivo'),   # False se guarda en la DB, 'Inactivo' es legible
+)
+
 class AsignaturasEnCurso(models.Model):
-    estado = models.BooleanField()
+    # 2. Modificar el campo para usar las opciones
+    estado = models.BooleanField(
+        choices=ESTADO_CURSO_CHOICES,
+        default=True,  # Asumimos que al inicio está activo
+        verbose_name="Estado de la Asignatura"
+    )
     estudiantes = models.ForeignKey(Estudiantes, on_delete=models.CASCADE)
     asignaturas = models.ForeignKey(Asignaturas, on_delete=models.CASCADE)
+    
     class Meta:
         db_table = 'asignaturas_en_curso'
 
     def __str__(self):
-        return f"{self.estudiantes} cursando {self.asignaturas}"
+        # Opcional: Usar get_FOO_display() para mostrar el estado legible
+        return f"{self.estudiantes} cursando {self.asignaturas} ({self.get_estado_display()})"
 
 class Entrevistas(models.Model):
     fecha = models.DateTimeField()

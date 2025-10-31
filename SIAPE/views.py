@@ -1,5 +1,14 @@
-from django.shortcuts import render
-from rest_framework import viewsets
+# Django
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.contrib.auth.forms import UserCreationForm
+
+from rest_framework import (
+    viewsets, mixins, status
+)
+
+# APP
 from .serializer import (
     UsuarioSerializer, PerfilUsuarioSerializer, RolesSerializer, AreasSerializer, CategoriasAjustesSerializer, CarrerasSerializer,
     EstudiantesSerializer, SolicitudesSerializer, EvidenciasSerializer, AsignaturasSerializer, AsignaturasEnCursoSerializer, 
@@ -9,15 +18,42 @@ from .models import(
     Usuario, PerfilUsuario, Roles, Areas, CategoriasAjustes, Carreras, Estudiantes, Solicitudes, Evidencias,
     Asignaturas, AsignaturasEnCurso, Entrevistas, AjusteRazonable, AjusteAsignado
 )  
+
+# Django-restframework
 from rest_framework.authentication import SessionAuthentication 
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from django.contrib.auth.forms import UserCreationForm
-from django.shortcuts import redirect
-from rest_framework .permissions import IsAuthenticated
+from rest_framework .permissions import IsAuthenticated, AllowAny, IsAdminUser
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser
+from .permissions import IsAsesorPedagogico
 
+# ----------------------------------------------
+#           Vistas Publicas del Sistema
+# ----------------------------------------------
 
-# Create your views here.
+class PublicSolicitudCreateView(APIView):
+    """
+    Endpoint público para que el Estudiante
+    pueda enviar un formulario de solicitud de ajuste.
+    """
+    permission_classes = [AllowAny]
+    parser_classes = (MultiPartParser, FormParser)
+
+    def post(self, request, *args, **kwargs):
+        serializer = PublicaSolicitudSerializer(data=request.data)
+        if serializer.is_valid():
+            solicitud = serializer.save()
+            return Response(
+                {"message": "Solicitud creada con éxito."},
+                status=status.HTTP_2_CREATED
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# ----------------------------------------------
+#           Vistas PRivadas del Sistema
+# ----------------------------------------------
+
+# ----------- Vistas para la página ------------
 @login_required 
 def pag_inicio(request):
     return render(request, 'SIAPE/inicio.html')
@@ -47,6 +83,8 @@ def logout_view(request):
     logout(request)
     # Redirige a la página de inicio de sesión
     return redirect('login') 
+
+# ----------- Vistas de los modelos ------------
 
 class UsuarioViewSet(viewsets.ModelViewSet):
     queryset = Usuario.objects.all()
@@ -84,11 +122,17 @@ class EstudiantesViewSet(viewsets.ModelViewSet):
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
-class SolicitudesViewSet(viewsets.ModelViewSet):
-    queryset = Solicitudes.objects.all()
+class SolicitudesViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet
+):
+    
+    queryset = Solicitudes.objects.all().order_by('-created_at')
     serializer_class = SolicitudesSerializer
-    authentication_classes = [SessionAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAsesorPedagogico | IsAdminUser]
 
 class EvidenciasViewSet(viewsets.ModelViewSet):
     queryset = Evidencias.objects.all()
