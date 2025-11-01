@@ -1,0 +1,186 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solicitud de Apoyo Personalizado | SIAPE</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .container { max-width: 700px; margin: auto; padding: 20px; border: 1px solid #ccc; }
+        div { margin-bottom: 10px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], input[type="email"], textarea, select {
+            width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ddd;
+        }
+        button[type="submit"] { background-color: #007bff; color: white; padding: 10px 15px; border: none; cursor: pointer; margin-top: 15px; }
+        #mensaje { margin-top: 20px; padding: 10px; border: 1px solid; display: none; }
+        #mensaje.exito { background-color: #d4edda; color: #155724; border-color: #c3e6cb; }
+        #mensaje.error { background-color: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Formulario de Solicitud de Apoyo Personalizado</h1>
+        <p>Por favor, completa tus datos para iniciar el proceso de ajuste razonable. Los campos marcados con (*) son obligatorios.</p>
+
+        <form id="solicitud-form" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <h3>1. Identificación y Contacto</h3>
+            
+            <div>
+                <label for="nombres">Nombres (*):</label>
+                <input type="text" id="nombres" name="nombres" required>
+            </div>
+            <div>
+                <label for="apellidos">Apellidos (*):</label>
+                <input type="text" id="apellidos" name="apellidos" required>
+            </div>
+            <div>
+                <label for="rut">RUT (sin puntos, con guion: 12345678-K) (*):</label>
+                <input type="text" id="rut" name="rut" placeholder="Ej: 12345678-K" required>
+            </div>
+            <div>
+                <label for="email">Correo Electrónico (*):</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            <div>
+                <label for="numero">Teléfono (Opcional):</label>
+                <input type="text" id="numero" name="numero" placeholder="Ej: 987654321">
+            </div>
+            <div>
+                <label for="carrera_id">Tu Carrera (*):</label>
+                <select id="carrera_id" name="carrera_id" required>
+                    <option value="">-- Selecciona tu carrera --</option>
+                    {% for c in carreras %}
+                        <option value="{{ c.id }}">{{ c.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <h3>2. Detalle de la Solicitud</h3>
+
+            <div>
+                <label for="asunto">Asunto o Título de la Solicitud (*):</label>
+                <input type="text" id="asunto" name="asunto" required>
+            </div>
+            <div>
+                <label for="descripcion">Descripción Detallada (*):</label>
+                <textarea id="descripcion" name="descripcion" rows="6" required></textarea>
+                <small>Explica tu necesidad específica, las asignaturas afectadas y el tipo de apoyo que requieres.</small>
+            </div>
+            
+            <div>
+                <label for="asignaturas_solicitadas_ids">Ramos/Asignaturas Específicas para el Ajuste (Opcional):</label>
+                <select id="asignaturas_solicitadas_ids" name="asignaturas_solicitadas_ids" multiple size="5">
+                    {% for a in asignaturas %}
+                        <option value="{{ a.id }}">{{ a.nombre }} ({{ a.seccion }})</option>
+                    {% endfor %}
+                </select>
+                <small>Mantén la tecla Ctrl (o Cmd) presionada para seleccionar varios.</small>
+            </div>
+
+            <div>
+                <label for="documentos_adjuntos">Documentos de Respaldo (Evidencia, Opcional):</label>
+                <input type="file" id="documentos_adjuntos" name="documentos_adjuntos" multiple>
+                <small>Máximo 5 archivos.</small>
+            </div>
+
+            <hr>
+            <div>
+                <input type="checkbox" id="autorizacion_datos" name="autorizacion_datos" required>
+                <label for="autorizacion_datos" style="display: inline; font-weight: normal;">
+                    Autorizo el tratamiento de mis datos personales sensibles según las políticas de privacidad. (*)
+                </label>
+            </div>
+
+            <button type="submit" id="submit-button">Enviar Solicitud de Apoyo</button>
+        </form>
+
+        <div id="mensaje"></div>
+
+    </div>
+
+    <script>
+        const form = document.getElementById('solicitud-form');
+        const mensajeDiv = document.getElementById('mensaje');
+        const submitButton = document.getElementById('submit-button');
+
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        form.addEventListener('submit', async function(e) {
+            
+            e.preventDefault();
+            
+            submitButton.disabled = true;
+            submitButton.innerText = "Enviando Solicitud, espere...";
+            mensajeDiv.style.display = 'none';
+
+            const formData = new FormData(form);
+            
+            // Lógica para manejar campos Múltiples
+            // a) Asignaturas
+            const selectAsignaturas = document.getElementById('asignaturas_solicitadas_ids');
+            formData.delete('asignaturas_solicitadas_ids');
+            for (const option of selectAsignaturas.options) {
+                if (option.selected) {
+                    formData.append('asignaturas_solicitadas_ids', option.value);
+                }
+            }
+
+            // b) Archivos
+            const inputArchivos = document.getElementById('documentos_adjuntos');
+            formData.delete('documentos_adjuntos'); 
+            for (const file of inputArchivos.files) {
+                formData.append('documentos_adjuntos', file);
+            }
+            // Fin de la Lógica de corrección ---
+
+            try {
+                // Endpoint público: /SIAPE/solicitud-publica/
+                const response = await fetch('/SIAPE/solicitud-publica/', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                    'X-CSRFToken': csrfToken
+                }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) { 
+                    // Éxito (HTTP 201 Created)
+                    mensajeDiv.className = 'exito';
+                    mensajeDiv.innerHTML = `<strong>¡Solicitud enviada con éxito!</strong> El proceso ha iniciado. Tu RUT (${formData.get('rut')}) será usado como ID de seguimiento.`;
+                    mensajeDiv.style.display = 'block';
+                    form.reset(); 
+                } else {
+                    // Error de validación (HTTP 400 Bad Request)
+                    mensajeDiv.className = 'error';
+                    
+                    let errores = "<strong>Error de Validación:</strong><ul>";
+                    for (const [campo, mensajes] of Object.entries(data)) {
+                        errores += `<li><strong>${campo.toUpperCase()}:</strong> ${mensajes[0]}</li>`;
+                    }
+                    errores += "</ul>";
+                    mensajeDiv.innerHTML = errores;
+                    mensajeDiv.style.display = 'block';
+                }
+
+            } catch (error) {
+                // Error de red o del servidor
+                mensajeDiv.className = 'error';
+                mensajeDiv.innerText = 'Error de conexión con el servidor. Inténtalo de nuevo.';
+                mensajeDiv.style.display = 'block';
+                console.error('Error:', error);
+            }
+
+            submitButton.disabled = false;
+            submitButton.innerText = "Enviar Solicitud de Apoyo";
+        });
+    </script>
+
+</body>
+</html>
