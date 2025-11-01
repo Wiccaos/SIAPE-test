@@ -167,7 +167,7 @@ class Estudiantes(models.Model):
 
 class Solicitudes(models.Model):
     asunto = models.CharField(max_length=191)
-    descripcion = models.TextField(blank=True, null=True)
+    descripcion = models.TextField(blank=True, default='')
     autorizacion_datos = models.BooleanField(default=False)
     asignaturas_solicitadas = models.ManyToManyField(
         'Asignaturas',
