@@ -6,6 +6,7 @@ from .models import (
 )
 
 class UsuarioSerializer(serializers.ModelSerializer):
+    # --- Lectura y Escritura ---
     first_name = serializers.CharField(label='Nombre')
     last_name = serializers.CharField(label='Apellido')
     email = serializers.EmailField(label='Email')
@@ -26,6 +27,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
         ]
 
 class RolesSerializer(serializers.ModelSerializer):
+    # --- Lectura y Escritura ---
     nombre_rol = serializers.CharField(max_length=100, label='Nombre')
 
     class Meta:
@@ -36,6 +38,7 @@ class RolesSerializer(serializers.ModelSerializer):
         ]
 
 class AreasSerializer(serializers.ModelSerializer):
+    #  --- Lectura y Escritura
     nombre = serializers.CharField(max_length=100, label='Nombre del Área')
 
     class Meta:
@@ -56,14 +59,14 @@ class CategoriasAjustesSerializer(serializers.ModelSerializer):
         ]
 
 class PerfilUsuarioSerializer(serializers.ModelSerializer):
-    # --- Campos de Lectura (Read-only) ---
+    # --- Lectura  ---
     first_name = serializers.CharField(source='usuario.first_name', read_only=True, label='Nombre')
     last_name = serializers.CharField(source='usuario.last_name', read_only=True, label='Apellido')
     email = serializers.EmailField(source='usuario.email', read_only=True, label='Email')
     rol = serializers.CharField(source='rol.nombre_rol', read_only=True, label='Rol')
     area = serializers.CharField(source='area.nombre', read_only=True, label='Área', allow_null=True)
 
-    # --- Campos de Escritura (Write-only) ---
+    # --- Escritura  ---
     usuario = serializers.PrimaryKeyRelatedField(
         queryset=Usuario.objects.all(),
         write_only=True
@@ -96,11 +99,11 @@ class PerfilUsuarioSerializer(serializers.ModelSerializer):
 class CarrerasSerializer(serializers.ModelSerializer):
     nombre = serializers.CharField(max_length=100, label='Nombre de la Carrera')
 
-    # --- Campo de Lectura ---
+    # --- Lectura ---
     director = serializers.StringRelatedField(read_only=True)
     area = serializers.StringRelatedField(read_only=True)
 
-    # --- Campo de Escritura ---
+    # --- Escritura ---
     director_id = serializers.PrimaryKeyRelatedField(
         queryset=PerfilUsuario.objects.filter(rol__nombre_rol='Director de Carrera'), 
         source='director',
@@ -128,10 +131,10 @@ class CarrerasSerializer(serializers.ModelSerializer):
 
 class EstudiantesSerializer(serializers.ModelSerializer):
     
-    # --- Campo de Lectura (Read-only) ---
+    # --- Lectura  ---
     carreras = serializers.StringRelatedField(read_only=True)
     
-    # --- Campo de Escritura (Write-only) ---
+    # --- Escritura ---
     carrera_id = serializers.PrimaryKeyRelatedField(
         queryset=Carreras.objects.all(),
         source='carreras',
@@ -153,9 +156,22 @@ class EstudiantesSerializer(serializers.ModelSerializer):
         ]
 
 class SolicitudesSerializer(serializers.ModelSerializer):
+    asunto = serializers.StringRelatedField(read_only=True)
+    estudiante = serializers.StringRelatedField(source = 'estudiantes', read_only=True)
+    descripcion = serializers.CharField(read_only=True)
+    created_at = serializers.CharField(read_only=True)
+    asesores_pedagogicos = serializers.CharField(read_only=True)
+
     class Meta:
         model = Solicitudes
-        fields = '__all__'
+        fields = [
+            'id',
+            'asunto',
+            'descripcion',
+            'estudiante',
+            'created_at',
+            'asesores_pedagogicos'
+        ]
 
 class EvidenciasSerializer(serializers.ModelSerializer):
     class Meta:
@@ -163,11 +179,11 @@ class EvidenciasSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class AsignaturasSerializer(serializers.ModelSerializer):
-    # --- Campos de Lectura (Read-only) ---
+    # --- Lectura ---
     carreras = serializers.StringRelatedField(read_only=True)
     docente = serializers.StringRelatedField(read_only=True)
 
-    # --- Campos de Escritura (Write-only) ---
+    # --- Escritura---
     carrera_id = serializers.PrimaryKeyRelatedField(
         queryset=Carreras.objects.all(),
         source='carreras',
@@ -194,18 +210,68 @@ class AsignaturasSerializer(serializers.ModelSerializer):
         ]
 
 class AsignaturasEnCursoSerializer(serializers.ModelSerializer):
-    # --- Campos de Lectura (Read-only) ---
-    estudiantes = serializers.StringRelatedField(read_only = True)
-    estado = serializers.StringRelatedField (read_only = True)
-    asignaturas = serializers.StringRelatedField (read_only = True)
+    """
+    Serializer para AsignaturasEnCurso.
+    Muestra nombres legibles para LECTURA (GET).
+    Acepta IDs para ESCRITURA (POST/PUT).
+    """
+    
+    # --- CAMPOS DE LECTURA (Read-only) ---
+    # (Estos se mostrarán en las solicitudes GET)
+    
+    # Muestra el __str__ del Estudiante (e.g., "Javier Soto")
+    estudiante_info = serializers.StringRelatedField(
+        source='estudiantes', 
+        read_only=True
+    )
+    
+    # Muestra el __str__ de la Asignatura (e.g., "Proyecto Integrado PIS-001")
+    asignatura_info = serializers.StringRelatedField(
+        source='asignaturas', 
+        read_only=True
+    )
+
+    # Muestra "Activo" o "Inactivo" usando la función del modelo
+    estado_display = serializers.CharField(
+        source='get_estado_display', 
+        read_only=True
+    )
+
+    # --- CAMPOS DE ESCRITURA (Write-only) ---
+    # (Estos se usarán para recibir datos en POST/PUT)
+    
+    # Acepta el ID del estudiante
+    estudiantes = serializers.PrimaryKeyRelatedField(
+        queryset=Estudiantes.objects.all(),
+        write_only=True # Oculto en GET
+    )
+    
+    # Acepta el ID de la asignatura
+    asignaturas = serializers.PrimaryKeyRelatedField(
+        queryset=Asignaturas.objects.all(),
+        write_only=True # Oculto en GET
+    )
+    
+    # El campo 'estado' (booleano) funciona tanto para lectura como escritura.
+    # Se mostrará como True/False en GET y aceptará True/False en POST.
+    # (Tu modelo se encarga de mostrar "Activo" en el Admin)
 
     class Meta:
         model = AsignaturasEnCurso
         fields = [
-            'id',
-            'estudiantes',
-            'estado',
-            'asignaturas',
+            'id', 
+            
+            # Campos de LECTURA (Output)
+            'estudiante_info', 
+            'asignatura_info',
+            'estado_display', 
+            
+            # Campos de LECTURA Y ESCRITURA
+            'estado',         # Muestra True/False Y Acepta True/False
+            
+            # Campos de ESCRITURA (Input)
+            'estudiantes',   # Recibe ID de Estudiante
+            'asignaturas'    # Recibe ID de Asignatura
         ]
 
 class EntrevistasSerializer(serializers.ModelSerializer):
@@ -214,14 +280,78 @@ class EntrevistasSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class AjusteRazonableSerializer(serializers.ModelSerializer):
+    nombre_categoria = serializers.StringRelatedField(source='categorias_ajustes', read_only=True)
+    
+    categorias_ajustes = serializers.PrimaryKeyRelatedField(
+        queryset=CategoriasAjustes.objects.all(),
+        required=False,
+        allow_null=True,
+        label="Categoría Existente"
+    )
+    
+    # Crear si no existe el tipo de categoría
+    nueva_categoria_nombre = serializers.CharField(
+        write_only=True, 
+        required=False,
+        allow_null=True,
+        label="Crear Nueva Categoría (Opcional)"
+    )
+
+    # Asignar al estudiante
+    solicitud_id_asignar = serializers.PrimaryKeyRelatedField(
+        queryset=Solicitudes.objects.all(),
+        write_only=True,
+        required=False,
+        allow_null=True,
+        label="Asignar a Solicitud (ID)"
+    )
+
     class Meta:
         model = AjusteRazonable
-        fields = '__all__'
+        fields = [
+            'id', 
+            'descripcion', 
+            'nombre_categoria',
+            'categorias_ajustes',
+            'nueva_categoria_nombre',
+            'solicitud_id_asignar'
+        ]
+        
+    def validate(self, data):
+        id_existente = data.get('categorias_ajustes')
+        nombre_nuevo = data.get('nueva_categoria_nombre')
+        
+        if not id_existente and not nombre_nuevo:
+            raise serializers.ValidationError(
+                "Debe seleccionar una Categoría existente o proporcionar un nombre para crear una nueva."
+            )
+        if id_existente and nombre_nuevo:
+            raise serializers.ValidationError(
+                "No puede seleccionar una Categoría existente Y crear una nueva a la vez."
+            )
+            
+        return data
+
+    def create(self, validated_data):
+        nueva_categoria_nombre = validated_data.pop('nueva_categoria_nombre', None)
+        
+        if nueva_categoria_nombre:
+            categoria, created = CategoriasAjustes.objects.get_or_create(
+                nombre_categoria=nueva_categoria_nombre.strip().capitalize()
+            )
+            validated_data['categorias_ajustes'] = categoria
+
+        return AjusteRazonable.objects.create(**validated_data)
 
 class AjusteAsignadoSerializer(serializers.ModelSerializer):
+    ajuste_descripcion = serializers.StringRelatedField(source='ajuste_razonable', read_only=True)
+    solicitud_asunto = serializers.StringRelatedField(source='solicitudes', read_only=True)
+    ajuste_razonable = serializers.PrimaryKeyRelatedField(queryset=AjusteRazonable.objects.all(), write_only=True)
+    solicitudes = serializers.PrimaryKeyRelatedField(queryset=Solicitudes.objects.all(), write_only=True)
+
     class Meta:
         model = AjusteAsignado
-        fields = '__all__'
+        fields = ['id', 'ajuste_descripcion', 'solicitud_asunto', 'ajuste_razonable', 'solicitudes']
 
 class PublicaSolicitudSerializer(serializers.Serializer):
     # --- Campos para el modelo Estudiantes ---
@@ -268,10 +398,12 @@ class PublicaSolicitudSerializer(serializers.Serializer):
             )
         return value
         
-    def validate_rut(self, value):
-        # (Aquí puedes añadir tu lógica de validación de RUT chileno si quieres)
-        rut_limpio = value.strip().replace(".", "").replace("-", "")
-        return rut_limpio
+    def validate_rut(self):
+        """
+        Función para validar el rut POR DESARROLLAR
+        de momento no se agrega para poder crear ejemplos sin que tire error
+        """
+        pass
 
     def create(self, validated_data):
 

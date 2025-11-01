@@ -12,7 +12,7 @@ from rest_framework import (
 from .serializer import (
     UsuarioSerializer, PerfilUsuarioSerializer, RolesSerializer, AreasSerializer, CategoriasAjustesSerializer, CarrerasSerializer,
     EstudiantesSerializer, SolicitudesSerializer, EvidenciasSerializer, AsignaturasSerializer, AsignaturasEnCursoSerializer, 
-    AjusteRazonableSerializer, AjusteAsignadoSerializer, EntrevistasSerializer
+    AjusteRazonableSerializer, AjusteAsignadoSerializer, EntrevistasSerializer, PublicaSolicitudSerializer
 )
 from .models import(
     Usuario, PerfilUsuario, Roles, Areas, CategoriasAjustes, Carreras, Estudiantes, Solicitudes, Evidencias,
@@ -48,6 +48,32 @@ class PublicSolicitudCreateView(APIView):
                 status=status.HTTP_2_CREATED
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+def vista_formulario_solicitud(request):
+    """
+    Esta vista pública solo muestra la página HTML
+    con el formulario de solicitud (formulario_solicitud.html).
+    """
+    
+    # 1. Obtenemos los datos para los <select> del formulario
+    try:
+        carreras = Carreras.objects.all().order_by('nombre')
+    except Carreras.DoesNotExist:
+        carreras = []
+
+    try:
+        asignaturas = Asignaturas.objects.all().order_by('nombre')
+    except Asignaturas.DoesNotExist:
+        asignaturas = []
+    
+    # 2. Preparamos el contexto para la plantilla
+    context = {
+        'carreras': carreras,
+        'asignaturas': asignaturas
+    }
+    
+    # 3. Renderizamos el template (el HTML que creaste)
+    return render(request, 'SIAPE/formulario_solicitud.html', context)
 
 # ----------------------------------------------
 #           Vistas PRivadas del Sistema
