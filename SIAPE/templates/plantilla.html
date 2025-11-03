@@ -8,60 +8,11 @@
     <!-- CSS de Bootstrap (lo saqué de tu 'inicio.html') -->
     <link rel="stylesheet" href="{% static 'CSS/bootstrap.css' %}">
     
+    <link rel="stylesheet" href="{% static 'CSS/base.css' %}">
+    
     <!-- Título dinámico -->
     <title>{% block title %}SIAPE{% endblock %}</title>
     
-    <!-- Estilos base para el layout -->
-    <style>
-        body {
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-            background-color: #f4f7f6;
-        }
-        .app-header {
-            background-color: #ffffff;
-            padding: 1rem 2rem;
-            border-bottom: 1px solid #dee2e6;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .header-logo {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-        .header-logo img {
-            height: 40px; /* Ajusta la altura según sea necesario */
-        }
-        .header-logo span {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: #343a40;
-        }
-        .header-user {
-            font-size: 0.9rem;
-            color: #495057;
-        }
-        .header-user strong {
-            color: #212529;
-        }
-        .app-main {
-            flex-grow: 1;
-            padding: 2rem;
-        }
-        .app-footer {
-            text-align: center;
-            padding: 1.5rem;
-            background-color: #ffffff;
-            border-top: 1px solid #dee2e6;
-            font-size: 0.9rem;
-            color: #6c757d;
-            margin-top: auto;
-        }
-    </style>
     
     <!-- Bloque para estilos extra de páginas hijas (como el formulario) -->
     {% block extra_head %}{% endblock %}
@@ -74,25 +25,22 @@
         <!-- Icono y Nombre de la App -->
         <div class="header-logo">
             <img src="{% static 'images/logo-inacap-negro.png' %}" alt="Logo Inacap">
-            <span>Sistema de Apoyo Personalizado</span>
+            <span>Sistema de Apoyos Personalizados</span>
         </div>
         
         <!-- Información del Usuario (Dinámico) -->
         <div class="header-user">
             {% if user.is_authenticated %}
-                {% comment %} Revisa si el usuario tiene un perfil y rol asignado {% endcomment %}
                 {% if user.perfil.rol.nombre_rol %}
-                    <strong>Rol:</strong> {{ user.perfil.rol.nombre_rol }}
-                    (<strong>Usuario:</strong> {{ user.first_name }} {{ user.last_name }})
+                    <strong>{{ user.perfil.rol.nombre_rol }}:</strong> 
+                    <strong>{{ user.first_name }} {{ user.last_name }}</strong>
                 {% else %}
-                    {% comment %} Esto se mostrará para el SuperAdmin (que no tiene PerfilUsuario) {% endcomment %}
                     <strong>Usuario:</strong> {{ user.email }}
                 {% endif %}
                 
                 | <a href="{% url 'logout' %}">Cerrar Sesión</a>
                 
             {% else %}
-                {% comment %} Para usuarios no logueados (como en el formulario de solicitud) {% endcomment %}
                 <span>Plataforma de Apoyo Estudiantil</span>
             {% endif %}
         </div>

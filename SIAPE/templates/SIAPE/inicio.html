@@ -1,5 +1,4 @@
 {% extends "plantilla.html" %}
-
 {% load static %}
 
 
@@ -13,8 +12,8 @@
         <h1>Biblioteca</h1>
         <a href="http://127.0.0.1:8000/admin/">Django Admin</a>
         <a href="http://127.0.0.1:8000/SIAPE/">Rest Framework</a>
-        <a href="http://127.0.0.1:8000/formulario-solicitud/">SOLICITUD</a>
+        <a href="{% url 'formulario-solicitud' %}">Formulario de Solicitud</a>
     </div>
 
-    <a href="{% url 'logout' %}">Cerrar Sesión</a>
+    {% comment %} El link de Cerrar Sesión ahora está en el header global {% endcomment %}
 {% endblock %}
