@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework import routers
 from SIAPE import views
+from .views import PublicSolicitudCreateView
 
 router = routers.DefaultRouter()
 
@@ -20,5 +21,6 @@ router.register(r'ajuste_asignado', views.AjusteAsignadoViewSet)
 router.register(r'perfil_usuarios', views.PerfilUsuarioViewSet)
 
 urlpatterns = [
-    path('', include(router.urls))
+    path('', include(router.urls)),
+    path('solicitud-publica/', PublicSolicitudCreateView.as_view(), name='solicitud-publica'),
 ]

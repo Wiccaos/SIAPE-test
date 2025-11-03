@@ -1,80 +1,91 @@
+{% extends 'plantilla.html' %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solicitud de Apoyo Personalizado | SIAPE</title>
-    <style>
-        body { font-family: sans-serif; margin: 20px; }
-        .container { max-width: 700px; margin: auto; padding: 20px; border: 1px solid #ccc; }
-        div { margin-bottom: 10px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input[type="text"], input[type="email"], textarea, select {
-            width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ddd;
-        }
-        button[type="submit"] { background-color: #007bff; color: white; padding: 10px 15px; border: none; cursor: pointer; margin-top: 15px; }
-        #mensaje { margin-top: 20px; padding: 10px; border: 1px solid; display: none; }
-        #mensaje.exito { background-color: #d4edda; color: #155724; border-color: #c3e6cb; }
-        #mensaje.error { background-color: #f8d7da; color: #721c24; border-color: #f5c6cb; }
-    </style>
-</head>
-<body>
 
-    <div class="container">
-        <h1>Formulario de Solicitud de Apoyo Personalizado</h1>
-        <p>Por favor, completa tus datos para iniciar el proceso de ajuste razonable. Los campos marcados con (*) son obligatorios.</p>
+{% comment %} Bloque para el título de la página {% endcomment %}
+{% block title %}Solicitud de Apoyo | SIAPE{% endblock %}
+
+{% comment %} 
+  Bloque para los estilos CSS específicos de esta página.
+  Enlaza al archivo CSS que te di en la respuesta anterior.
+{% endcomment %}
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/formulario.css' %}">
+{% endblock %}
+
+
+{% comment %} Bloque para el contenido principal de la página {% endcomment %}
+{% block content %}
+    <div class="form-container">
+        
+        <div class="form-header">
+            <h1>Información de la Solicitud</h1>
+            <p>Proporciona los detalles de tu solicitud de apoyo</p>
+        </div>
 
         <form id="solicitud-form" enctype="multipart/form-data">
             {% csrf_token %}
 
-            <h3>1. Identificación y Contacto</h3>
-            
-            <div>
-                <label for="nombres">Nombres (*):</label>
-                <input type="text" id="nombres" name="nombres" required>
-            </div>
-            <div>
-                <label for="apellidos">Apellidos (*):</label>
-                <input type="text" id="apellidos" name="apellidos" required>
-            </div>
-            <div>
-                <label for="rut">RUT (sin puntos, con guion: 12345678-K) (*):</label>
-                <input type="text" id="rut" name="rut" placeholder="Ej: 12345678-K" required>
-            </div>
-            <div>
-                <label for="email">Correo Electrónico (*):</label>
-                <input type="email" id="email" name="email" required>
-            </div>
-            <div>
-                <label for="numero">Teléfono (Opcional):</label>
-                <input type="text" id="numero" name="numero" placeholder="Ej: 987654321">
-            </div>
-            <div>
-                <label for="carrera_id">Tu Carrera (*):</label>
-                <select id="carrera_id" name="carrera_id" required>
-                    <option value="">-- Selecciona tu carrera --</option>
-                    {% for c in carreras %}
-                        <option value="{{ c.id }}">{{ c.nombre }}</option>
-                    {% endfor %}
-                </select>
+            <!-- Campos del formulario en 2 columnas -->
+            <div class="form-grid">
+                
+                <!-- Columna Izquierda -->
+                <div class="form-group">
+                    <label for="nombres">Nombres <span>*</span></label>
+                    <input type="text" id="nombres" name="nombres" placeholder="Ej: Juan" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Correo Electrónico <span>*</span></label>
+                    <input type="email" id="email" name="email" placeholder="juan.perez@estudiante.edu" required>
+                </div>
+                
+                <div class="form-group">
+                    <!-- Mantenemos este campo requerido por el backend -->
+                    <label for="carrera_id">Tu Carrera <span>*</span></label>
+                    <select id="carrera_id" name="carrera_id" required>
+                        <option value="">-- Selecciona tu carrera --</option>
+                        {% for c in carreras %}
+                            <option value="{{ c.id }}">{{ c.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Columna Derecha -->
+                <div class="form-group">
+                    <label for="apellidos">Apellidos <span>*</span></label>
+                    <input type="text" id="apellidos" name="apellidos" placeholder="Ej: Pérez González" required>
+                </div>
+
+                <div class="form-group">
+                    <!-- Adaptamos el campo 'rut' para que coincida con el mockup -->
+                    <label for="rut">RUT / Código Estudiantil <span>*</span></label>
+                    <input type="text" id="rut" name="rut" placeholder="Ej: 12345678-K" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="numero">Teléfono de Contacto (Opcional)</label>
+                    <input type="text" id="numero" name="numero" placeholder="Ej: +56 9 1234 5678">
+                </div>
             </div>
 
-            <h3>2. Detalle de la Solicitud</h3>
-
-            <div>
-                <label for="asunto">Asunto o Título de la Solicitud (*):</label>
-                <input type="text" id="asunto" name="asunto" required>
-            </div>
-            <div>
-                <label for="descripcion">Descripción Detallada (*):</label>
-                <textarea id="descripcion" name="descripcion" rows="6" required></textarea>
-                <small>Explica tu necesidad específica, las asignaturas afectadas y el tipo de apoyo que requieres.</small>
-            </div>
+            <!-- Campos de ancho completo -->
             
-            <div>
-                <label for="asignaturas_solicitadas_ids">Ramos/Asignaturas Específicas para el Ajuste (Opcional):</label>
-                <select id="asignaturas_solicitadas_ids" name="asignaturas_solicitadas_ids" multiple size="5">
+            <div class="form-group">
+                <!-- Mantenemos este campo requerido por el backend -->
+                <label for="asunto">Asunto o Título de la Solicitud <span>*</span></label>
+                <input type="text" id="asunto" name="asunto" placeholder="Ej: Solicitud de apoyo por discapacidad auditiva" required>
+            </div>
+
+            <div class="form-group">
+                <label for="descripcion">Descripción Detallada <span>*</span></label>
+                <textarea id="descripcion" name="descripcion" rows="5" placeholder="Describe detalladamente tu situación, las dificultades que enfrentas y cómo el apoyo solicitado podría ayudarte..." required></textarea>
+                <small>Mínimo 50 caracteres. Incluye toda la información relevante.</small>
+            </div>
+
+            <div class="form-group">
+                <!-- Mantenemos este campo opcional del backend -->
+                <label for="asignaturas_solicitadas_ids">Ramos/Asignaturas Específicas para el Ajuste (Opcional)</label>
+                <select id="asignaturas_solicitadas_ids" name="asignaturas_solicitadas_ids" multiple size="4">
                     {% for a in asignaturas %}
                         <option value="{{ a.id }}">{{ a.nombre }} ({{ a.seccion }})</option>
                     {% endfor %}
@@ -82,34 +93,106 @@
                 <small>Mantén la tecla Ctrl (o Cmd) presionada para seleccionar varios.</small>
             </div>
 
-            <div>
-                <label for="documentos_adjuntos">Documentos de Respaldo (Evidencia, Opcional):</label>
-                <input type="file" id="documentos_adjuntos" name="documentos_adjuntos" multiple>
-                <small>Máximo 5 archivos.</small>
+            <!-- Zona de Carga de Archivos -->
+            <div class="form-group">
+                <label>Documentos de Apoyo (Opcional)</label>
+                <div class="drop-zone" id="drop-zone">
+                    <input type="file" id="documentos_adjuntos" name="documentos_adjuntos" multiple>
+                    <p class="drop-zone__prompt">Arrastra archivos aquí o <strong>haz clic para seleccionar</strong></p>
+                    <small>Máximo 5 archivos. Formatos PDF, DOC, JPG, PNG (max 10MB)</small>
+                </div>
+                <div id="file-list"></div>
             </div>
 
-            <hr>
-            <div>
+            <!-- Autorización -->
+            <div class="auth-group">
                 <input type="checkbox" id="autorizacion_datos" name="autorizacion_datos" required>
-                <label for="autorizacion_datos" style="display: inline; font-weight: normal;">
-                    Autorizo el tratamiento de mis datos personales sensibles según las políticas de privacidad. (*)
+                <label for="autorizacion_datos">
+                    Autorizo el tratamiento de mis datos personales de acuerdo con la Política de Privacidad y acepto los Términos y Condiciones del servicio. <span>*</span>
                 </label>
             </div>
 
-            <button type="submit" id="submit-button">Enviar Solicitud de Apoyo</button>
+            <!-- Caja de Información -->
+            <div class="info-box">
+                <h4>Importante:</h4>
+                <ul>
+                    <li>Tu solicitud será revisada en un plazo máximo de 3 días hábiles.</li>
+                    <li>Recibirás notificaciones sobre el estado de tu solicitud.</li>
+                    <li>La información proporcionada debe ser veraz y completa.</li>
+                </ul>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="button-group">
+                <button type="button" class="btn btn-secondary" disabled>Guardar Borrador (Próximamente)</button>
+                <button type="submit" id="submit-button" class="btn btn-primary">Enviar Solicitud</button>
+            </div>
         </form>
 
         <div id="mensaje"></div>
-
     </div>
 
+    <!-- El script se queda aquí, al final del bloque de contenido -->
     <script>
         const form = document.getElementById('solicitud-form');
         const mensajeDiv = document.getElementById('mensaje');
         const submitButton = document.getElementById('submit-button');
-
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('documentos_adjuntos');
+        const fileList = document.getElementById('file-list');
+        let droppedFiles = [];
 
+        // --- Lógica de Drag & Drop ---
+
+        // Abrir selector de archivos al hacer clic en la zona
+        dropZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // Evento al cambiar el input de archivo (por si lo seleccionan manualmente)
+        fileInput.addEventListener('change', () => {
+            droppedFiles = Array.from(fileInput.files);
+            updateFileList();
+        });
+
+        // Resaltar zona al arrastrar
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        // Quitar resaltado
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+        });
+
+        // Manejar archivos soltados
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            
+            // Usamos dataTransfer.files para obtener los archivos
+            droppedFiles = Array.from(e.dataTransfer.files);
+            updateFileList();
+        });
+
+        // Actualizar la lista de archivos visibles
+        function updateFileList() {
+            fileList.innerHTML = ''; // Limpiar lista
+            if (droppedFiles.length > 0) {
+                fileList.innerHTML = '<strong>Archivos seleccionados:</strong>';
+                droppedFiles.forEach(file => {
+                    const fileItem = document.createElement('div');
+                    fileItem.textContent = file.name;
+                    fileList.appendChild(fileItem);
+                });
+            }
+        }
+
+        // --- Lógica de Envío de Formulario ---
         form.addEventListener('submit', async function(e) {
             
             e.preventDefault();
@@ -120,7 +203,8 @@
 
             const formData = new FormData(form);
             
-            // Lógica para manejar campos Múltiples
+            // --- Lógica para campos Múltiples ---
+            
             // a) Asignaturas
             const selectAsignaturas = document.getElementById('asignaturas_solicitadas_ids');
             formData.delete('asignaturas_solicitadas_ids');
@@ -130,13 +214,12 @@
                 }
             }
 
-            // b) Archivos
-            const inputArchivos = document.getElementById('documentos_adjuntos');
+            // b) Archivos (ahora usamos la variable 'droppedFiles')
             formData.delete('documentos_adjuntos'); 
-            for (const file of inputArchivos.files) {
+            for (const file of droppedFiles) {
                 formData.append('documentos_adjuntos', file);
             }
-            // Fin de la Lógica de corrección ---
+            // --- Fin de la Lógica de corrección ---
 
             try {
                 // Endpoint público: /SIAPE/solicitud-publica/
@@ -144,8 +227,9 @@
                     method: 'POST',
                     body: formData,
                     headers: {
-                    'X-CSRFToken': csrfToken
-                }
+                        'X-CSRFToken': csrfToken
+                        // No es necesario 'Content-Type' cuando se usa FormData
+                    }
                 });
 
                 const data = await response.json();
@@ -156,6 +240,8 @@
                     mensajeDiv.innerHTML = `<strong>¡Solicitud enviada con éxito!</strong> El proceso ha iniciado. Tu RUT (${formData.get('rut')}) será usado como ID de seguimiento.`;
                     mensajeDiv.style.display = 'block';
                     form.reset(); 
+                    droppedFiles = [];
+                    updateFileList();
                 } else {
                     // Error de validación (HTTP 400 Bad Request)
                     mensajeDiv.className = 'error';
@@ -181,6 +267,5 @@
             submitButton.innerText = "Enviar Solicitud de Apoyo";
         });
     </script>
+{% endblock %}
 
-</body>
-</html>

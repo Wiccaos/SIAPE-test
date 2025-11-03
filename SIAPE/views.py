@@ -45,7 +45,7 @@ class PublicSolicitudCreateView(APIView):
             solicitud = serializer.save()
             return Response(
                 {"message": "Solicitud creada con éxito."},
-                status=status.HTTP_2_CREATED
+                status=status.HTTP_201_CREATED
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
@@ -76,7 +76,7 @@ def vista_formulario_solicitud(request):
     return render(request, 'SIAPE/formulario_solicitud.html', context)
 
 # ----------------------------------------------
-#           Vistas PRivadas del Sistema
+#           Vistas Privadas del Sistema
 # ----------------------------------------------
 
 # ----------- Vistas para la página ------------

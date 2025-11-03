@@ -425,12 +425,12 @@ class PublicaSolicitudSerializer(serializers.Serializer):
             )
         return value
         
-    def validate_rut(self):
-        """
-        Función para validar el rut POR DESARROLLAR
-        de momento no se agrega para poder crear ejemplos sin que tire error
-        """
-        pass
+    # def validate_rut(self):
+    #     """
+    #     Función para validar el rut POR DESARROLLAR
+    #     de momento no se agrega para poder crear ejemplos sin que tire error
+    #     """
+    #     return value
 
     def create(self, validated_data):
 
