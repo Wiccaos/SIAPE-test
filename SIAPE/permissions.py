@@ -24,8 +24,7 @@ class IsAsesorPedagogico(BasePermission):
             return False
         
         # Compara el rol
-        return rol_usuario == 'Asesor Pedagogico'
-
+        return rol_usuario == 'Asesor Pedagógico'
 
 class IsDocente(BasePermission):
     """

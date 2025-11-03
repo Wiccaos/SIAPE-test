@@ -181,7 +181,7 @@ class Solicitudes(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        limit_choices_to={'rol__nombre_rol': 'Asesor Pedagogico'}
+        limit_choices_to={'rol__nombre_rol': 'Asesor Pedagógico'}
     )
     
     class Meta:

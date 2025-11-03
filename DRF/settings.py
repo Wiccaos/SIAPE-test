@@ -145,7 +145,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Guardado de archivos en el servidor
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# URL pulbica para el navegador
+# URL publica para el navegador
 MEDIA_URL = '/media/'
 
 # Redireccionar al inicio despues de login

@@ -82,6 +82,20 @@ def vista_formulario_solicitud(request):
 # ----------- Vistas para la página ------------
 @login_required 
 def pag_inicio(request):
+    """
+    Vista de inicio que actúa como enrutador basado en el rol.
+    """
+
+    try:
+        rol = request.user.perfil.rol.nombre_rol
+    except AttributeError:
+        rol = None
+
+    # --- Lógica de Redirección ---
+    
+    if rol == 'Asesor Pedagógico':
+            return redirect('dashboard_asesor')
+        
     return render(request, 'SIAPE/inicio.html')
 
 def registro(request):
@@ -109,6 +123,23 @@ def logout_view(request):
     logout(request)
     # Redirige a la página de inicio de sesión
     return redirect('login') 
+
+@login_required
+def dashboard_asesor(request):
+    """
+    Dashboard exclusivo para Asesores Pedagógicos.
+    """
+    try:
+        if request.user.perfil.rol.nombre_rol != 'Asesor Pedagógico':
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+    
+    # Si es Asesor, renderiza su dashboard
+    context = {
+        'nombre_usuario': request.user.first_name
+    }
+    return render(request, 'SIAPE/dashboard_asesor.html', context)
 
 # ----------- Vistas de los modelos ------------
 

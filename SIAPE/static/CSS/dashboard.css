@@ -1,0 +1,202 @@
+/* --- ESTILOS GENERALES --- */
+body {
+    background-color: #f4f7fa; /* Fondo gris claro como el mockup */
+    color: #333;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    margin: 0;
+}
+
+.main-content {
+    width: 100%;
+    max-width: 1200px; /* Ancho máximo del dashboard */
+    margin: 0 auto; /* Centrado */
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+/* --- ENCABEZADO (HEADER) --- */
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 15px;
+    border-bottom: 3px solid #cc0000; /* Línea roja de Inacap */
+    margin-bottom: 20px;
+}
+
+.header-logo {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+.header-logo img {
+    height: 40px; /* Altura del logo */
+    display: block;
+}
+.header-logo span {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #555;
+}
+
+.header-user {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    color: #444;
+    font-weight: 500;
+}
+.header-config {
+    color: #cc0000;
+    font-size: 1.5rem;
+    text-decoration: none;
+}
+
+/* --- NAVEGACIÓN (NAV) --- */
+.dashboard-nav {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 25px;
+    background-color: #ffffff;
+    padding: 10px 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.nav-item {
+    padding: 10px 15px;
+    text-decoration: none;
+    color: #555;
+    font-weight: 500;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.nav-item:hover {
+    background-color: #f0f0f0;
+}
+/* El botón "activo" del mockup */
+.nav-item.active {
+    background-color: #cc0000;
+    color: #ffffff;
+}
+.nav-item i {
+    font-size: 0.9rem; /* Tamaño del icono */
+}
+
+
+/* --- TARJETAS KPI (KPIs) --- */
+.kpi-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); /* Responsive */
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.kpi-card {
+    background-color: #ffffff;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.kpi-icon {
+    font-size: 2.5rem; /* Icono grande */
+    padding: 15px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+}
+/* Colores de iconos (basado en mockup) */
+.icon-solicitudes { color: #cc0000; background-color: #fdecec; }
+.icon-resueltos { color: #28a745; background-color: #eaf6ec; }
+.icon-proceso { color: #fd7e14; background-color: #fff3e8; }
+
+.kpi-info {
+    display: flex;
+    flex-direction: column;
+}
+.kpi-value {
+    font-size: 2.2rem;
+    font-weight: bold;
+    color: #333;
+}
+.kpi-label {
+    font-size: 1rem;
+    color: #555;
+    margin-top: -5px;
+}
+.kpi-detail {
+    font-size: 0.85rem;
+    color: #777;
+    margin-top: 5px;
+}
+.kpi-detail.increase {
+    color: #28a745; /* Verde para aumentos */
+}
+
+/* --- GRILLA DE DISTRIBUCIÓN (Support Grid) --- */
+.support-grid-container {
+    background-color: #ffffff;
+    border-radius: 8px;
+    padding: 25px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+.support-grid-container h2 {
+    margin-top: 0;
+    margin-bottom: 25px;
+    color: #333;
+}
+
+.support-row {
+    display: grid;
+    grid-template-columns: 2fr 1.5fr 1fr; /* 3 columnas */
+    align-items: center;
+    gap: 15px;
+    padding: 15px 0;
+    border-bottom: 1px solid #eee;
+}
+.support-row:last-child {
+    border-bottom: none;
+}
+
+.support-title {
+    font-weight: 500;
+    color: #444;
+}
+
+.support-stats {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+.stat-box {
+    padding: 8px 12px;
+    border-radius: 6px;
+    text-align: center;
+    font-size: 0.8rem;
+    min-width: 80px;
+}
+.stat-box strong {
+    display: block;
+    font-size: 1.3rem;
+    font-weight: bold;
+}
+/* Colores de cajas de estado (basado en mockup) */
+.stat-box.approved { background-color: #eaf6ec; color: #28a745; }
+.stat-box.pending  { background-color: #fff8e1; color: #e6a800; }
+.stat-box.rejected { background-color: #fdecec; color: #cc0000; }
+
+.support-total {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #777;
+    text-align: right;
+}
