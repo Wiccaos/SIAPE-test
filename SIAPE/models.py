@@ -181,6 +181,17 @@ class Solicitudes(models.Model):
         blank=True,
         limit_choices_to={'rol__nombre_rol': 'Asesor Pedagógico'}
     )
+    ESTADO_CHOICES = (
+        ('en_proceso', 'En proceso'),
+        ('aprobado', 'Aprobado'),
+        ('rechazado', 'Rechazado'),
+    )
+    estado = models.CharField(
+        max_length=20, 
+        choices=ESTADO_CHOICES, 
+        default='en_proceso',
+        verbose_name="Estado de la Solicitud"
+    )
     
     class Meta:
         db_table = 'solicitudes'

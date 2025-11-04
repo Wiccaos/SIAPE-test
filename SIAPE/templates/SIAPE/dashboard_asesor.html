@@ -5,29 +5,23 @@
     Panel Principal - Asesor | SIAPE
 {% endblock %}
 
-{% comment %} 
-Cargamos el CSS específico del dashboard. 
-El CSS base (tipografía, header) ya está en plantilla.html 
-{% endcomment %}
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-container">
+{% comment %} 
+  AÑADIMOS ESTE CONTENEDOR 'main-content' 
+  para que coincida con la página 'casos_asesor.html'
+{% endcomment %}
+<div class="main-content"> 
     
-    {% comment %} 
-    HEADER ELIMINADO DE AQUÍ
-    Ahora se hereda automáticamente de plantilla.html
-    {% endcomment %}
-
-    <!-- Navegación del Dashboard (Mockup P.11) -->
     <nav class="dashboard-nav">
-        <a href="#" class="nav-item active">
+        <a href="{% url 'dashboard_asesor' %}" class="nav-item active">
             <i class="fas fa-home"></i>
             Panel Principal
         </a>
-        <a href="#" class="nav-item">
+        <a href="{% url 'casos_asesor' %}" class="nav-item">
             <i class="fas fa-folder-open"></i>
             Casos
         </a>
@@ -37,11 +31,8 @@ El CSS base (tipografía, header) ya está en plantilla.html
         </a>
     </nav>
 
-    <!-- Contenedor de KPIs (Tarjetas superiores) -->
     <section class="kpi-container">
-        <!-- Tarjeta 1: Total Solicitudes -->
         <div class="kpi-card">
-            <!-- ... (contenido kpi 1) ... -->
             <div class="kpi-icon icon-solicitudes">
                 <i class="fas fa-file-alt"></i>
             </div>
@@ -52,9 +43,7 @@ El CSS base (tipografía, header) ya está en plantilla.html
             </div>
         </div>
 
-        <!-- Tarjeta 2: Casos Resueltos -->
         <div class="kpi-card">
-            <!-- ... (contenido kpi 2) ... -->
             <div class="kpi-icon icon-resueltos">
                 <i class="fas fa-check-circle"></i>
             </div>
@@ -65,9 +54,7 @@ El CSS base (tipografía, header) ya está en plantilla.html
             </div>
         </div>
 
-        <!-- Tarjeta 3: En Proceso -->
         <div class="kpi-card">
-            <!-- ... (contenido kpi 3) ... -->
             <div class="kpi-icon icon-proceso">
                 <i class="fas fa-clock"></i>
             </div>
@@ -79,12 +66,9 @@ El CSS base (tipografía, header) ya está en plantilla.html
         </div>
     </section>
 
-    <!-- Contenedor de Distribución (Grilla inferior) -->
     <section class="support-grid-container">
-        <!-- ... (contenido de la grilla) ... -->
         <h2>Distribución de apoyo personalizado</h2>
 
-        <!-- Fila 1: Ingreso por atraso -->
         <div class="support-row">
             <div class="support-title">
                 Ingreso por atraso: Estudiantes con problemas de locomoción, viajes a larga distancia...
@@ -108,13 +92,11 @@ El CSS base (tipografía, header) ya está en plantilla.html
             </div>
         </div>
 
-        <!-- Fila 2: Problemas de audición -->
         <div class="support-row">
             <div class="support-title">
                 Problemas de audición: Controlar volumen en clases, aumentar o disminuir volumen...
             </div>
             <div class="support-stats">
-                <!-- ... (stats) ... -->
                 <div class="stat-box approved">
                     <strong>26</strong>
                     <span>aprobados</span>
@@ -133,13 +115,11 @@ El CSS base (tipografía, header) ya está en plantilla.html
             </div>
         </div>
 
-        <!-- Fila 3: Problemas a la vista -->
         <div class="support-row">
             <div class="support-title">
                 Problemas a la vista: Maximizar presentaciones, aumentar tamaño de fuente...
             </div>
             <div class="support-stats">
-                <!-- ... (stats) ... -->
                 <div class="stat-box approved">
                     <strong>12</strong>
                     <span>aprobados</span>
@@ -160,5 +140,5 @@ El CSS base (tipografía, header) ya está en plantilla.html
 
     </section>
 
-</div>
+</div> {% comment %} CERRAMOS EL NUEVO DIV {% endcomment %}
 {% endblock %}

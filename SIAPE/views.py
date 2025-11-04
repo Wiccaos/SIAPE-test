@@ -103,6 +103,8 @@ def logout_view(request):
     logout(request)
     return redirect('login') 
 
+# ----------- Páginas de Asesor Pedagógco ------------
+
 @login_required
 def dashboard_asesor(request):
     """ Dashboard exclusivo para Asesores Pedagógicos. """
@@ -117,6 +119,30 @@ def dashboard_asesor(request):
     }
     return render(request, 'SIAPE/dashboard_asesor.html', context)
 
+@login_required
+def casos_asesor(request):
+    """
+    Muestra la tabla de Casos Activos para el Asesor.
+    """
+    # 1. Verificación de seguridad
+    try:
+        if request.user.perfil.rol.nombre_rol != 'Asesor Pedagógico':
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+    
+    # 2. Obtener los datos de las solicitudes (casos)
+    # Usamos .select_related('estudiantes') para optimizar la consulta
+    lista_solicitudes = Solicitudes.objects.select_related('estudiantes').order_by('-created_at')
+    
+    # 3. Preparar contexto
+    context = {
+        'solicitudes': lista_solicitudes,
+        'total_casos': lista_solicitudes.count()
+    }
+    
+    # 4. Renderizar la nueva plantilla de 'casos'
+    return render(request, 'SIAPE/casos_asesor.html', context)
 
 
 # ----------- Vistas de los modelos ------------

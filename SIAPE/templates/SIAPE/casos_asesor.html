@@ -1,0 +1,97 @@
+{% extends "plantilla.html" %}
+{% load static %}
+
+{% block title %}
+    Casos Activos - Asesor | SIAPE
+{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="main-content"> <nav class="dashboard-nav">
+        <a href="{% url 'dashboard_asesor' %}" class="nav-item">
+            <i class="fas fa-home"></i>
+            Panel Principal
+        </a>
+        <a href="{% url 'casos_asesor' %}" class="nav-item active"> <i class="fas fa-folder-open"></i>
+            Casos
+        </a>
+        <a href="#" class="nav-item">
+            <i class="fas fa-tachometer-alt"></i>
+            Panel de Control
+        </a>
+    </nav>
+
+    <section class="table-container">
+        <div class="table-header">
+            <h2>Casos</h2>
+        </div>
+        
+        <div class="table-controls">
+            <div class="entries-selector">
+                <label for="entries">Mostrar</label>
+                <select id="entries" name="entries">
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                </select>
+                <span>entradas</span>
+            </div>
+            <div class="search-bar">
+                <label for="search">Buscar:</label>
+                <input type="text" id="search" name="search">
+            </div>
+        </div>
+
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Nombre estudiante</th>
+                    <th>Fecha</th>
+                    <th>Documentos adjuntos</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for solicitud in solicitudes %}
+                <tr>
+                    <td>{{ solicitud.estudiantes.nombres }} {{ solicitud.estudiantes.apellidos }}</td>
+                    
+                    <td>{{ solicitud.created_at|date:"d/m/Y" }}</td>
+                    
+                    <td>
+                        <a href="#" class="link-rojo">Ver más »</a>
+                    </td>
+                    
+                    <td>
+                        {% comment %} 
+                        NOTA: Necesitarás añadir el campo 'estado' al modelo Solicitudes
+                        para que esto funcione dinámicamente. 
+                        De momento, usamos 'En proceso'.
+                        {% endcomment %}
+                        <span class="status status-en_proceso">En proceso</span>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4">No se encontraron solicitudes de casos.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="table-footer">
+            <span>Mostrando 1 a {{ total_casos|default:0 }} de {{ total_casos|default:0 }} entradas</span>
+            <div class="pagination-controls">
+                <a href="#" class="pagination-btn disabled">Anterior</a>
+                <span class="pagination-page active">1</span>
+                <a href="#" class="pagination-btn">Siguiente</a>
+            </div>
+        </div>
+
+    </section>
+
+</div>
+{% endblock %}
