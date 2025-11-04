@@ -40,7 +40,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', views.pag_inicio, name='home'),
 
-    # URL's de la app SIAPE
+    # URLs de la app SIAPE
     path('SIAPE/', include('SIAPE.urls')),
     path('formulario-solicitud/', views.vista_formulario_solicitud, name='formulario-solicitud'),
     path('dashboard/asesor/', views.dashboard_asesor, name='dashboard_asesor'),
@@ -49,7 +49,7 @@ urlpatterns = [
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
 
-    # URL's de autenticación
+    # URLs de autenticación
     path('accounts/', include('django.contrib.auth.urls')),
     path('login/', auth_views.LoginView.as_view(), name='login'),
     path('logout/', views.logout_view, name='logout'),

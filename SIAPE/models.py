@@ -57,11 +57,9 @@ class Usuario(AbstractUser):
     rut = models.CharField(max_length=20, unique=True)
     numero = models.IntegerField(null=True, blank=True,)
 
-    # Configuración para usar email como identificador único
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['first_name', 'last_name', 'rut']
 
-    # Asignar el manager personalizado 
     objects = UsuarioManager()
     
     class Meta:
@@ -219,15 +217,14 @@ class Asignaturas(models.Model):
 
 # estado para las Asignaturas
 ESTADO_CURSO_CHOICES = (
-    (True, 'Activo'),      # True se guarda en la DB, 'Activo' es legible
-    (False, 'Inactivo'),   # False se guarda en la DB, 'Inactivo' es legible
+    (True, 'Activo'),
+    (False, 'Inactivo'),
 )
 
 class AsignaturasEnCurso(models.Model):
-    # 2. Modificar el campo para usar las opciones
     estado = models.BooleanField(
         choices=ESTADO_CURSO_CHOICES,
-        default=True,  # Asumimos que al inicio está activo
+        default=True,
         verbose_name="Estado de la Asignatura"
     )
     estudiantes = models.ForeignKey(Estudiantes, on_delete=models.CASCADE)
@@ -237,7 +234,6 @@ class AsignaturasEnCurso(models.Model):
         db_table = 'asignaturas_en_curso'
 
     def __str__(self):
-        # Opcional: Usar get_FOO_display() para mostrar el estado legible
         return f"{self.estudiantes} cursando {self.asignaturas} ({self.get_estado_display()})"
 
 class Entrevistas(models.Model):

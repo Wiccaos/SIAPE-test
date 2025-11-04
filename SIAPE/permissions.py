@@ -11,19 +11,14 @@ class IsAsesorPedagogico(BasePermission):
     message = "No tiene permisos de Asesor Pedagógico."
 
     def has_permission(self, request, view):
-        # Verifica que el usuario esté autenticado
         if not request.user or not request.user.is_authenticated:
             return False
         
-        # Verifica que tenga un perfil y un rol asignado
         try:
-            # Usamos 'perfil' (el related_name)
             rol_usuario = request.user.perfil.rol.nombre_rol
         except AttributeError:
-            # El usuario no tiene perfil, o el perfil no tiene rol
             return False
         
-        # Compara el rol
         return rol_usuario == 'Asesor Pedagógico'
 
 class IsDocente(BasePermission):

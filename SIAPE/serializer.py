@@ -12,9 +12,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(label='Email')
     rut = serializers.CharField(label='RUT')
     numero = serializers.CharField(label='Número Telefónico', required=False, allow_blank=True)
-    
-    # 1. Cambia el campo password a write_only (no debe ser leído)
-    password = serializers.CharField(label='Contraseña', write_only=True)
+    password = serializers.CharField(label='Contraseña')
 
     class Meta:
         model = Usuario
@@ -28,26 +26,19 @@ class UsuarioSerializer(serializers.ModelSerializer):
             'password',
         ]
 
-    # 2. Sobrescribe el método create para usar el manager
     def create(self, validated_data):
-        # Extraemos el password de los datos validados
+        """ Crear usuario con contraseña hasheada """
         password = validated_data.pop('password')
-        
-        # Usamos el manager 'objects' que definiste en tu modelo Usuario
-        # El método create_user() se encargará de hashear el password
         user = Usuario.objects.create_user(password=password, **validated_data)
         
         return user
 
     def update(self, instance, validated_data):
-        # Extrae el password si viene en la petición
+        """ Actualizar usuario y hashea nueva contraseña si se proporciona """
         password = validated_data.pop('password', None)
-        
-        # Llama al update() normal para los otros campos
         user = super().update(instance, validated_data)
 
         if password:
-            # Si se proporcionó un nuevo password, hashealo y guárdalo
             user.set_password(password)
             user.save()
             
@@ -345,6 +336,7 @@ class AjusteRazonableSerializer(serializers.ModelSerializer):
         ]
         
     def validate(self, data):
+        """ Validar que se elija una categoría existente o se cree una nueva, no ambas. """
         id_existente = data.get('categorias_ajustes')
         nombre_nuevo = data.get('nueva_categoria_nombre')
         
@@ -360,6 +352,7 @@ class AjusteRazonableSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
+        """ Crear AjusteRazonable, creando nueva categoría si es necesario. """
         nueva_categoria_nombre = validated_data.pop('nueva_categoria_nombre', None)
         
         if nueva_categoria_nombre:
@@ -427,6 +420,7 @@ class PublicaSolicitudSerializer(serializers.Serializer):
     #     return value
 
     def create(self, validated_data):
+        """ Crea Estudiante, Solicitud y Evidencias asociadas. """
 
         datos_estudiante = {
             'nombres': validated_data['nombres'],

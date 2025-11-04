@@ -59,19 +59,16 @@ def vista_formulario_solicitud(request):
     Esta vista pública solo muestra la página HTML
     con el formulario de solicitud (formulario_solicitud.html).
     """
-    
-    # Datos para el formulario
+
     try:
         carreras = Carreras.objects.all().order_by('nombre')
     except Carreras.DoesNotExist:
         carreras = []
-    
-    # context para enviar a la plantilla
+
     context = {
         'carreras': carreras,
     }
-    
-    # render de la plantilla
+
     return render(request, 'SIAPE/formulario_solicitud.html', context)
 
 # ----------------------------------------------
@@ -103,9 +100,7 @@ def vista_protegida(request):
     return render(request, 'vista_protegida.html')
 
 def logout_view(request):
-    # Cierra la sesión del usuario y limpia la data de SESSION
     logout(request)
-    # Redirige a la página de inicio de sesión
     return redirect('login') 
 
 @login_required
@@ -116,8 +111,7 @@ def dashboard_asesor(request):
             return redirect('home')
     except AttributeError:
         return redirect('home')
-    
-    # Si es Asesor, renderiza su dashboard
+
     context = {
         'nombre_usuario': request.user.first_name
     }
