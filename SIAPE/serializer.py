@@ -403,12 +403,6 @@ class PublicaSolicitudSerializer(serializers.Serializer):
     )
     
     # --- Campos para las relaciones ---
-    asignaturas_solicitadas_ids = serializers.ListField(
-        child=serializers.PrimaryKeyRelatedField(queryset=Asignaturas.objects.all()),
-        label="Ramos para los que solicita ajuste (IDs)",
-        required=False,
-        allow_empty=True
-    )
     documentos_adjuntos = serializers.ListField(
         child=serializers.FileField(),
         label="Documentos adjuntos (evidencia)",
