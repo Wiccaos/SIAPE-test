@@ -11,8 +11,10 @@ class UsuarioSerializer(serializers.ModelSerializer):
     last_name = serializers.CharField(label='Apellido')
     email = serializers.EmailField(label='Email')
     rut = serializers.CharField(label='RUT')
-    numero = serializers.CharField(label='Número Telefónico')
-    password = serializers.CharField(label='Contraseña')
+    numero = serializers.CharField(label='Número Telefónico', required=False, allow_blank=True)
+    
+    # 1. Cambia el campo password a write_only (no debe ser leído)
+    password = serializers.CharField(label='Contraseña', write_only=True)
 
     class Meta:
         model = Usuario
@@ -25,6 +27,31 @@ class UsuarioSerializer(serializers.ModelSerializer):
             'numero',
             'password',
         ]
+
+    # 2. Sobrescribe el método create para usar el manager
+    def create(self, validated_data):
+        # Extraemos el password de los datos validados
+        password = validated_data.pop('password')
+        
+        # Usamos el manager 'objects' que definiste en tu modelo Usuario
+        # El método create_user() se encargará de hashear el password
+        user = Usuario.objects.create_user(password=password, **validated_data)
+        
+        return user
+
+    def update(self, instance, validated_data):
+        # Extrae el password si viene en la petición
+        password = validated_data.pop('password', None)
+        
+        # Llama al update() normal para los otros campos
+        user = super().update(instance, validated_data)
+
+        if password:
+            # Si se proporcionó un nuevo password, hashealo y guárdalo
+            user.set_password(password)
+            user.save()
+            
+        return user
 
 class RolesSerializer(serializers.ModelSerializer):
     # --- Lectura y Escritura ---
@@ -376,12 +403,6 @@ class PublicaSolicitudSerializer(serializers.Serializer):
     )
     
     # --- Campos para las relaciones ---
-    asignaturas_solicitadas_ids = serializers.ListField(
-        child=serializers.PrimaryKeyRelatedField(queryset=Asignaturas.objects.all()),
-        label="Ramos para los que solicita ajuste (IDs)",
-        required=False,
-        allow_empty=True
-    )
     documentos_adjuntos = serializers.ListField(
         child=serializers.FileField(),
         label="Documentos adjuntos (evidencia)",
@@ -398,12 +419,12 @@ class PublicaSolicitudSerializer(serializers.Serializer):
             )
         return value
         
-    def validate_rut(self):
-        """
-        Función para validar el rut POR DESARROLLAR
-        de momento no se agrega para poder crear ejemplos sin que tire error
-        """
-        pass
+    # def validate_rut(self):
+    #     """
+    #     Función para validar el rut POR DESARROLLAR
+    #     de momento no se agrega para poder crear ejemplos sin que tire error
+    #     """
+    #     return value
 
     def create(self, validated_data):
 

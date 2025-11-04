@@ -1,0 +1,98 @@
+/* --- Tipografía Global y Fondo --- */
+body {
+    /* Esta es la fuente de tu dashboard */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background-color: #f4f7fa;
+    color: #333;
+    margin: 0;
+}
+
+/* --- ¡ESTA ES LA REGLA CLAVE! ---
+  Forzamos a los elementos de formulario a HEREDAR la fuente del 'body'
+*/
+input,
+button,
+select,
+textarea,
+.btn {
+    font-family: inherit !important;
+}
+
+/* --- Layout Principal --- */
+.app-main {
+    flex-grow: 1;
+    padding: 2rem;
+    width: 100%;
+    max-width: 1400px; /* Ancho máximo general */
+    margin: 0 auto;
+    box-sizing: border-box;
+}
+
+/* --- Header Unificado (Estilo Dashboard) --- */
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    background-color: #ffffff;
+    border-bottom: 3px solid #cc0000; /* Línea roja de Inacap */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.header-logo {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+.header-logo img {
+    height: 40px;
+    display: block;
+}
+.header-logo span {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #555;
+}
+
+.header-user {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    color: #444;
+    font-weight: 500;
+}
+.header-user-info {
+    text-align: right;
+}
+.header-user-info .user-role {
+    font-weight: bold;
+    text-transform: uppercase;
+}
+.header-user-info .user-name {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.header-actions a {
+    color: #cc0000;
+    font-size: 1.5rem;
+    text-decoration: none;
+    margin-left: 10px;
+}
+.header-actions a:hover {
+    color: #333;
+}
+
+/* --- Footer Unificado --- */
+.app-footer {
+    text-align: center;
+    padding: 1.5rem;
+    background-color: #ffffff;
+    border-top: 1px solid #dee2e6;
+    font-size: 0.9rem;
+    color: #6c757d;
+    margin-top: auto;
+}

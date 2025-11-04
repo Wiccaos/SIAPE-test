@@ -3,6 +3,7 @@ from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth import logout, login
 
 from rest_framework import (
     viewsets, mixins, status
@@ -28,7 +29,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from .permissions import IsAsesorPedagogico
 
 # ----------------------------------------------
-#           Vistas Publicas del Sistema
+#           Vistas Públicas del Sistema
 # ----------------------------------------------
 
 class PublicSolicitudCreateView(APIView):
@@ -40,14 +41,18 @@ class PublicSolicitudCreateView(APIView):
     parser_classes = (MultiPartParser, FormParser)
 
     def post(self, request, *args, **kwargs):
-        serializer = PublicaSolicitudSerializer(data=request.data)
-        if serializer.is_valid():
-            solicitud = serializer.save()
-            return Response(
-                {"message": "Solicitud creada con éxito."},
-                status=status.HTTP_2_CREATED
-            )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            serializer = PublicaSolicitudSerializer(data=request.data)
+            if serializer.is_valid():
+                solicitud = serializer.save()
+
+                return Response(
+                    {
+                        "message": "Solicitud creada con éxito.",
+                        "solicitud_id": solicitud.id
+                    },
+                    status=status.HTTP_201_CREATED
+                )
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 def vista_formulario_solicitud(request):
     """
@@ -55,52 +60,45 @@ def vista_formulario_solicitud(request):
     con el formulario de solicitud (formulario_solicitud.html).
     """
     
-    # 1. Obtenemos los datos para los <select> del formulario
+    # Datos para el formulario
     try:
         carreras = Carreras.objects.all().order_by('nombre')
     except Carreras.DoesNotExist:
         carreras = []
-
-    try:
-        asignaturas = Asignaturas.objects.all().order_by('nombre')
-    except Asignaturas.DoesNotExist:
-        asignaturas = []
     
-    # 2. Preparamos el contexto para la plantilla
+    # context para enviar a la plantilla
     context = {
         'carreras': carreras,
-        'asignaturas': asignaturas
     }
     
-    # 3. Renderizamos el template (el HTML que creaste)
+    # render de la plantilla
     return render(request, 'SIAPE/formulario_solicitud.html', context)
 
 # ----------------------------------------------
-#           Vistas PRivadas del Sistema
+#           Vistas Privadas del Sistema
 # ----------------------------------------------
 
 # ----------- Vistas para la página ------------
 @login_required 
 def pag_inicio(request):
-    return render(request, 'SIAPE/inicio.html')
+    """
+    Vista de inicio que actúa como enrutador basado en el rol.
+    """
 
-def registro(request):
-    if request.method == 'POST':
-        form = UserCreationForm(request.POST)
-        if form.is_valid():
-            user = form.save()
-            login(request, user)
-            messages.success(request, "Registro Exitoso. ¡Bienvenido!")
-            return redirect('/')
-        else:
-            messages.error(request, "No ha sido posible Registrarlo. Por favor revise el formulario por errores.")
-    else:
-        form = UserCreationForm()
-        return render(request, 'SIAPE/registro.html', {'form':form}) 
+    try:
+        rol = request.user.perfil.rol.nombre_rol
+    except AttributeError:
+        rol = None
+
+    # Redireccionar según el rol
+    if rol == 'Asesor Pedagógico':
+            return redirect('dashboard_asesor')
+        
+    return render(request, 'SIAPE/inicio.html')
     
 def vista_protegida(request):
+    """    Redirecciona a login si el usuario no está autenticado """
     if not request.user.is_authenticated:
-    # Redirecciona a login si el usuario no está autenticado
         return redirect('login')
     return render(request, 'vista_protegida.html')
 
@@ -109,6 +107,23 @@ def logout_view(request):
     logout(request)
     # Redirige a la página de inicio de sesión
     return redirect('login') 
+
+@login_required
+def dashboard_asesor(request):
+    """ Dashboard exclusivo para Asesores Pedagógicos. """
+    try:
+        if request.user.perfil.rol.nombre_rol != 'Asesor Pedagógico':
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+    
+    # Si es Asesor, renderiza su dashboard
+    context = {
+        'nombre_usuario': request.user.first_name
+    }
+    return render(request, 'SIAPE/dashboard_asesor.html', context)
+
+
 
 # ----------- Vistas de los modelos ------------
 

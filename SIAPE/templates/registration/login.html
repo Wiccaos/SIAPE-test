@@ -1,37 +1,45 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Document</title>
-</head>
-<body>
-<form method="post" action="{% url 'login' %}">
-  {% csrf_token %}
+{% extends "plantilla.html" %}
+{% load static %}
 
-  <div class="card border-secondary mb-3" style="max-width: 20rem">
-    <div class="card-header">Inicio de sesión</div>
-    <div class="card-body">
-      <div>
-        <label for="username">Nombre Usuario:</label>
-        <input type="text" id="username" name="username" required />
-      </div>
-      <div>
-        <label for="password">Contraseña:</label>
-        <input type="password" id="password" name="password" required />
-      </div>
-      {% if form.errors %}
-      <p>Tu nombre de usuario y contraseña no coinciden. Inténtalo de nuevo.</p>
+{% block title %}Login | SIAPE{% endblock %}
 
-      <div class="error">{{ form.non_field_errors }}</div>
+{% block extra_head %}
+    <!-- 
+      Quitamos el bloque <style> y lo reemplazamos
+      por este <link> al nuevo archivo CSS.
+    -->
+    <link rel="stylesheet" href="{% static 'CSS/login.css' %}">
+{% endblock %}
 
-      {% endif %} {% comment %} {% if form.non_field_errors %}
-      <div class="error">{{ form.non_field_errors }}</div>
-      {% endif %} {% endcomment %}
-      <button type="submit">Login</button>
+{% block content %}
+<div class="login-container">
+    <h2>Inicio de Sesión</h2>
+
+    <form method="post" action="{% url 'login' %}" class="login-form">
+        {% csrf_token %}
+
+        <div class="form-group">
+            <label for="username">Email:</label>
+            <input type="text" id="username" name="username" required />
+        </div>
+        
+        <div class="form-group">
+            <label for="password">Contraseña:</label>
+            <input type="password" id="password" name="password" required />
+        </div>
+
+        {% if form.errors %}
+        <div class="login-errors">
+            <p>Tu email y contraseña no coinciden. Inténtalo de nuevo.</p>
+        </div>
+        {% endif %} 
+        
+        <button type="submit" class="btn-login">Login</button>
+    </form>
+
+    <div class="password-reset-link">
+        <p><a href="{% url 'password_reset' %}">¿Olvidaste tu contraseña?</a></p>
     </div>
-  </div>
-</form>
-<p><a href="{% url 'password_reset' %}">¿Olvidaste tu contraseña?</a></p>
-</body>
-</html>
+</div>
+{% endblock %}
+

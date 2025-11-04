@@ -1,16 +1,56 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <link rel="stylesheet" href="{% static 'CSS/base.css' %}">
+    <title>{% block title %}SIAPE{% endblock %}</title>
+    
+    
+    <!-- Bloque para estilos extra de páginas hijas -->
+    {% block extra_head %}{% endblock %}
 </head>
 <body>
-    <h1>SIAPE</h1>
-
-    <hr />
-    <footer>
-      <p>&copy; 2025 FV</p>
+    
+    <!-- ===== HEADER FIJO ===== -->
+    <header class="app-header">
+        
+        <!-- Icono y Nombre de la App -->
+        <div class="header-logo">
+            <img src="{% static 'images/logo-inacap-negro.png' %}" alt="Logo Inacap">
+            <span>Sistema de Apoyos Personalizados</span>
+        </div>
+        
+        <!-- Información del Usuario (Dinámico) -->
+        <div class="header-user">
+            {% if user.is_authenticated %}
+                {% if user.perfil.rol.nombre_rol %}
+                    <strong>{{ user.perfil.rol.nombre_rol }}:</strong> 
+                    <strong>{{ user.first_name }} {{ user.last_name }}</strong>
+                {% else %}
+                    <strong>Usuario:</strong> {{ user.email }}
+                {% endif %}
+                
+                | <a href="{% url 'logout' %}">Cerrar Sesión</a>
+                
+            {% else %}
+                <span>Plataforma de Apoyo Estudiantil</span>
+            {% endif %}
+        </div>
+    </header>
+    
+    <!-- ===== CONTENIDO DINÁMICO ===== -->
+    <main class="app-main">
+        {% block content %}
+        <!-- El contenido de las páginas hijas irá aquí -->
+        {% endblock %}
+    </main>
+    
+    <!-- ===== FOOTER FIJO ===== -->
+    <footer class="app-footer">
+      <p>&copy; 2025 - SIAPE - Desarrollado por F. Vidal, I. Zárate, N. Ríos</p>
     </footer>
+
 </body>
 </html>

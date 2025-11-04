@@ -1,0 +1,218 @@
+/* --- Contenedor Principal --- */
+.form-container {
+    max-width: 900px;
+    margin: 2rem auto;
+    padding: 2.5rem;
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e0e0e0;
+}
+
+/* --- Títulos --- */
+.form-header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 0.25rem;
+}
+.form-header p {
+    font-size: 0.95rem;
+    color: #666;
+    margin-bottom: 2rem;
+}
+
+/* --- Grid de 2 Columnas --- */
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+/* --- Estilo de Campos del Formulario --- */
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: #444;
+}
+.form-group label span {
+    color: #d9534f; /* Color rojo para el asterisco */
+}
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    box-sizing: border-box;
+    border: 1px solid #e0e0e0;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+}
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #007bff;
+    background-color: #fff;
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.2);
+}
+.form-group textarea {
+    resize: vertical;
+    min-height: 120px;
+}
+.form-group small {
+    font-size: 0.8rem;
+    color: #777;
+    margin-top: 0.3rem;
+}
+
+/* --- Zona de Carga de Archivos (Drag & Drop) --- */
+.drop-zone {
+    border: 2px dashed #e0e0e0;
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    color: #aaa;
+    background-color: #fcfcfc;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.drop-zone.dragover {
+    background-color: #f0f8ff;
+    border-color: #007bff;
+}
+.drop-zone input[type="file"] {
+    display: none;
+}
+.drop-zone__prompt {
+    font-size: 0.9rem;
+}
+.drop-zone__prompt strong {
+    color: #007bff;
+}
+#file-list {
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    text-align: left;
+}
+#file-list div {
+    padding: 0.25rem 0;
+}
+
+/* --- Checkbox de Autorización --- */
+.auth-group {
+    display: flex;
+    align-items: flex-start;
+    margin-top: 1.5rem;
+    gap: 0.75rem;
+}
+.auth-group input[type="checkbox"] {
+    margin-top: 0.15rem;
+    flex-shrink: 0;
+}
+.auth-group label {
+    font-size: 0.9rem;
+    color: #555;
+    line-height: 1.4;
+}
+
+/* --- Caja de Información "Importante" --- */
+.info-box {
+    background-color: #f5f5f5;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-top: 2rem;
+}
+.info-box h4 {
+    font-weight: 600;
+    color: #333;
+    margin-top: 0;
+    margin-bottom: 1rem;
+}
+.info-box ul {
+    padding-left: 1.25rem;
+    margin-bottom: 0;
+    color: #555;
+    font-size: 0.9rem;
+}
+.info-box li {
+    margin-bottom: 0.5rem;
+}
+
+/* --- Botones --- */
+.button-group {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 2.5rem;
+    border-top: 1px solid #eee;
+    padding-top: 2rem;
+}
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.btn-secondary {
+    background-color: #e9ecef;
+    color: #495057;
+    border: 1px solid #ced4da;
+}
+.btn-secondary:hover {
+    background-color: #d6dbe0;
+}
+.btn-primary {
+    background-color: #007bff;
+    color: white;
+}
+.btn-primary:hover {
+    background-color: #0056b3;
+}
+.btn:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+/* --- Mensajes de Exito/Error --- */
+#mensaje { 
+    margin-top: 20px; 
+    padding: 1rem 1.5rem; 
+    border-radius: 8px;
+    display: none; 
+    font-size: 0.95rem;
+}
+#mensaje.exito { 
+    background-color: #d4edda; 
+    color: #155724; 
+    border: 1px solid #c3e6cb; 
+}
+#mensaje.error { 
+    background-color: #f8d7da; 
+    color: #721c24; 
+    border: 1px solid #f5c6cb; 
+}
+
+/* --- Responsividad --- */
+@media (max-width: 768px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+    .button-group {
+        flex-direction: column-reverse;
+    }
+}

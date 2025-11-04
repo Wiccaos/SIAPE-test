@@ -145,11 +145,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Guardado de archivos en el servidor
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# URL pulbica para el navegador
+# URL publica para el navegador
 MEDIA_URL = '/media/'
 
 # Redireccionar al inicio despues de login
 LOGIN_REDIRECT_URL = '/' 
+LOGIN_URL = '/login'
+LOGOUT_REDIRECT_URL = '/login'
+
 
 # SESSION expira después de 1 hora
 SESSION_COOKIE_AGE = 3600
@@ -157,3 +160,6 @@ SESSION_COOKIE_AGE = 3600
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 # Usamos la DB para SESSION
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+
+
+
