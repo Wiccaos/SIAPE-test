@@ -293,9 +293,40 @@ class AsignaturasEnCursoSerializer(serializers.ModelSerializer):
         ]
 
 class EntrevistasSerializer(serializers.ModelSerializer):
+    # --- Campos de LECTURA (Read-only) ---
+    solicitud_info = serializers.StringRelatedField(source='solicitudes', read_only=True, label="Solicitud")
+    asesor_info = serializers.StringRelatedField(source='asesor_pedagogico', read_only=True, label="Asesor Pedagógico")
+
+    # --- Campos de ESCRITURA (Write-only) ---
+    solicitudes = serializers.PrimaryKeyRelatedField(queryset=Solicitudes.objects.all(), write_only=True, label="Solicitud")
+    asesor_pedagogico = serializers.PrimaryKeyRelatedField(
+        queryset=PerfilUsuario.objects.filter(rol__nombre_rol='Asesor Pedagógico'),
+        write_only=True,
+        label="Asesor Pedagógico Asignado"
+    )
+    fecha_entrevista = serializers.DateTimeField(
+        format="%d-%m-%Y %H:%M",
+        input_formats=[
+            "%Y-%m-%dT%H:%M:%SZ",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%d %H:%M",
+            "%d-%m-%Y %H:%M"
+        ],
+        label="Fecha (dd-mm-aaaa hh:mm)"
+    )
+
     class Meta:
         model = Entrevistas
-        fields = '__all__'
+        fields = [
+            'id', 
+            'solicitud_info',
+            'asesor_info',
+            'fecha_entrevista',
+            'modalidad',
+            'notas',
+            'solicitudes',
+            'asesor_pedagogico'
+        ]
 
 class AjusteRazonableSerializer(serializers.ModelSerializer):
     nombre_categoria = serializers.StringRelatedField(source='categorias_ajustes', read_only=True)

@@ -56,6 +56,8 @@ class Usuario(AbstractUser):
     email = models.EmailField(max_length=191, unique=True)
     rut = models.CharField(max_length=20, unique=True)
     numero = models.IntegerField(null=True, blank=True,)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['first_name', 'last_name', 'rut']
@@ -73,6 +75,9 @@ class Usuario(AbstractUser):
 
 class Roles(models.Model):
     nombre_rol = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     class Meta:
         db_table = 'roles'
 
@@ -81,6 +86,9 @@ class Roles(models.Model):
 
 class Areas(models.Model):
     nombre = models.CharField(max_length=191)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     class Meta:
         db_table = 'areas'
 
@@ -90,14 +98,20 @@ class Areas(models.Model):
 
 class CategoriasAjustes(models.Model):
     nombre_categoria = models.CharField(max_length=191)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     class Meta:
         db_table = 'categorias_ajustes'
+
 
     def __str__(self):
         return self.nombre_categoria
 
 # --- Modelos con dependencias ---
 class PerfilUsuario(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     usuario = models.OneToOneField(
         settings.AUTH_USER_MODEL, 
         on_delete=models.CASCADE,
@@ -141,6 +155,8 @@ class Carreras(models.Model):
         blank=True,
         related_name="carreras"
     )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'carreras'
@@ -155,7 +171,9 @@ class Estudiantes(models.Model):
     email = models.EmailField(max_length=191, unique=True)
     carreras = models.ForeignKey(Carreras, on_delete=models.CASCADE)
     numero = models.IntegerField(null=True, blank=True)
-    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     class Meta:
         db_table = 'estudiantes'
 
@@ -172,7 +190,8 @@ class Solicitudes(models.Model):
         related_name="solicitudes_de_ajuste",
         blank=True
     )
-    created_at = models.DateTimeField(auto_now_add=True) 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     estudiantes = models.ForeignKey('Estudiantes', on_delete=models.CASCADE) 
     asesores_pedagogicos = models.ForeignKey(
         'PerfilUsuario', 
@@ -203,6 +222,9 @@ class Evidencias(models.Model):
     archivo = models.FileField(upload_to='evidencias/') 
     estudiantes = models.ForeignKey(Estudiantes, on_delete=models.CASCADE)
     solicitudes = models.ForeignKey(Solicitudes, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     class Meta:
         db_table = 'evidencias'
 
@@ -220,6 +242,9 @@ class Asignaturas(models.Model):
             on_delete=models.CASCADE,
             limit_choices_to={'rol__nombre_rol': 'Docente'}
         )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     class Meta:
         db_table = 'asignaturas'
 
@@ -240,6 +265,8 @@ class AsignaturasEnCurso(models.Model):
     )
     estudiantes = models.ForeignKey(Estudiantes, on_delete=models.CASCADE)
     asignaturas = models.ForeignKey(Asignaturas, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
         db_table = 'asignaturas_en_curso'
@@ -248,10 +275,12 @@ class AsignaturasEnCurso(models.Model):
         return f"{self.estudiantes} cursando {self.asignaturas} ({self.get_estado_display()})"
 
 class Entrevistas(models.Model):
-    fecha = models.DateTimeField()
+    fecha_entrevista = models.DateTimeField()
     modalidad = models.CharField(max_length=100)
-    notas = models.TextField()
+    notas = models.CharField(max_length=500, blank=True, default='')
     solicitudes = models.ForeignKey(Solicitudes, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     asesor_pedagogico = models.ForeignKey(
         PerfilUsuario,
         on_delete=models.CASCADE,
@@ -267,6 +296,9 @@ class Entrevistas(models.Model):
 class AjusteRazonable(models.Model):
     descripcion = models.TextField()
     categorias_ajustes = models.ForeignKey(CategoriasAjustes, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     class Meta:
         db_table = 'ajuste_razonable'
 
@@ -276,6 +308,9 @@ class AjusteRazonable(models.Model):
 class AjusteAsignado(models.Model):
     ajuste_razonable = models.ForeignKey(AjusteRazonable, on_delete=models.CASCADE)
     solicitudes = models.ForeignKey(Solicitudes, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     class Meta:
         db_table = 'ajuste_asignado'
 
