@@ -114,8 +114,21 @@ def dashboard_asesor(request):
     except AttributeError:
         return redirect('home')
 
+    # --- CÁLCULO DE KPIs ---
+    
+    total_solicitudes = Solicitudes.objects.count()
+    casos_resueltos = Solicitudes.objects.filter(
+        estado='aprobado',
+        ajusteasignado__isnull=False
+    ).distinct().count()
+    casos_en_proceso = Solicitudes.objects.filter(estado='en_proceso').count()
+    
+
     context = {
-        'nombre_usuario': request.user.first_name
+        'nombre_usuario': request.user.first_name,
+        'total_solicitudes': total_solicitudes,
+        'casos_resueltos': casos_resueltos,
+        'casos_en_proceso': casos_en_proceso,
     }
     return render(request, 'SIAPE/dashboard_asesor.html', context)
 
@@ -124,24 +137,19 @@ def casos_asesor(request):
     """
     Muestra la tabla de Casos Activos para el Asesor.
     """
-    # 1. Verificación de seguridad
     try:
         if request.user.perfil.rol.nombre_rol != 'Asesor Pedagógico':
             return redirect('home')
     except AttributeError:
         return redirect('home')
     
-    # 2. Obtener los datos de las solicitudes (casos)
-    # Usamos .select_related('estudiantes') para optimizar la consulta
     lista_solicitudes = Solicitudes.objects.select_related('estudiantes').order_by('-created_at')
     
-    # 3. Preparar contexto
     context = {
         'solicitudes': lista_solicitudes,
         'total_casos': lista_solicitudes.count()
     }
     
-    # 4. Renderizar la nueva plantilla de 'casos'
     return render(request, 'SIAPE/casos_asesor.html', context)
 
 

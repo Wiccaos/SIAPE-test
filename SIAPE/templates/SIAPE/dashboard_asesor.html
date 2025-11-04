@@ -10,10 +10,6 @@
 {% endblock %}
 
 {% block content %}
-{% comment %} 
-  AÑADIMOS ESTE CONTENEDOR 'main-content' 
-  para que coincida con la página 'casos_asesor.html'
-{% endcomment %}
 <div class="main-content"> 
     
     <nav class="dashboard-nav">
@@ -37,10 +33,9 @@
                 <i class="fas fa-file-alt"></i>
             </div>
             <div class="kpi-info">
-                <span class="kpi-value">325</span>
+                <span class="kpi-value">{{ total_solicitudes|default:0 }}</span>
                 <span class="kpi-label">Total Solicitudes</span>
-                <span class="kpi-detail increase">+12% vs mes anterior</span>
-            </div>
+                </div>
         </div>
 
         <div class="kpi-card">
@@ -48,10 +43,9 @@
                 <i class="fas fa-check-circle"></i>
             </div>
             <div class="kpi-info">
-                <span class="kpi-value">212</span>
+                <span class="kpi-value">{{ casos_resueltos|default:0 }}</span>
                 <span class="kpi-label">Casos resueltos</span>
-                <span class="kpi-detail">Tasa: 75.3%</span>
-            </div>
+                </div>
         </div>
 
         <div class="kpi-card">
@@ -59,10 +53,9 @@
                 <i class="fas fa-clock"></i>
             </div>
             <div class="kpi-info">
-                <span class="kpi-value">113</span>
+                <span class="kpi-value">{{ casos_en_proceso|default:0 }}</span>
                 <span class="kpi-label">En Proceso</span>
-                <span class="kpi-detail">Promedio: 8 días</span>
-            </div>
+                </div>
         </div>
     </section>
 
@@ -140,5 +133,5 @@
 
     </section>
 
-</div> {% comment %} CERRAMOS EL NUEVO DIV {% endcomment %}
+</div>
 {% endblock %}
