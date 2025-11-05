@@ -76,6 +76,9 @@ def vista_formulario_solicitud(request):
 # ----------------------------------------------
 
 # ----------- Vistas para la página ------------
+
+ROL_AP = "Asesor Pedagógico"
+
 @login_required 
 def pag_inicio(request):
     """
@@ -88,7 +91,7 @@ def pag_inicio(request):
         rol = None
 
     # Redireccionar según el rol
-    if rol == 'Asesor Pedagógico':
+    if rol == ROL_AP:
             return redirect('dashboard_asesor')
         
     return render(request, 'SIAPE/inicio.html')
@@ -109,7 +112,7 @@ def logout_view(request):
 def dashboard_asesor(request):
     """ Dashboard exclusivo para Asesores Pedagógicos. """
     try:
-        if request.user.perfil.rol.nombre_rol != 'Asesor Pedagógico':
+        if request.user.perfil.rol.nombre_rol != ROL_AP:
             return redirect('home')
     except AttributeError:
         return redirect('home')
@@ -138,7 +141,7 @@ def casos_asesor(request):
     Muestra la tabla de Casos Activos para el Asesor.
     """
     try:
-        if request.user.perfil.rol.nombre_rol != 'Asesor Pedagógico':
+        if request.user.perfil.rol.nombre_rol != ROL_AP:
             return redirect('home')
     except AttributeError:
         return redirect('home')
@@ -158,7 +161,7 @@ def detalle_caso_asesor(request, solicitud_id):
     Muestra la vista detallada de un caso específico para el Asesor.
     """
     try:
-        if request.user.perfil.rol.nombre_rol != 'Asesor Pedagógico':
+        if request.user.perfil.rol.nombre_rol != ROL_AP:
             return redirect('home')
     except AttributeError:
         return redirect('home')
