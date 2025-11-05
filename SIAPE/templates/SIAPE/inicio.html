@@ -6,14 +6,24 @@
     Inicio | SIAPE
 {% endblock %}
 
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+{% endblock %}
+
 
 {% block content %}
-    <div class="row">
-        <h1>Biblioteca</h1>
-        <a href="http://127.0.0.1:8000/admin/">Django Admin</a>
-        <a href="http://127.0.0.1:8000/SIAPE/">Rest Framework</a>
-        <a href="{% url 'formulario-solicitud' %}">Formulario de Solicitud</a>
-    </div>
+
+        <nav class="dashboard-nav">
+        <a href="http://127.0.0.1:8000/admin/" class="nav-item">
+            Django Admin
+        </a>
+        <a href="http://127.0.0.1:8000/SIAPE/" class="nav-item">
+            Rest Framework
+        </a>
+        <a href="{% url 'formulario-solicitud' %}" class="nav-item">
+            Formulario Solicitud
+        </a>
+    </nav>
 
     {% comment %} El link de Cerrar Sesión ahora está en el header global {% endcomment %}
 {% endblock %}

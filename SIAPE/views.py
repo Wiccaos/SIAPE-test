@@ -1,5 +1,5 @@
 # Django
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.auth.forms import UserCreationForm
@@ -152,6 +152,35 @@ def casos_asesor(request):
     
     return render(request, 'SIAPE/casos_asesor.html', context)
 
+@login_required
+def detalle_caso_asesor(request, solicitud_id):
+    """
+    Muestra la vista detallada de un caso específico para el Asesor.
+    """
+    try:
+        if request.user.perfil.rol.nombre_rol != 'Asesor Pedagógico':
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+
+    solicitud = get_object_or_404(
+        Solicitudes.objects.select_related('estudiantes'), 
+        id=solicitud_id
+    )
+
+    evidencias = Evidencias.objects.filter(solicitudes=solicitud)
+    ajustes = AjusteAsignado.objects.filter(solicitudes=solicitud).select_related('ajuste_razonable')
+    entrevistas = Entrevistas.objects.filter(solicitudes=solicitud).order_by('fecha_entrevista')
+
+    context = {
+        'solicitud': solicitud,
+        'evidencias': evidencias,
+        'ajustes': ajustes,
+        'entrevistas': entrevistas,
+        'estudiante': solicitud.estudiantes,
+    }
+
+    return render(request, 'SIAPE/detalle_caso_asesor.html', context)
 
 # ----------- Vistas de los modelos ------------
 

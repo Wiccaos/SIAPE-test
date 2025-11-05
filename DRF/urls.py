@@ -47,6 +47,7 @@ urlpatterns = [
     # URLs de Asesor Pedagógico
     path('dashboard/asesor/', views.dashboard_asesor, name='dashboard_asesor'),
     path('dashboard/asesor/casos/', views.casos_asesor, name='casos_asesor'),
+    path('dashboard/asesor/casos/<int:solicitud_id>/', views.detalle_caso_asesor, name='detalle_caso_asesor'),
 
     # URLs documentación
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),

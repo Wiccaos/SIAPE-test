@@ -1,13 +1,7 @@
-/* --- SE ELIMINÓ EL BLOQUE 'body' DE AQUÍ ---
-   Ahora lo hereda de 'base.css'
-*/
-
 /* --- ESTILOS GENERALES (del dashboard) --- */
 .main-content {
     width: 100%;
-    max-width: 1200px; /* Ancho máximo del dashboard */
-    margin: 0 auto; /* Centrado */
-    padding: 0; /* Quitamos el padding para que no se duplique */
+    padding: 0; 
     box-sizing: border-box;
 }
 
@@ -300,4 +294,213 @@
 
 .pagination-btn:hover {
     background-color: #f5f5f5;
+}
+
+
+/* ==============================================
+  NUEVOS ESTILOS - DETALLE DE CASO
+=================================================
+*/
+
+.detalle-grid-container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: auto;
+    gap: 20px;
+    grid-template-areas:
+        "info-estudiante soluciones estado-caso"
+        "docs-estado     asunto     calendario"
+        "volver          .          .";
+}
+
+.detalle-card {
+    background-color: #ffffff;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+#card-info-estudiante { grid-area: info-estudiante; }
+#card-estado-caso   { grid-area: estado-caso; }
+#card-docs-estado   { grid-area: docs-estado; }
+#card-soluciones    { grid-area: soluciones; }
+#card-asunto        { grid-area: asunto; }
+#card-calendario    { grid-area: calendario; }
+#card-volver        { grid-area: volver; }
+
+/* Títulos dentro de las tarjetas */
+.detalle-titulo {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #777;
+    text-transform: uppercase;
+    margin-top: 0;
+    margin-bottom: 5px;
+}
+.detalle-card p, .detalle-card li {
+    font-size: 0.95rem;
+    color: #333;
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+.detalle-card ul {
+    padding-left: 20px;
+    margin-bottom: 0;
+}
+
+/* Estado General (Tarjeta superior derecha) */
+.detalle-status {
+    padding: 20px;
+    border-radius: 8px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+/* Estado de Documentos (Tarjeta izquierda) */
+.doc-status-box {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    margin-bottom: 15px;
+}
+.doc-status-box span {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #555;
+}
+.status-tag {
+    font-size: 0.8rem;
+    font-weight: bold;
+    padding: 5px 10px;
+    border-radius: 15px;
+}
+.status-tag.status-identificado {
+    background-color: #eaf6ec; 
+    color: #28a745;
+}
+.status-tag.status-en-proceso {
+    background-color: #fff3e8;
+    color: #fd7e14;
+}
+.status-tag.status-pendiente {
+    background-color: #fdecec; 
+    color: #cc0000;
+}
+
+
+/* Calendario (Tarjeta derecha) */
+.calendario-header {
+    text-align: center;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+.calendario-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+}
+.cal-day, .cal-day-header {
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-align: center;
+    padding: 8px 0;
+}
+.cal-day-header {
+    color: #999;
+}
+.cal-day {
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+}
+.cal-day.other-month {
+    color: #ccc;
+}
+.day-entrevista {
+    background-color: #eaf6ec;
+    color: #28a745;
+    font-weight: bold;
+}
+.day-habil {
+    background-color: #fdecec;
+    color: #cc0000;
+    font-weight: bold;
+}
+.day-interrupcion {
+    background-color: #fff8e1;
+    color: #e6a800;
+    font-weight: bold;
+}
+.calendario-leyenda {
+    margin-top: 20px;
+    font-size: 0.8rem;
+    color: #555;
+}
+.calendario-leyenda div {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+}
+.dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+.dot.dot-entrevista { background-color: #28a745; }
+.dot.dot-habil { background-color: #cc0000; }
+.dot.dot-interrupcion { background-color: #e6a800; }
+
+/* Botón Volver */
+.btn-volver {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: #f0f0f0;
+    color: #555;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+.btn-volver:hover {
+    background-color: #e0e0e0;
+}
+.btn-volver i {
+    margin-right: 5px;
+}
+
+/* --- Responsividad para el grid de detalle --- */
+@media (max-width: 992px) {
+    .detalle-grid-container {
+        grid-template-columns: 1fr 1fr;
+        grid-template-areas:
+            "info-estudiante estado-caso"
+            "docs-estado     calendario"
+            "soluciones      soluciones"
+            "asunto          asunto"
+            "volver          volver";
+    }
+}
+
+@media (max-width: 768px) {
+    .detalle-grid-container {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "estado-caso"
+            "info-estudiante"
+            "docs-estado"
+            "calendario"
+            "soluciones"
+            "asunto"
+            "volver";
+    }
 }

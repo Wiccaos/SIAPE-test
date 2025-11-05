@@ -1,4 +1,8 @@
 /* --- Tipografía Global y Fondo --- */
+html {
+    overflow-y: scroll;
+}
+
 body {
     /* Esta es la fuente de tu dashboard */
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;

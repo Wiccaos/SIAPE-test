@@ -50,7 +50,7 @@
                 <tr>
                     <th>Nombre estudiante</th>
                     <th>Fecha</th>
-                    <th>Información adicional</th>
+                    <th>Documentos adjuntos</th>
                     <th>Estado</th>
                 </tr>
             </thead>
@@ -62,12 +62,19 @@
                     <td>{{ solicitud.created_at|date:"d/m/Y" }}</td>
                     
                     <td>
-                        <a href="#" class="link-rojo">Ver más »</a>
-                    </td>
+                        <a href="{% url 'detalle_caso_asesor' solicitud.id %}" class="link-rojo">Ver más »</a>
+                        </td>
                     
                     <td>
-                        <span class="status status-en_proceso">En proceso</span>
-                    </td>
+                        
+                        {% if solicitud.estado == 'aprobado' %}
+                            <span class="status status-aprobado">{{ solicitud.get_estado_display }}</span>
+                        {% elif solicitud.estado == 'rechazado' %}
+                            <span class="status status-rechazado">{{ solicitud.get_estado_display }}</span>
+                        {% else %}
+                            <span class="status status-en_proceso">{{ solicitud.get_estado_display }}</span>
+                        {% endif %}
+                        </td>
                 </tr>
                 {% empty %}
                 <tr>
