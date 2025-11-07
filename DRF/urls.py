@@ -49,6 +49,9 @@ urlpatterns = [
     path('dashboard/asesor/casos/', views.casos_asesor, name='casos_asesor'),
     path('dashboard/asesor/casos/<int:solicitud_id>/', views.detalle_caso_asesor, name='detalle_caso_asesor'),
 
+    # URLs de Director de Carrera
+    path('dashboard/director/', views.dashboard_director, name='dashboard_director'),
+
     # URLs documentación
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),

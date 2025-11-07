@@ -185,6 +185,39 @@ def detalle_caso_asesor(request, solicitud_id):
 
     return render(request, 'SIAPE/detalle_caso_asesor.html', context)
 
+# ----------- Paginas de Director de Carrera ---------------------
+# --- INICIO DE NUEVA VISTA (DIRECTOR) ---
+@login_required
+def dashboard_director(request):
+    """
+    Dashboard para Directores de Carrera. Muestra KPIs
+    y distribución por carreras (basado en el mockup).
+    """
+    try:
+        if request.user.perfil.rol.nombre_rol != 'Director de Carrera':
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+
+    # Calcular KPIs
+    total_solicitudes = Solicitudes.objects.count()
+    casos_resueltos = Solicitudes.objects.filter(
+        estado='aprobado',
+        ajusteasignado__isnull=False
+    ).distinct().count()
+    casos_en_proceso = Solicitudes.objects.filter(estado='en_proceso').count()
+    
+    carreras = Carreras.objects.all() 
+
+    context = {
+        'nombre_usuario': request.user.first_name,
+        'total_solicitudes': total_solicitudes,
+        'casos_resueltos': casos_resueltos,
+        'casos_en_proceso': casos_en_proceso,
+        'carreras': carreras, 
+    }
+    return render(request, 'SIAPE/dashboard_director.html', context)
+
 # ----------- Vistas de los modelos ------------
 
 class UsuarioViewSet(viewsets.ModelViewSet):

@@ -1,0 +1,106 @@
+{% extends "plantilla.html" %}
+{% load static %}
+
+{% block title %}
+    Panel Director | SIAPE
+{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="main-content"> 
+    
+    <nav class="dashboard-nav">
+        <a href="{% url 'dashboard_director' %}" class="nav-item active">
+            <i class="fas fa-home"></i>
+            Panel Principal
+        </a>
+        <a href="#" class="nav-item">
+            <i class="fas fa-chart-bar"></i>
+            Métricas
+        </a>
+        <a href="#" class="nav-item">
+            <i class="fas fa-file-alt"></i>
+            Reportes
+        </a>
+        
+        <a href="#" class="nav-item" style="margin-left: auto;">
+            <i class="fas fa-cog"></i>
+            Configuración
+        </a>
+        <a href="#" class="nav-item">
+            <i class="fas fa-user-circle"></i>
+        </a>
+    </nav>
+
+    <section class="kpi-container">
+        <div class="kpi-card">
+            <div class="kpi-icon icon-solicitudes">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ total_solicitudes|default:0 }}</span>
+                <span class="kpi-label">Total Solicitudes</span>
+                <span class="kpi-detail increase">+12% vs mes anterior</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-resueltos">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ casos_resueltos|default:0 }}</span>
+                <span class="kpi-label">Casos resueltos</span>
+                <span class="kpi-detail">Tasa: 75.3%</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-proceso">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ casos_en_proceso|default:0 }}</span>
+                <span class="kpi-label">En Proceso</span>
+                <span class="kpi-detail">Promedio: 8 días</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="support-grid-container">
+        <h2><i class="fas fa-chart-pie"></i> Distribución por Carreras</h2>
+
+        {% for carrera in carreras %}
+            <div class="support-row">
+                <div class="support-title">
+                    {{ carrera.nombre }}
+                </div>
+                <div class="support-stats">
+                    <div class="stat-box approved">
+                        <strong>53</strong>
+                        <span>aprobados</span>
+                    </div>
+                    <div class="stat-box pending">
+                        <strong>12</strong>
+                        <span>Pendientes</span>
+                    </div>
+                    <div class_A"stat-box rejected">
+                        <strong>5</strong>
+                        <span>Rechazados</span>
+                    </div>
+                </div>
+                <div class="support-total">
+                    70 casos (23.1%)
+                </div>
+            </div>
+        {% empty %}
+            <p>No hay carreras registradas.</p>
+        {% endfor %}
+
+    </section>
+
+</div>
+{% endblock %}
