@@ -28,6 +28,13 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from .permissions import IsAsesorPedagogico
 
+# ------------ CONSTANTES ------------
+ROL_ASESOR = 'Asesor Pedagógico'
+ROL_DIRECTOR = 'Director de Carrera'
+ROL_DOCENTE = 'Docente'
+ROL_ADMIN = 'Administrador'
+
+
 # ----------------------------------------------
 #           Vistas Públicas del Sistema
 # ----------------------------------------------
@@ -76,24 +83,26 @@ def vista_formulario_solicitud(request):
 # ----------------------------------------------
 
 # ----------- Vistas para la página ------------
-
-ROL_AP = "Asesor Pedagógico"
-
 @login_required 
 def pag_inicio(request):
     """
     Vista de inicio que actúa como enrutador basado en el rol.
     """
+    
+    rol = None
 
-    try:
-        rol = request.user.perfil.rol.nombre_rol
-    except AttributeError:
-        rol = None
+    if hasattr(request.user, 'perfil'):
+        if request.user.perfil.rol:
+            rol = request.user.perfil.rol.nombre_rol
 
-    # Redireccionar según el rol
-    if rol == ROL_AP:
-            return redirect('dashboard_asesor')
-        
+    if rol == 'Asesor Pedagógico':
+        return redirect('dashboard_asesor')
+    elif rol == ROL_DIRECTOR:
+        return redirect('dashboard_director')
+
+    if request.user.is_superuser or request.user.is_staff:
+        return redirect('admin:index') 
+
     return render(request, 'SIAPE/inicio.html')
     
 def vista_protegida(request):
@@ -112,20 +121,18 @@ def logout_view(request):
 def dashboard_asesor(request):
     """ Dashboard exclusivo para Asesores Pedagógicos. """
     try:
-        if request.user.perfil.rol.nombre_rol != ROL_AP:
+        if request.user.perfil.rol.nombre_rol != ROL_ASESOR:
             return redirect('home')
     except AttributeError:
         return redirect('home')
 
-    # --- CÁLCULO DE KPIs ---
-    
     total_solicitudes = Solicitudes.objects.count()
     casos_resueltos = Solicitudes.objects.filter(
         estado='aprobado',
         ajusteasignado__isnull=False
     ).distinct().count()
-    casos_en_proceso = Solicitudes.objects.filter(estado='en_proceso').count()
     
+    casos_en_proceso = Solicitudes.objects.filter(estado='en_proceso').count()
 
     context = {
         'nombre_usuario': request.user.first_name,
@@ -141,18 +148,18 @@ def casos_asesor(request):
     Muestra la tabla de Casos Activos para el Asesor.
     """
     try:
-        if request.user.perfil.rol.nombre_rol != ROL_AP:
+        if request.user.perfil.rol.nombre_rol != ROL_ASESOR:
             return redirect('home')
     except AttributeError:
         return redirect('home')
-    
+
     lista_solicitudes = Solicitudes.objects.select_related('estudiantes').order_by('-created_at')
-    
+
     context = {
         'solicitudes': lista_solicitudes,
         'total_casos': lista_solicitudes.count()
     }
-    
+
     return render(request, 'SIAPE/casos_asesor.html', context)
 
 @login_required
@@ -160,8 +167,9 @@ def detalle_caso_asesor(request, solicitud_id):
     """
     Muestra la vista detallada de un caso específico para el Asesor.
     """
+
     try:
-        if request.user.perfil.rol.nombre_rol != ROL_AP:
+        if request.user.perfil.rol.nombre_rol != ROL_ASESOR:
             return redirect('home')
     except AttributeError:
         return redirect('home')
@@ -173,7 +181,7 @@ def detalle_caso_asesor(request, solicitud_id):
 
     evidencias = Evidencias.objects.filter(solicitudes=solicitud)
     ajustes = AjusteAsignado.objects.filter(solicitudes=solicitud).select_related('ajuste_razonable')
-    entrevistas = Entrevistas.objects.filter(solicitudes=solicitud).order_by('fecha_entrevista')
+    entrevistas = Entrevistas.objects.filter(solicitudes=solicitud).order_by('fecha')
 
     context = {
         'solicitud': solicitud,
@@ -185,21 +193,22 @@ def detalle_caso_asesor(request, solicitud_id):
 
     return render(request, 'SIAPE/detalle_caso_asesor.html', context)
 
-# ----------- Paginas de Director de Carrera ---------------------
-# --- INICIO DE NUEVA VISTA (DIRECTOR) ---
+
+# --- VISTA DIRECTOR DE CARRERA ---
 @login_required
 def dashboard_director(request):
     """
     Dashboard para Directores de Carrera. Muestra KPIs
     y distribución por carreras (basado en el mockup).
     """
+
     try:
-        if request.user.perfil.rol.nombre_rol != 'Director de Carrera':
+
+        if request.user.perfil.rol.nombre_rol != ROL_DIRECTOR:
             return redirect('home')
     except AttributeError:
         return redirect('home')
 
-    # Calcular KPIs
     total_solicitudes = Solicitudes.objects.count()
     casos_resueltos = Solicitudes.objects.filter(
         estado='aprobado',
@@ -217,6 +226,7 @@ def dashboard_director(request):
         'carreras': carreras, 
     }
     return render(request, 'SIAPE/dashboard_director.html', context)
+
 
 # ----------- Vistas de los modelos ------------
 

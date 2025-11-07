@@ -21,6 +21,7 @@ from rest_framework import permissions
 from SIAPE import views
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
+from django.urls import reverse_lazy
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -58,7 +59,10 @@ urlpatterns = [
 
     # URLs de autenticación
     path('accounts/', include('django.contrib.auth.urls')),
-    path('login/', auth_views.LoginView.as_view(), name='login'),
+path('login/', auth_views.LoginView.as_view(
+        template_name='registration/login.html',
+        next_page=reverse_lazy('home')
+    ), name='login'),
     path('logout/', views.logout_view, name='logout'),
     # path('registro/', views.registro, name='registro'),
 ]
