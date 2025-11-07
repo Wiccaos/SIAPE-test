@@ -840,6 +840,39 @@
     color: #fd7e14;
 }
 
+/* --- Indicadores de estado de ajuste --- */
+.ajuste-asignado-info {
+    margin-top: 8px;
+    font-size: 0.85rem;
+    color: #28a745;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.ajuste-asignado-info i {
+    font-size: 1rem;
+}
+
+.sin-ajuste-info {
+    margin-top: 8px;
+    font-size: 0.85rem;
+    color: #fd7e14;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.sin-ajuste-info i {
+    font-size: 1rem;
+}
+
+.btn-disabled {
+    opacity: 0.6;
+    cursor: not-allowed !important;
+    pointer-events: none;
+}
+
 /* --- Responsive para Panel de Control --- */
 @media (max-width: 992px) {
     .panel-control-container {

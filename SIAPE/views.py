@@ -316,11 +316,25 @@ def panel_control_asesor(request):
     # Categorías de ajustes para el formulario
     categorias_ajustes = CategoriasAjustes.objects.all()
     
-    # Casos asignados al asesor actual
+    # Casos asignados al asesor actual con información de ajustes
     casos_asignados = Solicitudes.objects.filter(
         asesores_pedagogicos=perfil_asesor,
         estado='en_proceso'
     ).select_related('estudiantes').order_by('-created_at')
+    
+    # Agregar información de ajustes a cada caso
+    casos_con_ajustes = []
+    for caso in casos_asignados:
+        ajustes_asignados = AjusteAsignado.objects.filter(solicitudes=caso).select_related('ajuste_razonable', 'ajuste_razonable__categorias_ajustes')
+        tiene_ajuste = ajustes_asignados.exists()
+        ajuste_actual = ajustes_asignados.first() if tiene_ajuste else None
+        
+        casos_con_ajustes.append({
+            'caso': caso,
+            'tiene_ajuste': tiene_ajuste,
+            'ajuste_actual': ajuste_actual,
+            'total_ajustes': ajustes_asignados.count()
+        })
 
     context = {
         'casos_disponibles': casos_disponibles,
@@ -330,6 +344,7 @@ def panel_control_asesor(request):
         'citas_no_asistio': citas_no_asistio,
         'categorias_ajustes': categorias_ajustes,
         'casos_asignados': casos_asignados,
+        'casos_con_ajustes': casos_con_ajustes,
     }
     return render(request, 'SIAPE/panel_control_asesor.html', context)
 
@@ -408,9 +423,14 @@ def registrar_ajuste_razonable(request):
         descripcion = request.POST.get('descripcion')
         categoria_id = request.POST.get('categoria_id')
         nueva_categoria = request.POST.get('nueva_categoria', '').strip()
+        reasignar = request.POST.get('reasignar', 'false') == 'true'
         
         try:
-            solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
+            solicitud = get_object_or_404(
+                Solicitudes,
+                id=solicitud_id,
+                asesores_pedagogicos=request.user.perfil
+            )
             
             # Determinar la categoría
             if nueva_categoria:
@@ -421,6 +441,13 @@ def registrar_ajuste_razonable(request):
             else:
                 messages.error(request, 'Debe seleccionar una categoría o crear una nueva.')
                 return redirect('panel_control_asesor')
+            
+            # Si es reasignación, eliminar los ajustes anteriores (opcional, o mantenerlos)
+            # Por ahora, permitimos múltiples ajustes, pero podríamos eliminar los anteriores si se desea
+            if reasignar:
+                # Opcional: eliminar ajustes anteriores
+                # AjusteAsignado.objects.filter(solicitudes=solicitud).delete()
+                pass
             
             # Crear el ajuste razonable
             ajuste_razonable = AjusteRazonable.objects.create(
@@ -434,9 +461,89 @@ def registrar_ajuste_razonable(request):
                 solicitudes=solicitud
             )
             
-            messages.success(request, 'Ajuste razonable registrado y asignado correctamente.')
+            if reasignar:
+                messages.success(request, 'Ajuste razonable reasignado correctamente.')
+            else:
+                messages.success(request, 'Ajuste razonable registrado y asignado correctamente.')
         except Exception as e:
             messages.error(request, f'Error al registrar el ajuste: {str(e)}')
+    
+    return redirect('panel_control_asesor')
+
+@login_required
+def rechazar_solicitud_asesor(request, solicitud_id):
+    """ Rechazar una solicitud asignada al asesor actual. """
+    try:
+        if request.user.perfil.rol.nombre_rol != ROL_ASESOR:
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('panel_control_asesor')
+    except AttributeError:
+        return redirect('home')
+
+    if request.method == 'POST':
+        motivo_rechazo = request.POST.get('motivo_rechazo', '').strip()
+        
+        try:
+            solicitud = get_object_or_404(
+                Solicitudes,
+                id=solicitud_id,
+                asesores_pedagogicos=request.user.perfil
+            )
+            
+            # Solo se pueden rechazar solicitudes que estén en proceso
+            if solicitud.estado != 'en_proceso':
+                messages.warning(request, 'Solo se pueden rechazar solicitudes en proceso.')
+                return redirect('panel_control_asesor')
+            
+            solicitud.estado = 'rechazado'
+            solicitud.save()
+            
+            # Si se proporcionó un motivo, podríamos guardarlo en algún campo adicional
+            # Por ahora solo mostramos el mensaje
+            if motivo_rechazo:
+                messages.success(request, f'Solicitud rechazada. Motivo: {motivo_rechazo}')
+            else:
+                messages.success(request, 'Solicitud rechazada correctamente.')
+        except Exception as e:
+            messages.error(request, f'Error al rechazar la solicitud: {str(e)}')
+    
+    return redirect('panel_control_asesor')
+
+@login_required
+def aprobar_solicitud_asesor(request, solicitud_id):
+    """ Aprobar una solicitud asignada al asesor actual. """
+    try:
+        if request.user.perfil.rol.nombre_rol != ROL_ASESOR:
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('panel_control_asesor')
+    except AttributeError:
+        return redirect('home')
+
+    if request.method == 'POST':
+        try:
+            solicitud = get_object_or_404(
+                Solicitudes,
+                id=solicitud_id,
+                asesores_pedagogicos=request.user.perfil
+            )
+            
+            # Solo se pueden aprobar solicitudes que estén en proceso
+            if solicitud.estado != 'en_proceso':
+                messages.warning(request, 'Solo se pueden aprobar solicitudes en proceso.')
+                return redirect('panel_control_asesor')
+            
+            # Validar que la solicitud tenga al menos un ajuste asignado
+            tiene_ajuste = AjusteAsignado.objects.filter(solicitudes=solicitud).exists()
+            if not tiene_ajuste:
+                messages.error(request, 'No se puede aprobar la solicitud. Debe asignar al menos un ajuste razonable antes de aprobar.')
+                return redirect('panel_control_asesor')
+            
+            solicitud.estado = 'aprobado'
+            solicitud.save()
+            
+            messages.success(request, 'Solicitud aprobada correctamente.')
+        except Exception as e:
+            messages.error(request, f'Error al aprobar la solicitud: {str(e)}')
     
     return redirect('panel_control_asesor')
 

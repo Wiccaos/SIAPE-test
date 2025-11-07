@@ -68,24 +68,58 @@
         <!-- Sección: Casos Asignados (para agendar citas y registrar ajustes) -->
         <div class="panel-section">
             <h3><i class="fas fa-briefcase"></i> Mis Casos Asignados</h3>
-            {% if casos_asignados %}
-                {% for caso in casos_asignados %}
+            {% if casos_con_ajustes %}
+                {% for item in casos_con_ajustes %}
+                    {% with caso=item.caso %}
                     <div class="caso-item">
                         <div class="caso-header">
                             <div>
                                 <div class="caso-estudiante">{{ caso.estudiantes.nombres }} {{ caso.estudiantes.apellidos }}</div>
                                 <div class="caso-asunto">{{ caso.asunto }}</div>
+                                {% if item.tiene_ajuste %}
+                                <div class="ajuste-asignado-info">
+                                    <i class="fas fa-check-circle"></i> 
+                                    <span><strong>Ajuste asignado:</strong> {{ item.ajuste_actual.ajuste_razonable.categorias_ajustes.nombre_categoria }}
+                                    {% if item.total_ajustes > 1 %}
+                                        <span style="color: #666;">({{ item.total_ajustes }} ajustes)</span>
+                                    {% endif %}</span>
+                                </div>
+                                {% else %}
+                                <div class="sin-ajuste-info">
+                                    <i class="fas fa-exclamation-triangle"></i> 
+                                    <span><strong>Sin ajuste asignado</strong></span>
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
                         <div class="acciones-casos">
                             <button type="button" class="btn-accion btn-agendar" onclick="abrirModalAgendar({{ caso.id }}, '{{ caso.asunto }}')">
                                 <i class="fas fa-calendar-plus"></i> Agendar Cita
                             </button>
-                            <button type="button" class="btn-accion btn-ajuste" onclick="abrirModalAjuste({{ caso.id }}, '{{ caso.asunto }}')">
+                            {% if item.tiene_ajuste %}
+                            <button type="button" class="btn-accion btn-ajuste" onclick="abrirModalAjuste({{ caso.id }}, '{{ caso.asunto }}', true)">
+                                <i class="fas fa-edit"></i> Reasignar Ajuste
+                            </button>
+                            {% else %}
+                            <button type="button" class="btn-accion btn-ajuste" onclick="abrirModalAjuste({{ caso.id }}, '{{ caso.asunto }}', false)">
                                 <i class="fas fa-tools"></i> Registrar Ajuste
                             </button>
+                            {% endif %}
+                            {% if caso.estado == 'en_proceso' %}
+                            <button type="button" class="btn-accion btn-accion-green {% if not item.tiene_ajuste %}btn-disabled{% endif %}" onclick="abrirModalAprobar({{ caso.id }}, '{{ caso.asunto }}', {{ item.tiene_ajuste|yesno:'true,false' }})" {% if not item.tiene_ajuste %}title="Debe asignar un ajuste antes de aprobar"{% endif %}>
+                                <i class="fas fa-check-circle"></i> Aprobar
+                            </button>
+                            <button type="button" class="btn-accion btn-accion-red" onclick="abrirModalRechazar({{ caso.id }}, '{{ caso.asunto }}')">
+                                <i class="fas fa-times-circle"></i> Rechazar
+                            </button>
+                            {% else %}
+                            <span class="status status-{{ caso.estado }}" style="padding: 5px 10px; border-radius: 6px;">
+                                {{ caso.get_estado_display }}
+                            </span>
+                            {% endif %}
                         </div>
                     </div>
+                    {% endwith %}
                 {% endfor %}
             {% else %}
                 <div class="empty-state">
@@ -287,7 +321,7 @@
                 <h4><i class="fas fa-tools"></i> Registrar Ajuste Razonable</h4>
                 <button class="close" onclick="cerrarModalAjuste()">&times;</button>
             </div>
-            <form method="post" action="{% url 'registrar_ajuste_razonable' %}">
+            <form method="post" action="{% url 'registrar_ajuste_razonable' %}" id="formAjuste">
                 {% csrf_token %}
                 <input type="hidden" name="solicitud_id" id="ajuste_solicitud_id">
                 
@@ -433,6 +467,69 @@
         </div>
     </div>
 
+    <!-- Modal para Aprobar Solicitud -->
+    <div id="modalAprobar" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4><i class="fas fa-check-circle"></i> Aprobar Solicitud</h4>
+                <button class="close" onclick="cerrarModalAprobar()">&times;</button>
+            </div>
+            <form method="post" action="" id="formAprobar">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                    <label>Caso:</label>
+                    <input type="text" id="aprobar_caso_asunto" class="input-readonly" readonly>
+                </div>
+                
+                <div class="form-group" id="mensajeAprobacion">
+                    <p>¿Está seguro de que desea aprobar esta solicitud?</p>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalAprobar()">Cancelar</button>
+                    <button type="submit" class="btn-accion btn-accion-green" id="btnAprobarSubmit">
+                        <i class="fas fa-check"></i> Aprobar Solicitud
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para Rechazar Solicitud -->
+    <div id="modalRechazar" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4><i class="fas fa-times-circle"></i> Rechazar Solicitud</h4>
+                <button class="close" onclick="cerrarModalRechazar()">&times;</button>
+            </div>
+            <form method="post" action="" id="formRechazar">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                    <label>Caso:</label>
+                    <input type="text" id="rechazar_caso_asunto" class="input-readonly" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label for="motivo_rechazo">Motivo del Rechazo (opcional):</label>
+                    <textarea name="motivo_rechazo" id="motivo_rechazo" placeholder="Ingrese el motivo del rechazo de la solicitud..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <p style="color: #dc3545; font-weight: 500;">¿Está seguro de que desea rechazar esta solicitud?</p>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalRechazar()">Cancelar</button>
+                    <button type="submit" class="btn-accion btn-accion-red">
+                        <i class="fas fa-times"></i> Rechazar Solicitud
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 </div>
 
 <script>
@@ -449,9 +546,29 @@
         document.getElementById('notas').value = '';
     }
 
-    function abrirModalAjuste(solicitudId, asunto) {
+    function abrirModalAjuste(solicitudId, asunto, tieneAjuste) {
         document.getElementById('ajuste_solicitud_id').value = solicitudId;
         document.getElementById('ajuste_caso_asunto').value = asunto;
+        
+        // Agregar campo hidden para indicar si es reasignación
+        let reasignarInput = document.getElementById('reasignar_input');
+        if (!reasignarInput) {
+            reasignarInput = document.createElement('input');
+            reasignarInput.type = 'hidden';
+            reasignarInput.name = 'reasignar';
+            reasignarInput.id = 'reasignar_input';
+            document.getElementById('formAjuste').appendChild(reasignarInput);
+        }
+        reasignarInput.value = tieneAjuste ? 'true' : 'false';
+        
+        // Cambiar el título del modal según si ya tiene ajuste o no
+        const modalTitle = document.querySelector('#modalAjuste .modal-header h4');
+        if (tieneAjuste) {
+            modalTitle.innerHTML = '<i class="fas fa-edit"></i> Reasignar Ajuste Razonable';
+        } else {
+            modalTitle.innerHTML = '<i class="fas fa-tools"></i> Registrar Ajuste Razonable';
+        }
+        
         document.getElementById('modalAjuste').style.display = 'block';
     }
 
@@ -508,6 +625,52 @@
         document.getElementById('modalEditarNotas').style.display = 'none';
     }
 
+    function abrirModalAprobar(solicitudId, asunto, tieneAjuste) {
+        document.getElementById('aprobar_caso_asunto').value = asunto;
+        document.getElementById('formAprobar').action = '{% url "aprobar_solicitud_asesor" 0 %}'.replace('0', solicitudId);
+        
+        // Mostrar advertencia si no tiene ajuste
+        const mensajeAprobacion = document.getElementById('mensajeAprobacion');
+        const btnAprobar = document.getElementById('btnAprobarSubmit');
+        
+        if (!tieneAjuste) {
+            mensajeAprobacion.innerHTML = '<p style="color: #dc3545; font-weight: 500; padding: 10px; background-color: #f8d7da; border-radius: 6px; border-left: 4px solid #dc3545;">⚠️ <strong>No se puede aprobar.</strong> Debe asignar un ajuste razonable antes de aprobar esta solicitud.</p>';
+            btnAprobar.disabled = true;
+            btnAprobar.style.opacity = '0.5';
+            btnAprobar.style.cursor = 'not-allowed';
+            btnAprobar.classList.add('btn-disabled');
+        } else {
+            mensajeAprobacion.innerHTML = '<p>¿Está seguro de que desea aprobar esta solicitud?</p>';
+            btnAprobar.disabled = false;
+            btnAprobar.style.opacity = '1';
+            btnAprobar.style.cursor = 'pointer';
+            btnAprobar.classList.remove('btn-disabled');
+        }
+        
+        document.getElementById('modalAprobar').style.display = 'block';
+    }
+
+    function cerrarModalAprobar() {
+        document.getElementById('modalAprobar').style.display = 'none';
+        // Resetear el botón
+        const btnAprobar = document.getElementById('btnAprobarSubmit');
+        btnAprobar.disabled = false;
+        btnAprobar.style.opacity = '1';
+        btnAprobar.style.cursor = 'pointer';
+        btnAprobar.classList.remove('btn-disabled');
+    }
+
+    function abrirModalRechazar(solicitudId, asunto) {
+        document.getElementById('rechazar_caso_asunto').value = asunto;
+        document.getElementById('formRechazar').action = '{% url "rechazar_solicitud_asesor" 0 %}'.replace('0', solicitudId);
+        document.getElementById('modalRechazar').style.display = 'block';
+    }
+
+    function cerrarModalRechazar() {
+        document.getElementById('modalRechazar').style.display = 'none';
+        document.getElementById('motivo_rechazo').value = '';
+    }
+
     function abrirModalReagendar(entrevistaId, asunto, modalidad) {
         document.getElementById('reagendar_caso_asunto').value = asunto;
         document.getElementById('nueva_modalidad').value = modalidad;
@@ -528,6 +691,8 @@
         const modalConfirmar = document.getElementById('modalConfirmar');
         const modalEditarNotas = document.getElementById('modalEditarNotas');
         const modalReagendar = document.getElementById('modalReagendar');
+        const modalAprobar = document.getElementById('modalAprobar');
+        const modalRechazar = document.getElementById('modalRechazar');
         
         if (event.target == modalAgendar) {
             cerrarModalAgendar();
@@ -543,6 +708,12 @@
         }
         if (event.target == modalReagendar) {
             cerrarModalReagendar();
+        }
+        if (event.target == modalAprobar) {
+            cerrarModalAprobar();
+        }
+        if (event.target == modalRechazar) {
+            cerrarModalRechazar();
         }
     }
 </script>
