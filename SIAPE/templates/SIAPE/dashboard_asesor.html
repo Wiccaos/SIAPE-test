@@ -21,7 +21,7 @@
             <i class="fas fa-folder-open"></i>
             Casos
         </a>
-        <a href="#" class="nav-item">
+        <a href="{% url 'panel_control_asesor' %}" class="nav-item">
             <i class="fas fa-tachometer-alt"></i>
             Panel de Control
         </a>
@@ -57,79 +57,52 @@
                 <span class="kpi-label">En Proceso</span>
                 </div>
         </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-citas">
+                <i class="fas fa-calendar-check"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ citas_semana|default:0 }}</span>
+                <span class="kpi-label">Citas esta semana</span>
+                </div>
+        </div>
     </section>
 
     <section class="support-grid-container">
         <h2>Distribución de apoyo personalizado</h2>
 
-        <div class="support-row">
-            <div class="support-title">
-                Ingreso por atraso: Estudiantes con problemas de locomoción, viajes a larga distancia...
-            </div>
-            <div class="support-stats">
-                <div class="stat-box approved">
-                    <strong>53</strong>
-                    <span>aprobados</span>
+        {% if distribucion_apoyos %}
+            {% for item in distribucion_apoyos %}
+                <div class="support-row">
+                    <div class="support-title">
+                        {{ item.categoria.nombre_categoria }}
+                    </div>
+                    <div class="support-stats">
+                        <div class="stat-box approved">
+                            <strong>{{ item.aprobados }}</strong>
+                            <span>aprobados</span>
+                        </div>
+                        <div class="stat-box pending">
+                            <strong>{{ item.pendientes }}</strong>
+                            <span>Pendientes</span>
+                        </div>
+                        <div class="stat-box rejected">
+                            <strong>{{ item.rechazados }}</strong>
+                            <span>Rechazados</span>
+                        </div>
+                    </div>
+                    <div class="support-total">
+                        {{ item.total }} casos ({{ item.porcentaje }}%)
+                    </div>
                 </div>
-                <div class="stat-box pending">
-                    <strong>12</strong>
-                    <span>Pendientes</span>
-                </div>
-                <div class="stat-box rejected">
-                    <strong>5</strong>
-                    <span>Rechazados</span>
-                </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-inbox"></i>
+                <p>No hay datos de distribución de apoyos disponibles</p>
             </div>
-            <div class="support-total">
-                70 casos (23.1%)
-            </div>
-        </div>
-
-        <div class="support-row">
-            <div class="support-title">
-                Problemas de audición: Controlar volumen en clases, aumentar o disminuir volumen...
-            </div>
-            <div class="support-stats">
-                <div class="stat-box approved">
-                    <strong>26</strong>
-                    <span>aprobados</span>
-                </div>
-                <div class="stat-box pending">
-                    <strong>21</strong>
-                    <span>Pendientes</span>
-                </div>
-                <div class="stat-box rejected">
-                    <strong>9</strong>
-                    <span>Rechazados</span>
-                </div>
-            </div>
-            <div class="support-total">
-                56 casos (23.1%)
-            </div>
-        </div>
-
-        <div class="support-row">
-            <div class="support-title">
-                Problemas a la vista: Maximizar presentaciones, aumentar tamaño de fuente...
-            </div>
-            <div class="support-stats">
-                <div class="stat-box approved">
-                    <strong>12</strong>
-                    <span>aprobados</span>
-                </div>
-                <div class="stat-box pending">
-                    <strong>3</strong>
-                    <span>Pendientes</span>
-                </div>
-                <div class="stat-box rejected">
-                    <strong>0</strong>
-                    <span>Rechazados</span>
-                </div>
-            </div>
-            <div class="support-total">
-                15 casos (23.1%)
-            </div>
-        </div>
+        {% endif %}
 
     </section>
 
