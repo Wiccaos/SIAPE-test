@@ -49,6 +49,13 @@ urlpatterns = [
     path('dashboard/asesor/', views.dashboard_asesor, name='dashboard_asesor'),
     path('dashboard/asesor/casos/', views.casos_asesor, name='casos_asesor'),
     path('dashboard/asesor/casos/<int:solicitud_id>/', views.detalle_caso_asesor, name='detalle_caso_asesor'),
+    path('dashboard/asesor/panel-control/', views.panel_control_asesor, name='panel_control_asesor'),
+    path('dashboard/asesor/asignar-caso/<int:solicitud_id>/', views.asignar_caso_asesor, name='asignar_caso_asesor'),
+    path('dashboard/asesor/agendar-cita/', views.agendar_cita_asesor, name='agendar_cita_asesor'),
+    path('dashboard/asesor/registrar-ajuste/', views.registrar_ajuste_razonable, name='registrar_ajuste_razonable'),
+    path('dashboard/asesor/confirmar-cita/<int:entrevista_id>/', views.confirmar_cita_asesor, name='confirmar_cita_asesor'),
+    path('dashboard/asesor/editar-notas-cita/<int:entrevista_id>/', views.editar_notas_cita, name='editar_notas_cita'),
+    path('dashboard/asesor/reagendar-cita/<int:entrevista_id>/', views.reagendar_cita_asesor, name='reagendar_cita_asesor'),
 
     # URLs de Director de Carrera
     path('dashboard/director/', views.dashboard_director, name='dashboard_director'),

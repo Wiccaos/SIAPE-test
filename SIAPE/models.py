@@ -286,6 +286,17 @@ class Entrevistas(models.Model):
         on_delete=models.CASCADE,
         limit_choices_to={'rol__nombre_rol': 'Asesor Pedagógico'}
         )
+    ESTADO_CHOICES = (
+        ('pendiente', 'Pendiente'),
+        ('realizada', 'Realizada'),
+        ('no_asistio', 'No asistió'),
+    )
+    estado = models.CharField(
+        max_length=20,
+        choices=ESTADO_CHOICES,
+        default='pendiente',
+        verbose_name="Estado de la Entrevista"
+    )
 
     class Meta:
         db_table = 'entrevistas'

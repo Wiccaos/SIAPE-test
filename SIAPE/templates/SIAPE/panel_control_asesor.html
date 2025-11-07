@@ -1,0 +1,550 @@
+{% extends "plantilla.html" %}
+{% load static %}
+
+{% block title %}
+    Panel de Control - Asesor | SIAPE
+{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="main-content"> 
+    
+    <nav class="dashboard-nav">
+        <a href="{% url 'dashboard_asesor' %}" class="nav-item">
+            <i class="fas fa-home"></i>
+            Panel Principal
+        </a>
+        <a href="{% url 'casos_asesor' %}" class="nav-item">
+            <i class="fas fa-folder-open"></i>
+            Casos
+        </a>
+        <a href="{% url 'panel_control_asesor' %}" class="nav-item active">
+            <i class="fas fa-tachometer-alt"></i>
+            Panel de Control
+        </a>
+    </nav>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}" style="padding: 15px; margin-bottom: 20px; border-radius: 6px; background-color: {% if message.tags == 'success' %}#d4edda{% elif message.tags == 'error' %}#f8d7da{% else %}#fff3cd{% endif %}; color: {% if message.tags == 'success' %}#155724{% elif message.tags == 'error' %}#721c24{% else %}#856404{% endif %};">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="panel-control-container">
+        <!-- Sección: Casos Disponibles para Asignar -->
+        <div class="panel-section">
+            <h3><i class="fas fa-list"></i> Casos Disponibles</h3>
+            {% if casos_disponibles %}
+                {% for caso in casos_disponibles %}
+                    <div class="caso-item">
+                        <div class="caso-header">
+                            <div>
+                                <div class="caso-estudiante">{{ caso.estudiantes.nombres }} {{ caso.estudiantes.apellidos }}</div>
+                                <div class="caso-asunto">{{ caso.asunto }}</div>
+                                <div class="caso-asunto caso-asunto-date">{{ caso.created_at|date:"d/m/Y" }}</div>
+                            </div>
+                        </div>
+                        <form method="post" action="{% url 'asignar_caso_asesor' caso.id %}" class="form-margin-top">
+                            {% csrf_token %}
+                            <button type="submit" class="btn-accion btn-asignar">
+                                <i class="fas fa-user-check"></i> Asignarme
+                            </button>
+                        </form>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-inbox"></i>
+                    <p>No hay casos disponibles para asignar</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Sección: Casos Asignados (para agendar citas y registrar ajustes) -->
+        <div class="panel-section">
+            <h3><i class="fas fa-briefcase"></i> Mis Casos Asignados</h3>
+            {% if casos_asignados %}
+                {% for caso in casos_asignados %}
+                    <div class="caso-item">
+                        <div class="caso-header">
+                            <div>
+                                <div class="caso-estudiante">{{ caso.estudiantes.nombres }} {{ caso.estudiantes.apellidos }}</div>
+                                <div class="caso-asunto">{{ caso.asunto }}</div>
+                            </div>
+                        </div>
+                        <div class="acciones-casos">
+                            <button type="button" class="btn-accion btn-agendar" onclick="abrirModalAgendar({{ caso.id }}, '{{ caso.asunto }}')">
+                                <i class="fas fa-calendar-plus"></i> Agendar Cita
+                            </button>
+                            <button type="button" class="btn-accion btn-ajuste" onclick="abrirModalAjuste({{ caso.id }}, '{{ caso.asunto }}')">
+                                <i class="fas fa-tools"></i> Registrar Ajuste
+                            </button>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-folder-open"></i>
+                    <p>No tienes casos asignados</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Sección: Citas Pendientes de Confirmar (Pasadas) -->
+    {% if citas_pendientes_confirmar %}
+    <div class="panel-section citas-detalle">
+        <h3><i class="fas fa-exclamation-circle icon-warning"></i> Citas Pendientes de Confirmar</h3>
+        <div class="cita-detalle-item cita-detalle-header">
+            <div>Estudiante / Caso</div>
+            <div>Fecha y Hora</div>
+            <div>Modalidad</div>
+            <div>Estado</div>
+            <div>Acciones</div>
+        </div>
+        {% for cita in citas_pendientes_confirmar %}
+            <div class="cita-detalle-item cita-detalle-item-5cols">
+                <div>
+                    <div class="cita-estudiante">{{ cita.solicitudes.estudiantes.nombres }} {{ cita.solicitudes.estudiantes.apellidos }}</div>
+                    <div class="caso-asunto caso-asunto-small">{{ cita.solicitudes.asunto }}</div>
+                </div>
+                <div class="cita-fecha-hora cita-fecha-hora-pendiente">
+                    <i class="fas fa-clock"></i> {{ cita.fecha_entrevista|date:"d/m/Y H:i" }}
+                </div>
+                <div>
+                    <span class="cita-modalidad">{{ cita.modalidad }}</span>
+                </div>
+                <div>
+                    <span class="status status-en_proceso">{{ cita.get_estado_display }}</span>
+                </div>
+                <div class="acciones-container">
+                    <button type="button" class="btn-accion btn-asignar btn-accion-small" onclick="abrirModalConfirmar({{ cita.id }}, 'realizada', '{{ cita.solicitudes.asunto }}')">
+                        <i class="fas fa-check"></i> Realizada
+                    </button>
+                    <button type="button" class="btn-accion btn-accion-red btn-accion-small" onclick="abrirModalConfirmar({{ cita.id }}, 'no_asistio', '{{ cita.solicitudes.asunto }}')">
+                        <i class="fas fa-times"></i> No asistió
+                    </button>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Sección: Próximas Citas con Detalle -->
+    <div class="panel-section citas-detalle">
+        <h3><i class="fas fa-calendar-check"></i> Próximas Citas</h3>
+        {% if proximas_citas %}
+            <div class="cita-detalle-item cita-detalle-header">
+                <div>Estudiante / Caso</div>
+                <div>Fecha y Hora</div>
+                <div>Modalidad</div>
+                <div>Estado</div>
+                <div>Acciones</div>
+            </div>
+            {% for cita in proximas_citas %}
+                <div class="cita-detalle-item cita-detalle-item-5cols">
+                    <div>
+                        <div class="cita-estudiante">{{ cita.solicitudes.estudiantes.nombres }} {{ cita.solicitudes.estudiantes.apellidos }}</div>
+                        <div class="caso-asunto caso-asunto-small">{{ cita.solicitudes.asunto }}</div>
+                    </div>
+                    <div class="cita-fecha-hora">
+                        <i class="fas fa-clock"></i> {{ cita.fecha_entrevista|date:"d/m/Y H:i" }}
+                    </div>
+                    <div>
+                        <span class="cita-modalidad">{{ cita.modalidad }}</span>
+                    </div>
+                    <div>
+                        <span class="status status-en_proceso">{{ cita.get_estado_display }}</span>
+                    </div>
+                    <div class="acciones-container">
+                        <button type="button" class="btn-accion btn-accion-gray btn-accion-small" onclick="abrirModalEditarNotas({{ cita.id }}, '{{ cita.notas|escapejs }}', '{{ cita.solicitudes.asunto }}')">
+                            <i class="fas fa-edit"></i> Editar Notas
+                        </button>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-calendar-times"></i>
+                <p>No hay citas programadas</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Sección: Citas Realizadas / No Asistió -->
+    {% if citas_realizadas or citas_no_asistio %}
+    <div class="panel-section citas-detalle">
+        <h3><i class="fas fa-history"></i> Historial de Citas</h3>
+        <div class="cita-detalle-item cita-detalle-header">
+            <div>Estudiante / Caso</div>
+            <div>Fecha y Hora</div>
+            <div>Modalidad</div>
+            <div>Estado</div>
+            <div>Acciones</div>
+        </div>
+        {% for cita in citas_realizadas %}
+            <div class="cita-detalle-item cita-detalle-item-5cols">
+                <div>
+                    <div class="cita-estudiante">{{ cita.solicitudes.estudiantes.nombres }} {{ cita.solicitudes.estudiantes.apellidos }}</div>
+                    <div class="caso-asunto caso-asunto-small">{{ cita.solicitudes.asunto }}</div>
+                </div>
+                <div class="cita-fecha-hora">
+                    <i class="fas fa-clock"></i> {{ cita.fecha_entrevista|date:"d/m/Y H:i" }}
+                </div>
+                <div>
+                    <span class="cita-modalidad">{{ cita.modalidad }}</span>
+                </div>
+                <div>
+                    <span class="status status-aprobado">{{ cita.get_estado_display }}</span>
+                </div>
+                <div class="acciones-container">
+                    <button type="button" class="btn-accion btn-accion-gray btn-accion-small" onclick="abrirModalEditarNotas({{ cita.id }}, '{{ cita.notas|escapejs }}', '{{ cita.solicitudes.asunto }}')">
+                        <i class="fas fa-edit"></i> Editar Notas
+                    </button>
+                </div>
+            </div>
+        {% endfor %}
+        {% for cita in citas_no_asistio %}
+            <div class="cita-detalle-item cita-detalle-item-5cols">
+                <div>
+                    <div class="cita-estudiante">{{ cita.solicitudes.estudiantes.nombres }} {{ cita.solicitudes.estudiantes.apellidos }}</div>
+                    <div class="caso-asunto caso-asunto-small">{{ cita.solicitudes.asunto }}</div>
+                </div>
+                <div class="cita-fecha-hora cita-fecha-hora-no-asistio">
+                    <i class="fas fa-clock"></i> {{ cita.fecha_entrevista|date:"d/m/Y H:i" }}
+                </div>
+                <div>
+                    <span class="cita-modalidad">{{ cita.modalidad }}</span>
+                </div>
+                <div>
+                    <span class="status status-rechazado">{{ cita.get_estado_display }}</span>
+                </div>
+                <div class="acciones-container">
+                    <button type="button" class="btn-accion btn-agendar btn-accion-small" onclick="abrirModalReagendar({{ cita.id }}, '{{ cita.solicitudes.asunto }}', '{{ cita.modalidad }}')">
+                        <i class="fas fa-redo"></i> Reagendar
+                    </button>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Modal para Agendar Cita -->
+    <div id="modalAgendar" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4><i class="fas fa-calendar-plus"></i> Agendar Nueva Cita</h4>
+                <button class="close" onclick="cerrarModalAgendar()">&times;</button>
+            </div>
+            <form method="post" action="{% url 'agendar_cita_asesor' %}">
+                {% csrf_token %}
+                <input type="hidden" name="solicitud_id" id="agendar_solicitud_id">
+                
+                <div class="form-group">
+                    <label>Caso:</label>
+                    <input type="text" id="agendar_caso_asunto" class="input-readonly" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label for="fecha_entrevista">Fecha y Hora:</label>
+                    <input type="datetime-local" name="fecha_entrevista" id="fecha_entrevista" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="modalidad">Modalidad:</label>
+                    <select name="modalidad" id="modalidad" required>
+                        <option value="">Seleccione una modalidad</option>
+                        <option value="Presencial">Presencial</option>
+                        <option value="Virtual">Virtual</option>
+                        <option value="Híbrida">Híbrida</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="notas">Notas (opcional):</label>
+                    <textarea name="notas" id="notas" placeholder="Agregar notas adicionales sobre la cita..."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalAgendar()">Cancelar</button>
+                    <button type="submit" class="btn-accion btn-agendar">
+                        <i class="fas fa-save"></i> Guardar Cita
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para Registrar Ajuste Razonable -->
+    <div id="modalAjuste" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4><i class="fas fa-tools"></i> Registrar Ajuste Razonable</h4>
+                <button class="close" onclick="cerrarModalAjuste()">&times;</button>
+            </div>
+            <form method="post" action="{% url 'registrar_ajuste_razonable' %}">
+                {% csrf_token %}
+                <input type="hidden" name="solicitud_id" id="ajuste_solicitud_id">
+                
+                <div class="form-group">
+                    <label>Caso:</label>
+                    <input type="text" id="ajuste_caso_asunto" class="input-readonly" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label for="descripcion">Descripción del Ajuste:</label>
+                    <textarea name="descripcion" id="descripcion" required placeholder="Describa el ajuste razonable a implementar..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="categoria_id">Categoría:</label>
+                    <select name="categoria_id" id="categoria_id" onchange="toggleNuevaCategoria()">
+                        <option value="">Seleccione una categoría</option>
+                        {% for categoria in categorias_ajustes %}
+                            <option value="{{ categoria.id }}">{{ categoria.nombre_categoria }}</option>
+                        {% endfor %}
+                        <option value="nueva">Crear nueva categoría</option>
+                    </select>
+                </div>
+                
+                <div class="form-group hidden" id="nuevaCategoriaGroup">
+                    <label for="nueva_categoria">Nombre de Nueva Categoría:</label>
+                    <input type="text" name="nueva_categoria" id="nueva_categoria" placeholder="Ingrese el nombre de la nueva categoría">
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalAjuste()">Cancelar</button>
+                    <button type="submit" class="btn-accion btn-ajuste">
+                        <i class="fas fa-save"></i> Guardar Ajuste
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para Confirmar Cita -->
+    <div id="modalConfirmar" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4><i class="fas fa-check-circle"></i> Confirmar Cita</h4>
+                <button class="close" onclick="cerrarModalConfirmar()">&times;</button>
+            </div>
+            <form method="post" action="" id="formConfirmar">
+                {% csrf_token %}
+                <input type="hidden" name="accion" id="confirmar_accion">
+                
+                <div class="form-group">
+                    <label>Caso:</label>
+                    <input type="text" id="confirmar_caso_asunto" class="input-readonly" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label for="notas_adicionales">Notas Adicionales (opcional):</label>
+                    <textarea name="notas_adicionales" id="notas_adicionales" placeholder="Agregar notas sobre la confirmación de la cita..."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalConfirmar()">Cancelar</button>
+                    <button type="submit" class="btn-accion btn-accion-green" id="btnConfirmarSubmit">
+                        <i class="fas fa-check"></i> Confirmar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para Editar Notas -->
+    <div id="modalEditarNotas" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4><i class="fas fa-edit"></i> Editar Notas de la Cita</h4>
+                <button class="close" onclick="cerrarModalEditarNotas()">&times;</button>
+            </div>
+            <form method="post" action="" id="formEditarNotas">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                    <label>Caso:</label>
+                    <input type="text" id="editar_notas_caso_asunto" class="input-readonly" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label for="notas">Notas:</label>
+                    <textarea name="notas" id="editar_notas_textarea" required placeholder="Agregar o editar las notas de la cita..."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalEditarNotas()">Cancelar</button>
+                    <button type="submit" class="btn-accion btn-accion-gray">
+                        <i class="fas fa-save"></i> Guardar Notas
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para Reagendar Cita -->
+    <div id="modalReagendar" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4><i class="fas fa-redo"></i> Reagendar Cita</h4>
+                <button class="close" onclick="cerrarModalReagendar()">&times;</button>
+            </div>
+            <form method="post" action="" id="formReagendar">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                    <label>Caso:</label>
+                    <input type="text" id="reagendar_caso_asunto" class="input-readonly" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label for="nueva_fecha_entrevista">Nueva Fecha y Hora:</label>
+                    <input type="datetime-local" name="nueva_fecha_entrevista" id="nueva_fecha_entrevista" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="nueva_modalidad">Modalidad:</label>
+                    <select name="nueva_modalidad" id="nueva_modalidad">
+                        <option value="">Seleccione una modalidad</option>
+                        <option value="Presencial">Presencial</option>
+                        <option value="Virtual">Virtual</option>
+                        <option value="Híbrida">Híbrida</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="notas_reagendamiento">Notas (opcional):</label>
+                    <textarea name="notas_reagendamiento" id="notas_reagendamiento" placeholder="Agregar notas sobre el reagendamiento..."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalReagendar()">Cancelar</button>
+                    <button type="submit" class="btn-accion btn-agendar">
+                        <i class="fas fa-save"></i> Reagendar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    function abrirModalAgendar(solicitudId, asunto) {
+        document.getElementById('agendar_solicitud_id').value = solicitudId;
+        document.getElementById('agendar_caso_asunto').value = asunto;
+        document.getElementById('modalAgendar').style.display = 'block';
+    }
+
+    function cerrarModalAgendar() {
+        document.getElementById('modalAgendar').style.display = 'none';
+        document.getElementById('fecha_entrevista').value = '';
+        document.getElementById('modalidad').value = '';
+        document.getElementById('notas').value = '';
+    }
+
+    function abrirModalAjuste(solicitudId, asunto) {
+        document.getElementById('ajuste_solicitud_id').value = solicitudId;
+        document.getElementById('ajuste_caso_asunto').value = asunto;
+        document.getElementById('modalAjuste').style.display = 'block';
+    }
+
+    function cerrarModalAjuste() {
+        document.getElementById('modalAjuste').style.display = 'none';
+        document.getElementById('descripcion').value = '';
+        document.getElementById('categoria_id').value = '';
+        document.getElementById('nueva_categoria').value = '';
+        document.getElementById('nuevaCategoriaGroup').style.display = 'none';
+    }
+
+    function toggleNuevaCategoria() {
+        const categoriaSelect = document.getElementById('categoria_id');
+        const nuevaCategoriaGroup = document.getElementById('nuevaCategoriaGroup');
+        if (categoriaSelect.value === 'nueva') {
+            nuevaCategoriaGroup.classList.remove('hidden');
+            document.getElementById('nueva_categoria').required = true;
+        } else {
+            nuevaCategoriaGroup.classList.add('hidden');
+            document.getElementById('nueva_categoria').required = false;
+        }
+    }
+
+    function abrirModalConfirmar(entrevistaId, accion, asunto) {
+        document.getElementById('confirmar_accion').value = accion;
+        document.getElementById('confirmar_caso_asunto').value = asunto;
+        document.getElementById('formConfirmar').action = '{% url "confirmar_cita_asesor" 0 %}'.replace('0', entrevistaId);
+        
+        const btnSubmit = document.getElementById('btnConfirmarSubmit');
+        if (accion === 'realizada') {
+            btnSubmit.innerHTML = '<i class="fas fa-check"></i> Marcar como Realizada';
+            btnSubmit.className = 'btn-accion btn-accion-green';
+        } else {
+            btnSubmit.innerHTML = '<i class="fas fa-times"></i> Marcar como No Asistió';
+            btnSubmit.className = 'btn-accion btn-accion-red';
+        }
+        
+        document.getElementById('modalConfirmar').style.display = 'block';
+    }
+
+    function cerrarModalConfirmar() {
+        document.getElementById('modalConfirmar').style.display = 'none';
+        document.getElementById('notas_adicionales').value = '';
+    }
+
+    function abrirModalEditarNotas(entrevistaId, notas, asunto) {
+        document.getElementById('editar_notas_caso_asunto').value = asunto;
+        document.getElementById('editar_notas_textarea').value = notas.replace(/\\n/g, '\n');
+        document.getElementById('formEditarNotas').action = '{% url "editar_notas_cita" 0 %}'.replace('0', entrevistaId);
+        document.getElementById('modalEditarNotas').style.display = 'block';
+    }
+
+    function cerrarModalEditarNotas() {
+        document.getElementById('modalEditarNotas').style.display = 'none';
+    }
+
+    function abrirModalReagendar(entrevistaId, asunto, modalidad) {
+        document.getElementById('reagendar_caso_asunto').value = asunto;
+        document.getElementById('nueva_modalidad').value = modalidad;
+        document.getElementById('formReagendar').action = '{% url "reagendar_cita_asesor" 0 %}'.replace('0', entrevistaId);
+        document.getElementById('modalReagendar').style.display = 'block';
+    }
+
+    function cerrarModalReagendar() {
+        document.getElementById('modalReagendar').style.display = 'none';
+        document.getElementById('nueva_fecha_entrevista').value = '';
+        document.getElementById('notas_reagendamiento').value = '';
+    }
+
+    // Cerrar modales al hacer clic fuera de ellos
+    window.onclick = function(event) {
+        const modalAgendar = document.getElementById('modalAgendar');
+        const modalAjuste = document.getElementById('modalAjuste');
+        const modalConfirmar = document.getElementById('modalConfirmar');
+        const modalEditarNotas = document.getElementById('modalEditarNotas');
+        const modalReagendar = document.getElementById('modalReagendar');
+        
+        if (event.target == modalAgendar) {
+            cerrarModalAgendar();
+        }
+        if (event.target == modalAjuste) {
+            cerrarModalAjuste();
+        }
+        if (event.target == modalConfirmar) {
+            cerrarModalConfirmar();
+        }
+        if (event.target == modalEditarNotas) {
+            cerrarModalEditarNotas();
+        }
+        if (event.target == modalReagendar) {
+            cerrarModalReagendar();
+        }
+    }
+</script>
+{% endblock %}
+
