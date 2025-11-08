@@ -646,6 +646,7 @@
     width: 100%;
     height: 100%;
     background-color: rgba(0,0,0,0.5);
+    overflow-y: auto; /* Permite scroll si el modal es muy alto */
 }
 
 .modal-content {
@@ -655,8 +656,8 @@
     border-radius: 8px;
     width: 90%;
     max-width: 600px;
-    max-height: 80vh;
-    overflow-y: auto;
+    max-height: 90vh; /* Límite de altura */
+    overflow-y: auto; /* Scroll interno si es necesario */
 }
 
 .modal-header {
@@ -922,26 +923,55 @@
     border: 2px solid #007bff; /* Borde de "Hoy" */
 }
 
-/* Aseguramos que el grid del calendario en el panel 
-  tenga el espaciado correcto (ya definido en detalle_caso)
+/* --- INICIO DE LA SOLUCIÓN --- */
+
+/* Regla específica para la grilla del calendario EN EL PANEL.
+  Hereda 'display: grid' y 'gap: 5px' de la regla general '.calendario-grid'
 */
 #card-calendario-panel .calendario-grid {
-    gap: 5px;
+    /* Quitamos el '1fr' (fraccional) que estira las columnas.
+      'auto' hace que las columnas se ajusten al contenido (los 30px del .cal-day)
+    */
+    grid-template-columns: repeat(7, auto);
+    
+    /* Centra la grilla de días si sobra espacio en el contenedor */
+    justify-content: center; 
 }
 
+/* Regla específica para los días del calendario EN EL PANEL.
+  Asegura que todas las propiedades de .cal-day se apliquen
+  y no sean sobreescritas por reglas de menor especificidad.
+*/
 #card-calendario-panel .cal-day {
     width: 30px;
     height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
 }
 
-/* Ajuste para la tarjeta de calendario en el panel 
-  para que el padding no sea excesivo 
+/* Ajuste para la tarjeta de calendario en el panel.
+  Quitamos el padding para que el contenido se alinee mejor
+  y añadimos 'overflow-x: auto' para que en móviles pequeños
+  la grilla (7 * 30px + gaps) pueda deslizarse sin romper el layout.
 */
 #card-calendario-panel {
     padding: 0; 
+    overflow-x: auto;
 }
+/* --- FIN DE LA SOLUCIÓN --- */
+
 
 #card-calendario-panel .calendario-header {
     padding: 15px 15px 0 15px;
 }
 
+/* --- Grid de 2 Columnas para Formularios (Modales) --- */
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}

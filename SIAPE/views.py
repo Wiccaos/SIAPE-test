@@ -105,6 +105,7 @@ def pag_inicio(request):
     elif rol == ROL_ADMIN:
         return redirect('dashboard_admin')
 
+    # Si es superusuario pero no tiene rol (ej. 'admin' puro), va al admin de Django
     if request.user.is_superuser or request.user.is_staff:
         return redirect('admin:index')
 
@@ -149,14 +150,17 @@ def dashboard_admin(request):
         'solicitudes_rechazadas': Solicitudes.objects.filter(estado='rechazado').count(),
     }
 
+    # --- Tabla: Casos Críticos (Sin Asignar) ---
+    # Solicitudes en proceso que no tienen ningún asesor
     solicitudes_sin_asignar = Solicitudes.objects.filter(
         asesores_pedagogicos__isnull=True,
         estado='en_proceso'
     ).select_related(
         'estudiantes', 
         'estudiantes__carreras'
-    ).order_by('created_at')
+    ).order_by('created_at') # <-- Más antiguas primero
 
+    # --- Gráfico: Distribución de Solicitudes por Área ---
     distribucion_areas = Areas.objects.annotate(
         total_solicitudes=Count('carreras__estudiantes__solicitudes')
     ).filter(
@@ -183,36 +187,43 @@ def dashboard_admin(request):
     
     return render(request, 'SIAPE/dashboard_admin.html', context)
 
+# --- Vistas de Gestión de Usuarios y Roles ---
+
+def _check_admin_permission(request):
+    """Función helper para verificar permisos de admin."""
+    rol = None
+    if hasattr(request.user, 'perfil') and request.user.perfil.rol:
+        rol = request.user.perfil.rol.nombre_rol
+    
+    if not request.user.is_superuser and rol != ROL_ADMIN:
+        return False
+    return True
+
 @login_required
 def gestion_usuarios_admin(request):
     """
     Página para que el Admin vea y gestione usuarios y roles.
     """
-    # Verificar permisos (igual que en dashboard_admin)
-    rol = None
-    if hasattr(request.user, 'perfil'):
-        if request.user.perfil.rol:
-            rol = request.user.perfil.rol.nombre_rol
-
-    if not request.user.is_superuser and rol != ROL_ADMIN:
+    if not _check_admin_permission(request):
         return redirect('home')
 
-    # Obtenemos todos los perfiles de usuario con su info relacionada
-    # Usamos select_related para optimizar la consulta a la BD
     perfiles = PerfilUsuario.objects.select_related(
         'usuario', 
         'rol', 
         'area'
     ).all().order_by('usuario__first_name')
     
-    # Obtenemos todos los roles y áreas para los modales
     roles_disponibles = Roles.objects.all()
     areas_disponibles = Areas.objects.all()
+
+    # Traemos la lista de roles a esta vista
+    roles_list = Roles.objects.all().order_by('nombre_rol')
 
     context = {
         'perfiles': perfiles,
         'roles_disponibles': roles_disponibles,
         'areas_disponibles': areas_disponibles,
+        'roles_list': roles_list, # Añadimos la lista al contexto
     }
     
     return render(request, 'SIAPE/gestion_usuarios_admin.html', context)
@@ -222,12 +233,7 @@ def agregar_usuario_admin(request):
     """
     Acción POST para crear un nuevo usuario desde el modal.
     """
-    # Verificar permisos
-    rol = None
-    if hasattr(request.user, 'perfil'):
-        if request.user.perfil.rol:
-            rol = request.user.perfil.rol.nombre_rol
-    if not request.user.is_superuser and rol != ROL_ADMIN:
+    if not _check_admin_permission(request):
         messages.error(request, 'No tienes permisos para realizar esta acción.')
         return redirect('gestion_usuarios_admin')
 
@@ -281,12 +287,7 @@ def editar_usuario_admin(request, perfil_id):
     """
     Acción POST para editar el rol Y los datos de un usuario existente.
     """
-    # Verificar permisos
-    rol_permiso = None
-    if hasattr(request.user, 'perfil'):
-        if request.user.perfil.rol:
-            rol_permiso = request.user.perfil.rol.nombre_rol
-    if not request.user.is_superuser and rol_permiso != ROL_ADMIN:
+    if not _check_admin_permission(request):
         messages.error(request, 'No tienes permisos para realizar esta acción.')
         return redirect('gestion_usuarios_admin')
 
@@ -339,6 +340,183 @@ def editar_usuario_admin(request, perfil_id):
             
     return redirect('gestion_usuarios_admin')
 
+# ----------------------------------------------
+#           Vistas de Gestión Institucional
+# ----------------------------------------------
+
+@login_required
+def gestion_institucional_admin(request):
+    """
+    Página para que el Admin gestione Carreras y Asignaturas.
+    """
+    if not _check_admin_permission(request):
+        return redirect('home')
+
+    # Datos para las tablas (Quitamos 'roles')
+    carreras = Carreras.objects.select_related('director__usuario', 'area').all().order_by('nombre')
+    asignaturas = Asignaturas.objects.select_related('carreras', 'docente__usuario').all().order_by('nombre')
+    
+    # Datos para los formularios (modales)
+    areas = Areas.objects.all().order_by('nombre')
+    # Usamos .select_related('usuario') para poder mostrar el nombre en el dropdown
+    directores = PerfilUsuario.objects.select_related('usuario').filter(rol__nombre_rol=ROL_DIRECTOR).order_by('usuario__first_name')
+    docentes = PerfilUsuario.objects.select_related('usuario').filter(rol__nombre_rol=ROL_DOCENTE).order_by('usuario__first_name')
+
+    context = {
+        'carreras_list': carreras,
+        'asignaturas_list': asignaturas,
+        'areas_list': areas,
+        'directores_list': directores,
+        'docentes_list': docentes,
+    }
+    
+    return render(request, 'SIAPE/gestion_institucional_admin.html', context)
+
+# --- Vistas de Acción para ROLES (Redirigen a gestion_usuarios_admin) ---
+
+@login_required
+def agregar_rol_admin(request):
+    if not _check_admin_permission(request):
+        messages.error(request, 'No tienes permisos.')
+        return redirect('gestion_usuarios_admin')
+    
+    if request.method == 'POST':
+        nombre_rol = request.POST.get('nombre_rol')
+        if nombre_rol and not Roles.objects.filter(nombre_rol=nombre_rol).exists():
+            Roles.objects.create(nombre_rol=nombre_rol)
+            messages.success(request, f'Rol "{nombre_rol}" creado exitosamente.')
+        else:
+            messages.error(request, 'El nombre del rol no puede estar vacío o ya existe.')
+    return redirect('gestion_usuarios_admin')
+
+@login_required
+def editar_rol_admin(request, rol_id):
+    if not _check_admin_permission(request):
+        messages.error(request, 'No tienes permisos.')
+        return redirect('gestion_usuarios_admin')
+        
+    rol = get_object_or_404(Roles, id=rol_id)
+    if request.method == 'POST':
+        nombre_rol = request.POST.get('nombre_rol')
+        if nombre_rol and not Roles.objects.filter(nombre_rol=nombre_rol).exclude(id=rol_id).exists():
+            rol.nombre_rol = nombre_rol
+            rol.save()
+            messages.success(request, f'Rol actualizado a "{nombre_rol}".')
+        else:
+            messages.error(request, 'El nombre del rol no puede estar vacío o ya existe.')
+    return redirect('gestion_usuarios_admin')
+
+# --- Vistas de Acción para CARRERAS (Redirigen a gestion_institucional_admin) ---
+
+@login_required
+def agregar_carrera_admin(request):
+    if not _check_admin_permission(request):
+        messages.error(request, 'No tienes permisos.')
+        return redirect('gestion_institucional_admin')
+    
+    if request.method == 'POST':
+        try:
+            nombre = request.POST.get('nombre')
+            area_id = request.POST.get('area_id')
+            director_id = request.POST.get('director_id')
+            
+            area = get_object_or_404(Areas, id=area_id)
+            director = None
+            if director_id:
+                director = get_object_or_404(PerfilUsuario, id=director_id, rol__nombre_rol=ROL_DIRECTOR)
+            
+            Carreras.objects.create(
+                nombre=nombre,
+                area=area,
+                director=director
+            )
+            messages.success(request, f'Carrera "{nombre}" creada exitosamente.')
+        except Exception as e:
+            messages.error(request, f'Error al crear la carrera: {str(e)}')
+    return redirect('gestion_institucional_admin')
+
+@login_required
+def editar_carrera_admin(request, carrera_id):
+    if not _check_admin_permission(request):
+        messages.error(request, 'No tienes permisos.')
+        return redirect('gestion_institucional_admin')
+    
+    carrera = get_object_or_404(Carreras, id=carrera_id)
+    if request.method == 'POST':
+        try:
+            nombre = request.POST.get('nombre')
+            area_id = request.POST.get('area_id')
+            director_id = request.POST.get('director_id')
+            
+            area = get_object_or_404(Areas, id=area_id)
+            director = None
+            if director_id:
+                director = get_object_or_404(PerfilUsuario, id=director_id, rol__nombre_rol=ROL_DIRECTOR)
+            
+            carrera.nombre = nombre
+            carrera.area = area
+            carrera.director = director
+            carrera.save()
+            messages.success(request, f'Carrera "{nombre}" actualizada exitosamente.')
+        except Exception as e:
+            messages.error(request, f'Error al actualizar la carrera: {str(e)}')
+    return redirect('gestion_institucional_admin')
+
+# --- Vistas de Acción para ASIGNATURAS (Redirigen a gestion_institucional_admin) ---
+
+@login_required
+def agregar_asignatura_admin(request):
+    if not _check_admin_permission(request):
+        messages.error(request, 'No tienes permisos.')
+        return redirect('gestion_institucional_admin')
+    
+    if request.method == 'POST':
+        try:
+            nombre = request.POST.get('nombre')
+            seccion = request.POST.get('seccion')
+            carrera_id = request.POST.get('carrera_id') # <-- Requerimiento del usuario
+            docente_id = request.POST.get('docente_id')
+            
+            carrera = get_object_or_404(Carreras, id=carrera_id)
+            docente = get_object_or_404(PerfilUsuario, id=docente_id, rol__nombre_rol=ROL_DOCENTE)
+            
+            Asignaturas.objects.create(
+                nombre=nombre,
+                seccion=seccion,
+                carreras=carrera,
+                docente=docente
+            )
+            messages.success(request, f'Asignatura "{nombre} - {seccion}" creada y asignada a {carrera.nombre}.')
+        except Exception as e:
+            messages.error(request, f'Error al crear la asignatura: {str(e)}')
+    return redirect('gestion_institucional_admin')
+
+@login_required
+def editar_asignatura_admin(request, asignatura_id):
+    if not _check_admin_permission(request):
+        messages.error(request, 'No tienes permisos.')
+        return redirect('gestion_institucional_admin')
+    
+    asignatura = get_object_or_404(Asignaturas, id=asignatura_id)
+    if request.method == 'POST':
+        try:
+            nombre = request.POST.get('nombre')
+            seccion = request.POST.get('seccion')
+            carrera_id = request.POST.get('carrera_id') # <-- Requerimiento del usuario
+            docente_id = request.POST.get('docente_id')
+            
+            carrera = get_object_or_404(Carreras, id=carrera_id)
+            docente = get_object_or_404(PerfilUsuario, id=docente_id, rol__nombre_rol=ROL_DOCENTE)
+            
+            asignatura.nombre = nombre
+            asignatura.seccion = seccion
+            asignatura.carreras = carrera
+            asignatura.docente = docente
+            asignatura.save()
+            messages.success(request, f'Asignatura "{nombre} - {seccion}" actualizada.')
+        except Exception as e:
+            messages.error(request, f'Error al actualizar la asignatura: {str(e)}')
+    return redirect('gestion_institucional_admin')
 
 
 # ----------- Páginas de Asesor Pedagógco ------------

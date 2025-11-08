@@ -128,37 +128,41 @@
                 </div>
             {% endif %}
         </div>
-    </div>
+    </div> <!-- FIN .panel-control-container -->
 
-    </div> <div class="panel-section">
-            <h3><i class="fas fa-calendar-alt"></i> Calendario de Citas</h3>
-            <div class="detalle-card" id="card-calendario-panel">
-                
-                <div class="calendario-header" id="cal-header">
-                    </div>
-                
-                <div class="cal-nav">
-                    <button id="cal-prev" class="btn-accion btn-accion-gray btn-accion-small"><i class="fas fa-chevron-left"></i> Anterior</button>
-                    <button id="cal-today" class="btn-accion btn-accion-gray btn-accion-small">Hoy</button>
-                    <button id="cal-next" class="btn-accion btn-accion-gray btn-accion-small">Siguiente <i class="fas fa-chevron-right"></i></button>
+    <!-- ========================================================
+         INICIO SECCIÓN CALENDARIO Y CITAS 
+         (Se quitó un </div> extra que estaba antes de esta línea)
+    ========================================================= -->
+    <div class="panel-section">
+        <h3><i class="fas fa-calendar-alt"></i> Calendario de Citas</h3>
+        <div class="detalle-card" id="card-calendario-panel">
+            
+            <div class="calendario-header" id="cal-header">
                 </div>
+            
+            <div class="cal-nav">
+                <button id="cal-prev" class="btn-accion btn-accion-gray btn-accion-small"><i class="fas fa-chevron-left"></i> Anterior</button>
+                <button id="cal-today" class="btn-accion btn-accion-gray btn-accion-small">Hoy</button>
+                <button id="cal-next" class="btn-accion btn-accion-gray btn-accion-small">Siguiente <i class="fas fa-chevron-right"></i></button>
+            </div>
 
-                <div class="calendario-grid">
-                    <div class="cal-day-header">L</div>
-                    <div class="cal-day-header">M</div>
-                    <div class="cal-day-header">X</div>
-                    <div class="cal-day-header">J</div>
-                    <div class="cal-day-header">V</div>
-                    <div class="cal-day-header">S</div>
-                    <div class="cal-day-header">D</div>
+            <div class="calendario-grid">
+                <div class="cal-day-header">L</div>
+                <div class="cal-day-header">M</div>
+                <div class="cal-day-header">X</div>
+                <div class="cal-day-header">J</div>
+                <div class="cal-day-header">V</div>
+                <div class="cal-day-header">S</div>
+                <div class="cal-day-header">D</div>
+            </div>
+            <div class="calendario-grid" id="cal-grid-body">
                 </div>
-                <div class="calendario-grid" id="cal-grid-body">
-                    </div>
-                <div class="calendario-leyenda" style="margin-top: 15px; padding: 0 15px;">
-                    <div><span class="dot dot-entrevista"></span> Día con Cita(s)</div>
-                </div>
+            <div class="calendario-leyenda" style="margin-top: 15px; padding: 0 15px;">
+                <div><span class="dot dot-entrevista"></span> Día con Cita(s)</div>
             </div>
         </div>
+    </div>
 
     <!-- Sección: Citas Pendientes de Confirmar (Pasadas) -->
     {% if citas_pendientes_confirmar %}
@@ -855,4 +859,3 @@
     renderCalendar();
 </script>
 {% endblock %}
-
