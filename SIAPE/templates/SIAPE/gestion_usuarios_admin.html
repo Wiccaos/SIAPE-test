@@ -1,0 +1,386 @@
+{% extends "plantilla.html" %}
+{% load static %}
+
+{% block title %}
+    Gestión de Usuarios y Roles | SIAPE
+{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="main-content"> 
+    
+    <nav class="dashboard-nav">
+        <a href="{% url 'dashboard_admin' %}" class="nav-item">
+            <i class="fas fa-shield-alt"></i>
+            Panel Principal
+        </a>
+        <a href="{% url 'gestion_usuarios_admin' %}" class="nav-item active">
+            <i class="fas fa-users-cog"></i>
+            Gestión de Usuarios
+        </a>
+        <a href="{% url 'gestion_institucional_admin' %}" class="nav-item">
+            <i class="fas fa-landmark"></i>
+            Gestión Institucional
+        </a>
+    </nav>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}" style="padding: 15px; margin-bottom: 20px; border-radius: 6px; background-color: {% if message.tags == 'success' %}#d4edda{% elif message.tags == 'error' %}#f8d7da{% else %}#fff3cd{% endif %}; color: {% if message.tags == 'success' %}#155724{% elif message.tags == 'error' %}#721c24{% else %}#856404{% endif %};">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- ======================= INICIO MODIFICACIÓN ======================= -->
+    <!-- Contenedor cambiado a 'display: block' para apilar las tablas -->
+    <div class="panel-control-container" style="display: block; margin-top: 30px;">
+
+        <!-- Tabla de Usuarios (Arriba) -->
+        <!-- Se añade 'margin-bottom: 30px' para separar de la siguiente tabla -->
+        <section class="table-container" style="margin-bottom: 30px;">
+            <div class="table-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="color: #333;"><i class="fas fa-users-cog"></i> Listado de Usuarios</h2>
+                <button type="button" class="btn-accion btn-asignar" onclick="abrirModalAgregar()">
+                    <i class="fas fa-user-plus"></i> Agregar Usuario
+                </button>
+            </div>
+            
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Email</th>
+                        <th>RUT</th>
+                        <th>Rol Actual</th>
+                        <th>Área</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for perfil in perfiles %}
+                    <tr>
+                        <td>{{ perfil.usuario.first_name }} {{ perfil.usuario.last_name }}</td>
+                        <td>{{ perfil.usuario.email }}</td>
+                        <td>{{ perfil.usuario.rut }}</td>
+                        <td>
+                            {% if perfil.rol %}
+                                <span class="status status-en_proceso" style="background-color: #e7f3ff; color: #007bff;">{{ perfil.rol.nombre_rol }}</span>
+                            {% else %}
+                                <span class="status status-rechazado">Sin rol</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ perfil.area.nombre|default:'N/A' }}</td>
+                        <td>
+                            <button type="button" class="btn-accion btn-accion-gray btn-accion-small" 
+                                    onclick="abrirModalEditar(
+                                        {{ perfil.id }}, 
+                                        '{{ perfil.usuario.email|escapejs }}', 
+                                        '{{ perfil.usuario.first_name|escapejs }}',
+                                        '{{ perfil.usuario.last_name|escapejs }}',
+                                        '{{ perfil.usuario.rut|escapejs }}',
+                                        '{{ perfil.rol.id|default:'' }}', 
+                                        '{{ perfil.area.id|default:'' }}'
+                                    )">
+                                <i class="fas fa-edit"></i> Editar
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state" style="padding: 20px;">
+                                <i class="fas fa-users"></i>
+                                <p>No hay usuarios en el sistema.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            
+            <div class="table-footer">
+                <span>Mostrando {{ perfiles|length }} usuarios</span>
+            </div>
+        </section>
+
+        <!-- Tabla de Roles (Abajo) -->
+        <section class="table-container" style="margin-bottom: 30px;">
+            <div class="table-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="color: #333;"><i class="fas fa-user-tag"></i> Gestión de Roles</h2>
+                <button type="button" class="btn-accion btn-asignar" onclick="abrirModalAgregarRol()">
+                    <i class="fas fa-plus"></i> Agregar
+                </button>
+            </div>
+            
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>Nombre del Rol</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Usamos la variable 'roles_list' del contexto -->
+                    {% for rol in roles_list %}
+                    <tr>
+                        <td>{{ rol.nombre_rol }}</td>
+                        <td>
+                            <button type="button" class="btn-accion btn-accion-gray btn-accion-small" 
+                                    onclick="abrirModalEditarRol({{ rol.id }}, '{{ rol.nombre_rol|escapejs }}')">
+                                <i class="fas fa-edit"></i> Editar
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="2">No hay roles registrados.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+
+    </div> <!-- Fin del .panel-control-container -->
+    <!-- ======================= FIN MODIFICACIÓN ======================= -->
+
+</div>
+
+<!-- =================================================================
+     MODALES DE USUARIOS
+================================================================== -->
+
+<!-- Modal para AGREGAR Usuario -->
+<div id="modalAgregar" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h4><i class="fas fa-user-plus"></i> Agregar Nuevo Usuario</h4>
+            <button class="close" onclick="cerrarModalAgregar()">&times;</button>
+        </div>
+        <form method="post" action="{% url 'agregar_usuario_admin' %}">
+            {% csrf_token %}
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="first_name">Nombres:</label>
+                    <input type="text" name="first_name" id="first_name" required>
+                </div>
+                <div class="form-group">
+                    <label for="last_name">Apellidos:</label>
+                    <input type="text" name="last_name" id="last_name" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email:</label>
+                    <input type="email" name="email" id="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="rut">RUT:</label>
+                    <input type="text" name="rut" id="rut" placeholder="12345678-K" required>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Contraseña Temporal:</label>
+                <input type="password" name="password" id="password" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="rol_id">Asignar Rol:</label>
+                <select name="rol_id" id="rol_id" required>
+                    <option value="">-- Seleccione un rol --</option>
+                    {% for rol in roles_disponibles %}
+                        <option value="{{ rol.id }}">{{ rol.nombre_rol }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="area_id">Asignar Área (Opcional, solo para Asesores):</label>
+                <select name="area_id" id="area_id">
+                    <option value="">-- Ninguna --</option>
+                    {% for area in areas_disponibles %}
+                        <option value="{{ area.id }}">{{ area.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-actions">
+                <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalAgregar()">Cancelar</button>
+                <button type="submit" class="btn-accion btn-asignar">
+                    <i class="fas fa-save"></i> Guardar Usuario
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal para EDITAR Usuario -->
+<div id="modalEditar" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h4><i class="fas fa-edit"></i> Editar Usuario</h4>
+            <button class="close" onclick="cerrarModalEditar()">&times;</button>
+        </div>
+        <form method="post" action="" id="formEditar">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label>Email (No se puede cambiar):</label>
+                <input type="email" id="editar_email" class="input-readonly" readonly>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="editar_first_name">Nombres:</label>
+                    <input type="text" name="first_name" id="editar_first_name" required>
+                </div>
+                <div class="form-group">
+                    <label for="editar_last_name">Apellidos:</label>
+                    <input type="text" name="last_name" id="editar_last_name" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="editar_rut">RUT:</label>
+                <input type="text" name="rut" id="editar_rut" placeholder="12345678-K" required>
+            </div>
+
+            <div class="form-group">
+                <label for="editar_password">Nueva Contraseña:</label>
+                <input type="password" name="password" id="editar_password">
+                <small style="color: #777; font-size: 0.8rem;">Dejar en blanco para no cambiar la contraseña actual.</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="editar_rol_id">Rol:</label>
+                <select name="rol_id" id="editar_rol_id" required>
+                    {% for rol in roles_disponibles %}
+                        <option value="{{ rol.id }}">{{ rol.nombre_rol }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="editar_area_id">Área (Opcional, solo para Asesores):</label>
+                <select name="area_id" id="editar_area_id">
+                    <option value="">-- Ninguna --</option>
+                    {% for area in areas_disponibles %}
+                        <option value="{{ area.id }}">{{ area.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-actions">
+                <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalEditar()">Cancelar</button>
+                <button type="submit" class="btn-accion btn-agendar">
+                    <i class="fas fa-save"></i> Actualizar Usuario
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- =================================================================
+     MODALES DE ROLES
+================================================================== -->
+
+<!-- Modal Agregar Rol -->
+<div id="modalAgregarRol" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h4><i class="fas fa-user-tag"></i> Agregar Nuevo Rol</h4>
+            <button class="close" onclick="cerrarModalAgregarRol()">&times;</button>
+        </div>
+        <form method="post" action="{% url 'agregar_rol_admin' %}">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="nombre_rol">Nombre del Rol:</label>
+                <input type="text" name="nombre_rol" required>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalAgregarRol()">Cancelar</button>
+                <button type="submit" class="btn-accion btn-asignar">Guardar Rol</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Editar Rol -->
+<div id="modalEditarRol" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h4><i class="fas fa-edit"></i> Editar Rol</h4>
+            <button class="close" onclick="cerrarModalEditarRol()">&times;</button>
+        </div>
+        <form method="post" action="" id="formEditarRol">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="nombre_rol">Nombre del Rol:</label>
+                <input type="text" name="nombre_rol" id="editar_nombre_rol" required>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalEditarRol()">Cancelar</button>
+                <button type="submit" class="btn-accion btn-agendar">Actualizar Rol</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<script>
+    // --- JavaScript para Modales de USUARIOS ---
+    const modalAgregar = document.getElementById('modalAgregar');
+    function abrirModalAgregar() { modalAgregar.style.display = 'block'; }
+    function cerrarModalAgregar() { modalAgregar.style.display = 'none'; modalAgregar.querySelector('form').reset(); }
+
+    const modalEditar = document.getElementById('modalEditar');
+    const formEditar = document.getElementById('formEditar');
+    
+    function abrirModalEditar(perfilId, email, firstName, lastName, rut, currentRolId, currentAreaId) {
+        formEditar.action = `/dashboard/admin/gestion-usuarios/editar/${perfilId}/`;
+        document.getElementById('editar_email').value = email;
+        document.getElementById('editar_first_name').value = firstName;
+        document.getElementById('editar_last_name').value = lastName;
+        document.getElementById('editar_rut').value = rut;
+        document.getElementById('editar_rol_id').value = currentRolId;
+        document.getElementById('editar_area_id').value = currentAreaId;
+        document.getElementById('editar_password').value = ""; 
+        modalEditar.style.display = 'block';
+    }
+    function cerrarModalEditar() { modalEditar.style.display = 'none'; }
+
+
+    // --- JavaScript para Modales de ROLES ---
+    const modalAgregarRol = document.getElementById('modalAgregarRol');
+    const modalEditarRol = document.getElementById('modalEditarRol');
+
+    function abrirModalAgregarRol() { modalAgregarRol.style.display = 'block'; }
+    function cerrarModalAgregarRol() { closeModal('modalAgregarRol'); }
+    
+    function abrirModalEditarRol(rolId, nombre) {
+        document.getElementById('formEditarRol').action = `/dashboard/admin/roles/editar/${rolId}/`;
+        document.getElementById('editar_nombre_rol').value = nombre;
+        modalEditarRol.style.display = 'block';
+    }
+    function cerrarModalEditarRol() { closeModal('modalEditarRol'); }
+
+
+    // Cerrar modales si se hace clic fuera de ellos
+    window.onclick = function(event) {
+        if (event.target == modalAgregar) { cerrarModalAgregar(); }
+        if (event.target == modalEditar) { cerrarModalEditar(); }
+        if (event.target == modalAgregarRol) { cerrarModalAgregarRol(); }
+        if (event.target == modalEditarRol) { cerrarModalEditarRol(); }
+    }
+
+    // Helper para cerrar modales (usado por JS de Roles)
+    function closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+</script>
+
+{% endblock %}

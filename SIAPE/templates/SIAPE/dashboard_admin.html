@@ -1,0 +1,186 @@
+{% extends "plantilla.html" %}
+{% load static %}
+
+{% block title %}
+    Dashboard Administrador | SIAPE
+{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="main-content"> 
+    
+    <nav class="dashboard-nav">
+        <a href="{% url 'dashboard_admin' %}" class="nav-item active">
+            <i class="fas fa-shield-alt"></i>
+            Panel Principal
+        </a>
+        <a href="{% url 'gestion_usuarios_admin' %}" class="nav-item">
+            <i class="fas fa-users-cog"></i>
+            Gestión de Usuarios
+        </a>
+        <a href="{% url 'gestion_institucional_admin' %}" class="nav-item">
+            <i class="fas fa-landmark"></i>
+            Gestión Institucional
+        </a>
+    </nav>
+
+    <section class="kpi-container">
+        
+        <div class="kpi-card">
+            <div class="kpi-icon icon-proceso">
+                <i class="fas fa-user-shield"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ kpis.total_asesores|default:0 }}</span>
+                <span class="kpi-label">Asesores</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-proceso">
+                <i class="fas fa-user-tie"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ kpis.total_directores|default:0 }}</span>
+                <span class="kpi-label">Directores</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-proceso">
+                <i class="fas fa-chalkboard-teacher"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ kpis.total_docentes|default:0 }}</span>
+                <span class="kpi-label">Docentes</span>
+            </div>
+        </div>
+        
+        <div class="kpi-card">
+            <div class="kpi-icon icon-proceso">
+                <i class="fas fa-user-graduate"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ kpis.total_estudiantes|default:0 }}</span>
+                <span class="kpi-label">Estudiantes</span>
+            </div>
+        </div>
+
+    </section>
+    
+    <section class="kpi-container">
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-solicitudes">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ kpis.total_solicitudes|default:0 }}</span>
+                <span class="kpi-label">Total Solicitudes</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-proceso">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ kpis.solicitudes_en_proceso|default:0 }}</span>
+                <span class="kpi-label">En Proceso</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-resueltos">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ kpis.solicitudes_aprobadas|default:0 }}</span>
+                <span class="kpi-label">Aprobadas</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-citas"> <i class="fas fa-times-circle"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ kpis.solicitudes_rechazadas|default:0 }}</span>
+                <span class="kpi-label">Rechazadas</span>
+            </div>
+        </div>
+
+    </section>
+
+    <section class="table-container" style="margin-top: 30px;">
+        <div class="table-header">
+            <h2 style="color: #cc0000;"><i class="fas fa-exclamation-triangle"></i> Casos Pendientes de Asignación</h2>
+        </div>
+        
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Estudiante</th>
+                    <th>Carrera</th>
+                    <th>Asunto</th>
+                    <th>Fecha Solicitud</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for solicitud in solicitudes_sin_asignar %}
+                <tr>
+                    <td>{{ solicitud.estudiantes.nombres }} {{ solicitud.estudiantes.apellidos }}</td>
+                    <td>{{ solicitud.estudiantes.carreras.nombre }}</td>
+                    <td>{{ solicitud.asunto }}</td>
+                    <td>{{ solicitud.created_at|date:"d/m/Y H:i" }}</td>
+                    <td>
+                        <span class="status status-en_proceso">{{ solicitud.get_estado_display }}</span>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5">
+                        <div class="empty-state" style="padding: 20px;">
+                            <i class="fas fa-check-circle" style="color: #28a745;"></i>
+                            <p>¡Excelente! No hay solicitudes pendientes de asignación.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <div class="table-footer">
+            <span>Mostrando {{ total_sin_asignar|default:0 }} entradas</span>
+        </div>
+    </section>
+
+    <section class="support-grid-container" style="margin-top: 30px;">
+        <h2>Distribución de Solicitudes por Área Académica</h2>
+
+        {% if distribucion_apoyos %}
+            {% for item in distribucion_apoyos %}
+                <div class="support-row" style="grid-template-columns: 3fr 1fr;">
+                    <div class="support-title">
+                        {{ item.area.nombre }}
+                    </div>
+                    
+                    <div class="support-total" style="text-align: left;">
+                        {{ item.total }} Casos ({{ item.porcentaje }}%)
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-inbox"></i>
+                <p>No hay datos de distribución de apoyos disponibles</p>
+            </div>
+        {% endif %}
+
+    </section>
+
+</div>
+{% endblock %}

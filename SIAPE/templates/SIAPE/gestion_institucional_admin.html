@@ -1,0 +1,341 @@
+{% extends "plantilla.html" %}
+{% load static %}
+
+{% block title %}
+    Gestión Institucional | SIAPE
+{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="main-content"> 
+    
+    <nav class="dashboard-nav">
+        <a href="{% url 'dashboard_admin' %}" class="nav-item">
+            <i class="fas fa-shield-alt"></i>
+            Panel Principal
+        </a>
+        <a href="{% url 'gestion_usuarios_admin' %}" class="nav-item">
+            <i class="fas fa-users-cog"></i>
+            Gestión de Usuarios
+        </a>
+        <a href="{% url 'gestion_institucional_admin' %}" class="nav-item active">
+            <i class="fas fa-landmark"></i>
+            Gestión Institucional
+        </a>
+    </nav>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}" style="padding: 15px; margin-bottom: 20px; border-radius: 6px; background-color: {% if message.tags == 'success' %}#d4edda{% elif message.tags == 'error' %}#f8d7da{% else %}#fff3cd{% endif %}; color: {% if message.tags == 'success' %}#155724{% elif message.tags == 'error' %}#721c24{% else %}#856404{% endif %};">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="panel-control-container" style="display: block; margin-top: 30px;">
+
+        <!-- ======================= TABLA DE CARRERAS ======================= -->
+        <section class="table-container" style="margin-bottom: 30px;">
+            <div class="table-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="color: #333;"><i class="fas fa-graduation-cap"></i> Gestión de Carreras</h2>
+                <button type="button" class="btn-accion btn-asignar" onclick="abrirModalAgregarCarrera()">
+                    <i class="fas fa-plus"></i> Agregar Carrera
+                </button>
+            </div>
+            
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>Nombre Carrera</th>
+                        <th>Área</th>
+                        <th>Director Asignado</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for carrera in carreras_list %}
+                    <tr>
+                        <td>{{ carrera.nombre }}</td>
+                        <td>{{ carrera.area.nombre|default:'N/A' }}</td>
+                        <td>{{ carrera.director.usuario.first_name|default:'Sin' }} {{ carrera.director.usuario.last_name|default:'Director' }}</td>
+                        <td>
+                            <button type="button" class="btn-accion btn-accion-gray btn-accion-small" 
+                                    onclick="abrirModalEditarCarrera({{ carrera.id }}, '{{ carrera.nombre|escapejs }}', '{{ carrera.area.id|default:'' }}', '{{ carrera.director.id|default:'' }}')">
+                                <i class="fas fa-edit"></i> Editar
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4">No hay carreras registradas.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+
+        <!-- ======================= TABLA DE ASIGNATURAS ======================= -->
+        <section class="table-container" style="margin-bottom: 30px;">
+            <div class="table-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="color: #333;"><i class="fas fa-book"></i> Gestión de Asignaturas</h2>
+                <button type="button" class="btn-accion btn-asignar" onclick="abrirModalAgregarAsignatura()">
+                    <i class="fas fa-plus"></i> Agregar Asignatura
+                </button>
+            </div>
+            
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>Nombre Asignatura</th>
+                        <th>Sección</th>
+                        <th>Carrera Asignada</th>
+                        <th>Docente Asignado</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for asignatura in asignaturas_list %}
+                    <tr>
+                        <td>{{ asignatura.nombre }}</td>
+                        <td>{{ asignatura.seccion }}</td>
+                        <td>{{ asignatura.carreras.nombre|default:'N/A' }}</td>
+                        <td>{{ asignatura.docente.usuario.first_name|default:'Sin' }} {{ asignatura.docente.usuario.last_name|default:'Docente' }}</td>
+                        <td>
+                            <button type="button" class="btn-accion btn-accion-gray btn-accion-small" 
+                                    onclick="abrirModalEditarAsignatura({{ asignatura.id }}, '{{ asignatura.nombre|escapejs }}', '{{ asignatura.seccion|escapejs }}', '{{ asignatura.carreras.id|default:'' }}', '{{ asignatura.docente.id|default:'' }}')">
+                                <i class="fas fa-edit"></i> Editar
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5">No hay asignaturas registradas.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+
+    </div> <!-- Fin .panel-control-container -->
+
+</div> <!-- Fin .main-content -->
+
+
+<!-- =================================================================
+     MODALES
+================================================================== -->
+
+<!-- Modal Agregar Carrera -->
+<div id="modalAgregarCarrera" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h4><i class="fas fa-graduation-cap"></i> Agregar Nueva Carrera</h4>
+            <button class="close" onclick="cerrarModalAgregarCarrera()">&times;</button>
+        </div>
+        <form method="post" action="{% url 'agregar_carrera_admin' %}">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="nombre">Nombre Carrera:</label>
+                <input type="text" name="nombre" required>
+            </div>
+            <div class="form-group">
+                <label for="area_id">Área:</label>
+                <select name="area_id" required>
+                    <option value="">-- Seleccione un área --</option>
+                    {% for area in areas_list %}
+                        <option value="{{ area.id }}">{{ area.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="director_id">Director (Opcional):</label>
+                <select name="director_id">
+                    <option value="">-- Sin Director Asignado --</option>
+                    {% for director in directores_list %}
+                        <option value="{{ director.id }}">{{ director.usuario.first_name }} {{ director.usuario.last_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalAgregarCarrera()">Cancelar</button>
+                <button type="submit" class="btn-accion btn-asignar">Guardar Carrera</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Editar Carrera -->
+<div id="modalEditarCarrera" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h4><i class="fas fa-edit"></i> Editar Carrera</h4>
+            <button class="close" onclick="cerrarModalEditarCarrera()">&times;</button>
+        </div>
+        <form method="post" action="" id="formEditarCarrera">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="nombre">Nombre Carrera:</label>
+                <input type="text" name="nombre" id="editar_carrera_nombre" required>
+            </div>
+            <div class="form-group">
+                <label for="area_id">Área:</label>
+                <select name="area_id" id="editar_carrera_area" required>
+                    <option value="">-- Seleccione un área --</option>
+                    {% for area in areas_list %}
+                        <option value="{{ area.id }}">{{ area.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="director_id">Director (Opcional):</label>
+                <select name="director_id" id="editar_carrera_director">
+                    <option value="">-- Sin Director Asignado --</option>
+                    {% for director in directores_list %}
+                        <option value="{{ director.id }}">{{ director.usuario.first_name }} {{ director.usuario.last_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalEditarCarrera()">Cancelar</button>
+                <button type="submit" class="btn-accion btn-agendar">Actualizar Carrera</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Agregar Asignatura -->
+<div id="modalAgregarAsignatura" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h4><i class="fas fa-book"></i> Agregar Nueva Asignatura</h4>
+            <button class="close" onclick="cerrarModalAgregarAsignatura()">&times;</button>
+        </div>
+        <form method="post" action="{% url 'agregar_asignatura_admin' %}">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="nombre">Nombre Asignatura:</label>
+                <input type="text" name="nombre" required>
+            </div>
+            <div class="form-group">
+                <label for="seccion">Sección:</label>
+                <input type="text" name="seccion" placeholder="Ej: PIS-001" required>
+            </div>
+            <div class="form-group">
+                <label for="carrera_id">Carrera:</label>
+                <select name="carrera_id" required>
+                    <option value="">-- Seleccione una carrera --</option>
+                    {% for carrera in carreras_list %}
+                        <option value="{{ carrera.id }}">{{ carrera.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="docente_id">Docente:</label>
+                <select name="docente_id" required>
+                    <option value="">-- Seleccione un docente --</option>
+                    {% for docente in docentes_list %}
+                        <option value="{{ docente.id }}">{{ docente.usuario.first_name }} {{ docente.usuario.last_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalAgregarAsignatura()">Cancelar</button>
+                <button type="submit" class="btn-accion btn-asignar">Guardar Asignatura</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Editar Asignatura -->
+<div id="modalEditarAsignatura" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h4><i class="fas fa-edit"></i> Editar Asignatura</h4>
+            <button class="close" onclick="cerrarModalEditarAsignatura()">&times;</button>
+        </div>
+        <form method="post" action="" id="formEditarAsignatura">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="nombre">Nombre Asignatura:</label>
+                <input type="text" name="nombre" id="editar_asignatura_nombre" required>
+            </div>
+            <div class="form-group">
+                <label for="seccion">Sección:</label>
+                <input type="text" name="seccion" id="editar_asignatura_seccion" placeholder="Ej: PIS-001" required>
+            </div>
+            <div class="form-group">
+                <label for="carrera_id">Carrera:</label>
+                <select name="carrera_id" id="editar_asignatura_carrera" required>
+                    <option value="">-- Seleccione una carrera --</option>
+                    {% for carrera in carreras_list %}
+                        <option value="{{ carrera.id }}">{{ carrera.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="docente_id">Docente:</label>
+                <select name="docente_id" id="editar_asignatura_docente" required>
+                    <option value="">-- Seleccione un docente --</option>
+                    {% for docente in docentes_list %}
+                        <option value="{{ docente.id }}">{{ docente.usuario.first_name }} {{ docente.usuario.last_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalEditarAsignatura()">Cancelar</button>
+                <button type="submit" class="btn-accion btn-agendar">Actualizar Asignatura</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // --- JavaScript para los Modales ---
+    const modals = document.querySelectorAll('.modal');
+
+    // Funciones genéricas para cerrar
+    function closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+    
+    // --- Carreras ---
+    function abrirModalAgregarCarrera() { document.getElementById('modalAgregarCarrera').style.display = 'block'; }
+    function cerrarModalAgregarCarrera() { closeModal('modalAgregarCarrera'); }
+
+    function abrirModalEditarCarrera(carreraId, nombre, areaId, directorId) {
+        document.getElementById('formEditarCarrera').action = `/dashboard/admin/carreras/editar/${carreraId}/`;
+        document.getElementById('editar_carrera_nombre').value = nombre;
+        document.getElementById('editar_carrera_area').value = areaId;
+        document.getElementById('editar_carrera_director').value = directorId;
+        document.getElementById('modalEditarCarrera').style.display = 'block';
+    }
+    function cerrarModalEditarCarrera() { closeModal('modalEditarCarrera'); }
+
+    // --- Asignaturas ---
+    function abrirModalAgregarAsignatura() { document.getElementById('modalAgregarAsignatura').style.display = 'block'; }
+    function cerrarModalAgregarAsignatura() { closeModal('modalAgregarAsignatura'); }
+    
+    function abrirModalEditarAsignatura(asignaturaId, nombre, seccion, carreraId, docenteId) {
+        document.getElementById('formEditarAsignatura').action = `/dashboard/admin/asignaturas/editar/${asignaturaId}/`;
+        document.getElementById('editar_asignatura_nombre').value = nombre;
+        document.getElementById('editar_asignatura_seccion').value = seccion;
+        document.getElementById('editar_asignatura_carrera').value = carreraId;
+        document.getElementById('editar_asignatura_docente').value = docenteId;
+        document.getElementById('modalEditarAsignatura').style.display = 'block';
+    }
+    function cerrarModalEditarAsignatura() { closeModal('modalEditarAsignatura'); }
+
+
+    // Cerrar modales si se hace clic fuera de ellos
+    window.onclick = function(event) {
+        modals.forEach(modal => {
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        });
+    }
+</script>
+
+{% endblock %}

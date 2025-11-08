@@ -45,6 +45,20 @@ urlpatterns = [
     path('SIAPE/', include('SIAPE.urls')),
     path('formulario-solicitud/', views.vista_formulario_solicitud, name='formulario-solicitud'),
 
+    # URLs del Administrador
+    path('dashboard/admin/', views.dashboard_admin, name='dashboard_admin'),
+    path('dashboard/admin/gestion-usuarios/', views.gestion_usuarios_admin, name='gestion_usuarios_admin'),
+    path('dashboard/admin/gestion-usuarios/agregar/', views.agregar_usuario_admin, name='agregar_usuario_admin'),
+    path('dashboard/admin/gestion-usuarios/editar/<int:perfil_id>/', views.editar_usuario_admin, name='editar_usuario_admin'),
+    # GESTIÓN INSTITUCIONAL - ADMIN
+    path('dashboard/admin/gestion-institucional/', views.gestion_institucional_admin, name='gestion_institucional_admin'),
+    path('dashboard/admin/carreras/agregar/', views.agregar_carrera_admin, name='agregar_carrera_admin'),
+    path('dashboard/admin/carreras/editar/<int:carrera_id>/', views.editar_carrera_admin, name='editar_carrera_admin'),
+    path('dashboard/admin/asignaturas/agregar/', views.agregar_asignatura_admin, name='agregar_asignatura_admin'),
+    path('dashboard/admin/asignaturas/editar/<int:asignatura_id>/', views.editar_asignatura_admin, name='editar_asignatura_admin'),
+    path('dashboard/admin/roles/agregar/', views.agregar_rol_admin, name='agregar_rol_admin'),
+    path('dashboard/admin/roles/editar/<int:rol_id>/', views.editar_rol_admin, name='editar_rol_admin'),
+
     # URLs de Asesor Pedagógico
     path('dashboard/asesor/', views.dashboard_asesor, name='dashboard_asesor'),
     path('dashboard/asesor/casos/', views.casos_asesor, name='casos_asesor'),
@@ -68,7 +82,7 @@ urlpatterns = [
 
     # URLs de autenticación
     path('accounts/', include('django.contrib.auth.urls')),
-path('login/', auth_views.LoginView.as_view(
+    path('login/', auth_views.LoginView.as_view(
         template_name='registration/login.html',
         next_page=reverse_lazy('home')
     ), name='login'),
