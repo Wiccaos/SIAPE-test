@@ -105,7 +105,6 @@ def pag_inicio(request):
     elif rol == ROL_ADMIN:
         return redirect('dashboard_admin')
 
-    # Si es superusuario pero no tiene rol (ej. 'admin' puro), va al admin de Django
     if request.user.is_superuser or request.user.is_staff:
         return redirect('admin:index')
 
@@ -150,17 +149,14 @@ def dashboard_admin(request):
         'solicitudes_rechazadas': Solicitudes.objects.filter(estado='rechazado').count(),
     }
 
-    # --- Tabla: Casos Críticos (Sin Asignar) ---
-    # Solicitudes en proceso que no tienen ningún asesor
     solicitudes_sin_asignar = Solicitudes.objects.filter(
         asesores_pedagogicos__isnull=True,
         estado='en_proceso'
     ).select_related(
         'estudiantes', 
         'estudiantes__carreras'
-    ).order_by('created_at') # <-- Más antiguas primero
+    ).order_by('created_at')
 
-    # --- Gráfico: Distribución de Solicitudes por Área ---
     distribucion_areas = Areas.objects.annotate(
         total_solicitudes=Count('carreras__estudiantes__solicitudes')
     ).filter(
@@ -186,6 +182,164 @@ def dashboard_admin(request):
     }
     
     return render(request, 'SIAPE/dashboard_admin.html', context)
+
+@login_required
+def gestion_usuarios_admin(request):
+    """
+    Página para que el Admin vea y gestione usuarios y roles.
+    """
+    # Verificar permisos (igual que en dashboard_admin)
+    rol = None
+    if hasattr(request.user, 'perfil'):
+        if request.user.perfil.rol:
+            rol = request.user.perfil.rol.nombre_rol
+
+    if not request.user.is_superuser and rol != ROL_ADMIN:
+        return redirect('home')
+
+    # Obtenemos todos los perfiles de usuario con su info relacionada
+    # Usamos select_related para optimizar la consulta a la BD
+    perfiles = PerfilUsuario.objects.select_related(
+        'usuario', 
+        'rol', 
+        'area'
+    ).all().order_by('usuario__first_name')
+    
+    # Obtenemos todos los roles y áreas para los modales
+    roles_disponibles = Roles.objects.all()
+    areas_disponibles = Areas.objects.all()
+
+    context = {
+        'perfiles': perfiles,
+        'roles_disponibles': roles_disponibles,
+        'areas_disponibles': areas_disponibles,
+    }
+    
+    return render(request, 'SIAPE/gestion_usuarios_admin.html', context)
+
+@login_required
+def agregar_usuario_admin(request):
+    """
+    Acción POST para crear un nuevo usuario desde el modal.
+    """
+    # Verificar permisos
+    rol = None
+    if hasattr(request.user, 'perfil'):
+        if request.user.perfil.rol:
+            rol = request.user.perfil.rol.nombre_rol
+    if not request.user.is_superuser and rol != ROL_ADMIN:
+        messages.error(request, 'No tienes permisos para realizar esta acción.')
+        return redirect('gestion_usuarios_admin')
+
+    if request.method == 'POST':
+        email = request.POST.get('email')
+        rut = request.POST.get('rut')
+        first_name = request.POST.get('first_name')
+        last_name = request.POST.get('last_name')
+        password = request.POST.get('password')
+        rol_id = request.POST.get('rol_id')
+        area_id = request.POST.get('area_id')
+
+        try:
+            # 1. Validar que el usuario no exista (por email o RUT)
+            if Usuario.objects.filter(Q(email=email) | Q(rut=rut)).exists():
+                messages.error(request, f'Error: Ya existe un usuario con ese Email o RUT.')
+                return redirect('gestion_usuarios_admin')
+
+            # 2. Obtener Rol y Área
+            rol_obj = get_object_or_404(Roles, id=rol_id)
+            area_obj = None
+            if area_id:
+                area_obj = get_object_or_404(Areas, id=area_id)
+                
+            # 3. Crear el Usuario (usando create_user para hashear la contraseña)
+            nuevo_usuario = Usuario.objects.create_user(
+                email=email,
+                password=password,
+                rut=rut,
+                first_name=first_name,
+                last_name=last_name
+            )
+            
+            # 4. Crear el PerfilUsuario
+            PerfilUsuario.objects.create(
+                usuario=nuevo_usuario,
+                rol=rol_obj,
+                area=area_obj
+            )
+            
+            messages.success(request, f'Usuario {email} creado y asignado con el rol de {rol_obj.nombre_rol}.')
+            
+        except Exception as e:
+            messages.error(request, f'Error al crear el usuario: {str(e)}')
+    
+    return redirect('gestion_usuarios_admin')
+
+
+@login_required
+def editar_usuario_admin(request, perfil_id):
+    """
+    Acción POST para editar el rol Y los datos de un usuario existente.
+    """
+    # Verificar permisos
+    rol_permiso = None
+    if hasattr(request.user, 'perfil'):
+        if request.user.perfil.rol:
+            rol_permiso = request.user.perfil.rol.nombre_rol
+    if not request.user.is_superuser and rol_permiso != ROL_ADMIN:
+        messages.error(request, 'No tienes permisos para realizar esta acción.')
+        return redirect('gestion_usuarios_admin')
+
+    if request.method == 'POST':
+        try:
+            # 1. Obtener los objetos a editar
+            perfil = get_object_or_404(PerfilUsuario.objects.select_related('usuario'), id=perfil_id)
+            usuario = perfil.usuario
+            
+            # 2. Obtener los datos del formulario
+            rut = request.POST.get('rut')
+            first_name = request.POST.get('first_name')
+            last_name = request.POST.get('last_name')
+            password = request.POST.get('password') # Será "" si está vacío
+            
+            nuevo_rol_id = request.POST.get('rol_id')
+            nuevo_area_id = request.POST.get('area_id')
+
+            # 3. Validar RUT (si cambió, verificar que no exista en otro usuario)
+            if rut != usuario.rut and Usuario.objects.filter(rut=rut).exclude(id=usuario.id).exists():
+                messages.error(request, f'Error: El RUT "{rut}" ya está en uso por otro usuario.')
+                return redirect('gestion_usuarios_admin')
+            
+            # 4. Actualizar el modelo Usuario
+            usuario.first_name = first_name
+            usuario.last_name = last_name
+            usuario.rut = rut
+            
+            # Si se proporcionó una nueva contraseña, la actualiza
+            if password:
+                usuario.set_password(password)
+                
+            usuario.save()
+            
+            # 5. Actualizar el modelo PerfilUsuario
+            rol_obj = get_object_or_404(Roles, id=nuevo_rol_id)
+            perfil.rol = rol_obj
+            
+            if nuevo_area_id:
+                perfil.area = get_object_or_404(Areas, id=nuevo_area_id)
+            else:
+                 perfil.area = None # Limpia el área si no se selecciona una
+
+            perfil.save()
+            
+            messages.success(request, f'Se actualizó correctamente al usuario {usuario.email}.')
+            
+        except Exception as e:
+            messages.error(request, f'Error al actualizar el usuario: {str(e)}')
+            
+    return redirect('gestion_usuarios_admin')
+
+
 
 # ----------- Páginas de Asesor Pedagógco ------------
 
