@@ -27,14 +27,52 @@
         <!-- Información del Usuario (Dinámico) -->
         <div class="header-user">
             {% if user.is_authenticated %}
-                {% if user.perfil.rol.nombre_rol %}
-                    <strong>{{ user.perfil.rol.nombre_rol }}:</strong> 
-                    <strong>{{ user.first_name }} {{ user.last_name }}</strong>
-                {% else %}
-                    <strong>Usuario:</strong> {{ user.email }}
-                {% endif %}
+
+                <div class="header-user-details">
+                    {% if user.perfil.rol.nombre_rol %}
+                        <strong class="user-role">{{ user.perfil.rol.nombre_rol }}</strong> 
+                        <span class="user-name">{{ user.first_name }} {{ user.last_name }}</span>
+                    {% else %}
+                        <strong class="user-role">Usuario</strong> 
+                        <span class="user-name">{{ user.email }}</span>
+                    {% endif %}
+                </div>
                 
-                | <a href="{% url 'logout' %}">Cerrar Sesión</a>
+                <!-- NUEVO: Contenedor del Dropdown de Configuración -->
+                <div class="header-dropdown">
+                    <!-- Este es el botón que se ve siempre -->
+                    <button type="button" class="header-config-link">
+                        <i class="fas fa-cog"></i>
+                        <span class="btn-text">Configuración</span>
+                    </button>
+                    <!-- Este es el menú que se despliega -->
+                    <div class="dropdown-menu">
+                        <a href="#" class="dropdown-item">
+                            <i class="fas fa-user-circle"></i>
+                            <span>Opciones de usuario</span>
+                        </a>
+                        <a href="#" class_A"dropdown-item" id="btn-accesibilidad">
+                            <i class="fas fa-universal-access"></i>
+                            <span>Accesibilidad</span>
+                        </a>
+                        <!-- Item especial para el toggle -->
+                        <div class="dropdown-item toggle-item">
+                            <label for="dark-mode-toggle">
+                                <i class="fas fa-moon"></i>
+                                <span>Modo oscuro</span>
+                            </label>
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="dark-mode-toggle">
+                                <span class="slider"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <a href="{% url 'logout' %}" class="header-logout-link">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Cerrar Sesión</span>
+                </a>
                 
             {% else %}
                 <span>Plataforma de Apoyo Estudiantil</span>
@@ -53,6 +91,73 @@
     <footer class="app-footer">
       <p>&copy; 2025 - SIAPE - Desarrollado por F. Vidal, I. Zárate, N. Ríos</p>
     </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const body = document.body;
+            
+            // --- Lógica de Modo Oscuro ---
+            const darkModeToggle = document.getElementById('dark-mode-toggle');
+            const currentTheme = localStorage.getItem('theme');
+
+            // Aplicar tema al cargar la página
+            if (currentTheme === 'dark') {
+                body.classList.add('dark-mode');
+                darkModeToggle.checked = true;
+            }
+
+            // Listener para el botón
+            darkModeToggle.addEventListener('change', () => {
+                if (darkModeToggle.checked) {
+                    body.classList.add('dark-mode');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    body.classList.remove('dark-mode');
+                    localStorage.setItem('theme', 'light');
+                }
+            });
+
+            // --- Lógica de Accesibilidad ---
+            const accessibilityToggle = document.getElementById('btn-accesibilidad');
+            const currentAccessibility = localStorage.getItem('accessibility');
+
+            // Aplicar modo accesibilidad al cargar
+            if (currentAccessibility === 'enabled') {
+                body.classList.add('accessibility-mode');
+            }
+
+            // Listener para el botón
+            accessibilityToggle.addEventListener('click', (e) => {
+                e.preventDefault(); // Evita que el enlace '#' navegue
+                body.classList.toggle('accessibility-mode');
+                
+                if (body.classList.contains('accessibility-mode')) {
+                    localStorage.setItem('accessibility', 'enabled');
+                } else {
+                    localStorage.setItem('accessibility', 'disabled');
+                }
+            });
+
+                        const dropdown = document.querySelector('.header-dropdown');
+            if (dropdown) {
+                const dropdownButton = dropdown.querySelector('.header-config-link');
+                const dropdownMenu = dropdown.querySelector('.dropdown-menu');
+
+                // 1. Abre/Cierra el menú al hacer clic en el botón
+                dropdownButton.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Evita que el clic se propague al 'window'
+                    dropdownMenu.classList.toggle('show');
+                });
+
+                // 2. Cierra el menú si se hace clic en cualquier otro lugar
+                window.addEventListener('click', (e) => {
+                    if (dropdownMenu.classList.contains('show') && !dropdown.contains(e.target)) {
+                        dropdownMenu.classList.remove('show');
+                    }
+                });
+            }
+        });
+    </script>
 
 </body>
 </html>

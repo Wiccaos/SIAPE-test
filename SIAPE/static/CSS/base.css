@@ -64,11 +64,360 @@ textarea,
 .header-user {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 10px; 
     color: #444;
     font-weight: 500;
 }
-.header-user-info {
+
+/* Contenedor para los detalles del usuario */
+.header-user-details {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+.header-user-details .user-role {
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    color: #333;
+}
+.header-user-details .user-name {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+/* Estilos de botones (compartidos) */
+.header-config-link,
+.header-logout-link {
+    text-decoration: none;
+    font-weight: 500;
+    padding: 8px 12px;
+    border-radius: 6px;
+    display: flex; 
+    align-items: center;
+    transition: all 0.2s ease;
+    cursor: pointer; /* Para que parezca clickeable */
+    border: 1px solid transparent; /* Borde placeholder */
+}
+.header-config-link i,
+.header-logout-link i {
+    margin-right: 6px; 
+    font-size: 0.9rem;
+}
+.header-config-link .btn-text,
+.header-logout-link .btn-text {
+    font-size: 0.9rem;
+    white-space: nowrap; /* Evita que el texto se parta */
+}
+
+
+/* Botón de Configuración (Gris) */
+.header-config-link {
+    color: #555; 
+    border-color: #ddd; 
+    background-color: #f9f9f9; 
+}
+.header-config-link:hover {
+    background-color: #f0f0f0; 
+    color: #000; 
+    border-color: #ccc;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+/* Botón de Logout (Rojo) */
+.header-logout-link {
+    color: #cc0000; 
+    border-color: #fdecec;
+    background-color: #fff;
+}
+.header-logout-link:hover {
+    background-color: #fdecec; 
+    color: #a70000; 
+    border-color: #f1c9c9;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+
+/* Oculta el texto en pantallas pequeñas */
+@media (max-width: 768px) {
+    .header-logout-link .btn-text,
+    .header-config-link .btn-text {
+        display: none;
+    }
+    .header-logout-link i,
+    .header-config-link i {
+        margin-right: 0;
+    }
+    .header-logo span {
+        display: none; 
+    }
+}
+
+
+/* =============================================================
+   NUEVOS ESTILOS: MENÚ DESPLEGABLE (DROPDOWN)
+================================================================ */
+
+/* Contenedor principal del dropdown */
+.header-dropdown {
+    position: relative; /* Clave para el menú absoluto */
+    display: inline-block;
+}
+
+/* El menú que se oculta/muestra */
+.dropdown-menu {
+    display: none; /* Oculto por defecto */
+    position: absolute;
+    right: 0;
+    top: 100%; /* Justo debajo del botón */
+    margin-top: 5px; /* Pequeño espacio */
+    min-width: 220px; /* Ancho mínimo */
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: 1px solid #eee;
+    z-index: 1000;
+    padding: 5px 0; /* Espacio arriba y abajo */
+}
+
+/* NUEVA REGLA (controlada por JS): */
+.dropdown-menu.show {
+    display: block;
+}
+
+
+/* Items individuales del menú */
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    color: #333;
+    text-decoration: none;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+.dropdown-item:hover {
+    background-color: #f4f7fa; /* Gris claro al pasar el mouse */
+    color: #000;
+}
+.dropdown-item i {
+    margin-right: 12px;
+    width: 16px; /* Ancho fijo para alinear íconos */
+    text-align: center;
+    color: #777;
+}
+
+/* Estilo para el item que contiene el toggle */
+.dropdown-item.toggle-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.dropdown-item.toggle-item label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+.dropdown-item.toggle-item label i {
+    margin-right: 12px;
+}
+
+
+/* =============================================================
+   NUEVOS ESTILOS: INTERRUPTOR (TOGGLE SWITCH)
+================================================================ */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;  /* Ancho del switch */
+    height: 20px; /* Alto del switch */
+}
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    border-radius: 20px;
+    transition: .4s;
+}
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 16px; /* Alto del círculo */
+    width: 16px;  /* Ancho del círculo */
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    border-radius: 50%;
+    transition: .4s;
+}
+input:checked + .slider {
+    background-color: #cc0000; /* Color rojo INACAP */
+}
+input:checked + .slider:before {
+    transform: translateX(20px); /* Movimiento = Ancho total - Ancho círculo - (Padding*2) */
+}
+
+
+/* =============================================================
+   NUEVOS ESTILOS: MODO OSCURO (CON CORRECCIÓN DE ESPECIFICIDAD)
+================================================================ */
+
+body.dark-mode {
+    background-color: #1a1a1a; /* Fondo principal oscuro */
+    color: #e0e0e0;
+}
+
+/* --- Componentes Claros en Modo Oscuro --- */
+body.dark-mode .app-header,
+body.dark-mode .app-footer,
+body.dark-mode .panel-section,
+body.dark-mode .table-container,
+body.dark-mode .kpi-card,
+body.dark-mode .support-grid-container,
+body.dark-mode .dashboard-nav,
+body.dark-mode .modal-content,
+body.dark-mode .cal-citas-list,
+body.dark-mode .cal-cita-item,
+body.dark-mode .login-container,
+body.dark-mode .form-container,
+body.dark-mode .dropdown-menu {
+    background-color: #2c2c2c; /* Fondo de tarjetas oscuro */
+    color: #e0e0e0;
+    border-color: #444;
+}
+
+/* --- INICIO DE CORRECCIÓN DE ESPECIFICIDAD --- */
+
+/* Textos y Bordes */
+body.dark-mode h1,
+body.dark-mode h2,
+body.dark-mode h3,
+body.dark-mode h4,
+body.dark-mode .kpi-value,
+body.dark-mode .support-title,
+body.dark-mode .custom-table td,
+body.dark-mode .header-user-details .user-role,
+body.dark-mode .dropdown-item,
+body.dark-mode .form-group label,
+body.dark-mode .table-header h2, /* REGLA ESPECÍFICA */
+body.dark-mode .custom-table th  /* REGLA ESPECÍFICA */ {
+    color: #ffffff;
+}
+/* --- FIN DE CORRECCIÓN DE ESPECIFICIDAD --- */
+
+
+body.dark-mode p,
+body.dark-mode span,
+body.dark-mode .kpi-label,
+body.dark-mode .support-total,
+body.dark-mode .header-user-details .user-name,
+body.dark-mode .cal-cita-asunto,
+body.dark-mode .form-group small {
+    color: #b0b0b0;
+}
+body.dark-mode .app-footer p {
+    color: #999;
+}
+body.dark-mode .border-bottom { /* Si usas clases de borde */
+    border-color: #444 !important;
+}
+
+/* Botones y Links */
+body.dark-mode .header-config-link,
+body.dark-mode .header-config-link:hover {
+    background-color: #333;
+    border-color: #555;
+    color: #e0e0e0;
+}
+body.dark-mode .header-logout-link {
+    background-color: #2c2c2c;
+    border-color: #555;
+}
+body.dark-mode .nav-item:hover,
+body.dark-mode .dropdown-item:hover {
+    background-color: #383838;
+}
+body.dark-mode .btn-volver {
+    background-color: #444;
+    color: #e0e0e0;
+}
+body.dark-mode .btn-volver:hover {
+    background-color: #555;
+}
+
+/* Formularios */
+body.dark-mode .form-group input,
+body.dark-mode .form-group select,
+body.dark-mode .form-group textarea,
+body.dark-mode .search-bar input,
+body.dark-mode .entries-selector select,
+body.dark-mode .input-readonly {
+    background-color: #333;
+    color: #e0e0e0;
+    border-color: #555;
+}
+body.dark-mode .drop-zone {
+    background-color: #222;
+    border-color: #444;
+}
+
+/* Calendario */
+body.dark-mode .cal-day:not(.other-month):hover {
+    background-color: #444;
+}
+body.dark-mode .cal-day.day-today {
+    background-color: #1d3c5a;
+    border-color: #007bff;
+    color: #e0e0e0;
+}
+
+
+/* =============================================================
+   NUEVOS ESTILOS: MODO ACCESIBILIDAD
+================================================================ */
+
+/* Aumenta el tamaño de fuente base */
+body.accessibility-mode {
+    font-size: 110%; /* O 1.1em. Aumenta todo */
+}
+
+/* Asegura que los botones e inputs hereden el tamaño */
+body.accessibility-mode .btn,
+body.accessibility-mode button,
+body.accessibility-mode input,
+body.accessibility-mode select,
+body.accessibility-mode textarea,
+body.accessibility-mode .dropdown-item {
+    font-size: 1em; /* Hereda el tamaño base aumentado */
+}
+
+/* Aumenta el contraste de los enlaces y botones en foco/hover */
+body.accessibility-mode a:hover,
+body.accessibility-mode button:hover,
+body.accessibility-mode input:focus,
+body.accessibility-mode select:focus,
+body.accessibility-mode textarea:focus,
+body.accessibility-mode .dropdown-item:hover,
+body.accessibility-mode .nav-item:hover,
+body.accessibility-mode .header-config-link:focus-within, /* Para el dropdown */
+body.accessibility-mode .header-logout-link:focus,
+body.accessibility-mode .btn-accion:focus {
+    outline: 3px solid #007bff; /* Borde azul de alto contraste */
+    box-shadow: 0 0 0 2px #ffffff; /* Borde interior blanco */
+}
+
+
+/* --- Reglas antiguas (sin cambios) --- */
+.header-user-info { 
     text-align: right;
 }
 .header-user-info .user-role {
