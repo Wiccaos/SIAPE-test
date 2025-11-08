@@ -130,6 +130,39 @@
         </div>
     </div>
 
+    </div> <div class="panel-section">
+            <h3><i class="fas fa-calendar-alt"></i> Calendario de Citas</h3>
+            <div class="detalle-card" id="card-calendario-panel">
+                
+                <div class="calendario-header" id="cal-header">
+                    </div>
+                
+                <div class="cal-nav">
+                    <button id="cal-prev" class="btn-accion btn-accion-gray btn-accion-small"><i class="fas fa-chevron-left"></i> Anterior</button>
+                    <button id="cal-today" class="btn-accion btn-accion-gray btn-accion-small">Hoy</button>
+                    <button id="cal-next" class="btn-accion btn-accion-gray btn-accion-small">Siguiente <i class="fas fa-chevron-right"></i></button>
+                </div>
+
+                <div class="calendario-grid">
+                    <div class="cal-day-header">L</div>
+                    <div class="cal-day-header">M</div>
+                    <div class="cal-day-header">X</div>
+                    <div class="cal-day-header">J</div>
+                    <div class="cal-day-header">V</div>
+                    <div class="cal-day-header">S</div>
+                    <div class="cal-day-header">D</div>
+                </div>
+                <div class="calendario-grid" id="cal-grid-body">
+                    </div>
+                <div class="calendario-leyenda" style="margin-top: 15px; padding: 0 15px;">
+                    <div><span class="dot dot-entrevista"></span> Día con Cita(s)</div>
+                </div>
+            </div>
+        </div>
+
+        {% if citas_pendientes_confirmar %}
+        <div class="panel-section citas-detalle">
+
     <!-- Sección: Citas Pendientes de Confirmar (Pasadas) -->
     {% if citas_pendientes_confirmar %}
     <div class="panel-section citas-detalle">
@@ -716,6 +749,113 @@
             cerrarModalRechazar();
         }
     }
+
+    // --- INICIO DE CÓDIGO AGREGADO PARA CALENDARIO ---
+
+    // 1. Obtener las fechas de las citas pasadas desde Django
+    // Usamos '|| "[]"' como respaldo por si 'fechas_citas_json' estuviera vacío
+    const fechasCitas = JSON.parse('{{ fechas_citas_json|escapejs }}' || "[]");
+
+    // 2. Variables globales del calendario
+    let navDate = new Date(); // Fecha para la navegación
+    const hoy = new Date(); // Fecha de hoy (no cambia)
+    const hoyStr = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+
+    // 3. Elementos del DOM
+    const calHeader = document.getElementById('cal-header');
+    const calGridBody = document.getElementById('cal-grid-body');
+    const btnPrev = document.getElementById('cal-prev');
+    const btnNext = document.getElementById('cal-next');
+    const btnToday = document.getElementById('cal-today');
+
+    // Nombres de meses
+    const meses = [
+        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ];
+
+    // 4. Función principal para renderizar el calendario
+    function renderCalendar() {
+        const year = navDate.getFullYear();
+        const month = navDate.getMonth(); // 0-11
+
+        // Título del header (e.g., "Noviembre 2025")
+        calHeader.innerText = `${meses[month]} ${year}`;
+
+        // Limpiar el grid
+        calGridBody.innerHTML = '';
+
+        // --- Calcular días ---
+        const primerDiaDelMes = new Date(year, month, 1);
+        const ultimoDiaDelMes = new Date(year, month + 1, 0);
+        const ultimoDiaNum = ultimoDiaDelMes.getDate();
+
+        // Obtener el día de la semana del primer día (0=Domingo, 1=Lunes, ..., 6=Sábado)
+        // Ajustamos para que la semana empiece en Lunes (0=Lunes, ..., 6=Domingo)
+        let diaInicioSemana = (primerDiaDelMes.getDay() + 6) % 7;
+
+        // --- Renderizar días del mes anterior (padding) ---
+        const ultimoDiaMesAnterior = new Date(year, month, 0).getDate();
+        for (let i = diaInicioSemana; i > 0; i--) {
+            const dia = ultimoDiaMesAnterior - i + 1;
+            const dayDiv = document.createElement('div');
+            dayDiv.classList.add('cal-day', 'other-month');
+            dayDiv.innerText = dia;
+            calGridBody.appendChild(dayDiv);
+        }
+
+        // --- Renderizar días del mes actual ---
+        for (let dia = 1; dia <= ultimoDiaNum; dia++) {
+            const dayDiv = document.createElement('div');
+            dayDiv.classList.add('cal-day');
+            dayDiv.innerText = dia;
+
+            // Formato 'YYYY-MM-DD'
+            const fechaStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+
+            // Marcar si es "Hoy"
+            if (fechaStr === hoyStr) {
+                dayDiv.classList.add('day-today');
+            }
+
+            // Marcar si hay cita (usamos la clase CSS que ya existe)
+            if (fechasCitas.includes(fechaStr)) {
+                dayDiv.classList.add('day-entrevista');
+            }
+            
+            calGridBody.appendChild(dayDiv);
+        }
+
+        // --- Renderizar días del mes siguiente (padding) ---
+        const totalDiasGrid = calGridBody.children.length;
+        const diasSiguientes = (7 - (totalDiasGrid % 7)) % 7; // Cuántos faltan para completar la semana
+
+        for (let i = 1; i <= diasSiguientes; i++) {
+            const dayDiv = document.createElement('div');
+            dayDiv.classList.add('cal-day', 'other-month');
+            dayDiv.innerText = i;
+            calGridBody.appendChild(dayDiv);
+        }
+    }
+
+    // 5. Event Listeners para navegación
+    btnPrev.addEventListener('click', () => {
+        navDate.setMonth(navDate.getMonth() - 1);
+        renderCalendar();
+    });
+
+    btnNext.addEventListener('click', () => {
+        navDate.setMonth(navDate.getMonth() + 1);
+        renderCalendar();
+    });
+
+    btnToday.addEventListener('click', () => {
+        navDate = new Date();
+        renderCalendar();
+    });
+
+    // 6. Renderizar el calendario al cargar la página
+    renderCalendar();
 </script>
 {% endblock %}
 

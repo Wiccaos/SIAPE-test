@@ -7,6 +7,7 @@ from django.contrib.auth import logout, login
 from django.utils import timezone
 from datetime import timedelta, datetime
 from django.db.models import Count, Q
+import json
 
 from rest_framework import (
     viewsets, mixins, status
@@ -36,7 +37,6 @@ ROL_ASESOR = 'Asesor Pedagógico'
 ROL_DIRECTOR = 'Director de Carrera'
 ROL_DOCENTE = 'Docente'
 ROL_ADMIN = 'Administrador'
-
 
 # ----------------------------------------------
 #           Vistas Públicas del Sistema
@@ -98,13 +98,16 @@ def pag_inicio(request):
         if request.user.perfil.rol:
             rol = request.user.perfil.rol.nombre_rol
 
-    if rol == 'Asesor Pedagógico':
+    if rol == ROL_ASESOR:
         return redirect('dashboard_asesor')
     elif rol == ROL_DIRECTOR:
         return redirect('dashboard_director')
+    elif rol == ROL_ADMIN:
+        return redirect('dashboard_admin')
 
+    # Si es superusuario pero no tiene rol (ej. 'admin' puro), va al admin de Django
     if request.user.is_superuser or request.user.is_staff:
-        return redirect('admin:index') 
+        return redirect('admin:index')
 
     return render(request, 'SIAPE/inicio.html')
     
@@ -117,6 +120,72 @@ def vista_protegida(request):
 def logout_view(request):
     logout(request)
     return redirect('login') 
+
+# ------------- Páginas del Admin ------------
+@login_required
+def dashboard_admin(request):
+    """
+    Dashboard para Administradores del Sistema.
+    Muestra KPIs globales y casos que requieren acción.
+    """
+    
+    # Verificar permisos
+    rol = None
+    if hasattr(request.user, 'perfil'):
+        if request.user.perfil.rol:
+            rol = request.user.perfil.rol.nombre_rol
+
+    if not request.user.is_superuser and rol != ROL_ADMIN:
+        return redirect('home')
+
+    # --- KPIs ---
+    kpis = {
+        'total_asesores': PerfilUsuario.objects.filter(rol__nombre_rol=ROL_ASESOR).count(),
+        'total_directores': PerfilUsuario.objects.filter(rol__nombre_rol=ROL_DIRECTOR).count(),
+        'total_docentes': PerfilUsuario.objects.filter(rol__nombre_rol=ROL_DOCENTE).count(),
+        'total_estudiantes': Estudiantes.objects.count(),
+        'total_solicitudes': Solicitudes.objects.count(),
+        'solicitudes_en_proceso': Solicitudes.objects.filter(estado='en_proceso').count(),
+        'solicitudes_aprobadas': Solicitudes.objects.filter(estado='aprobado').count(),
+        'solicitudes_rechazadas': Solicitudes.objects.filter(estado='rechazado').count(),
+    }
+
+    # --- Tabla: Casos Críticos (Sin Asignar) ---
+    # Solicitudes en proceso que no tienen ningún asesor
+    solicitudes_sin_asignar = Solicitudes.objects.filter(
+        asesores_pedagogicos__isnull=True,
+        estado='en_proceso'
+    ).select_related(
+        'estudiantes', 
+        'estudiantes__carreras'
+    ).order_by('created_at') # <-- Más antiguas primero
+
+    # --- Gráfico: Distribución de Solicitudes por Área ---
+    distribucion_areas = Areas.objects.annotate(
+        total_solicitudes=Count('carreras__estudiantes__solicitudes')
+    ).filter(
+        total_solicitudes__gt=0
+    ).order_by('-total_solicitudes')
+    
+    total_solicitudes_grafico = sum(area.total_solicitudes for area in distribucion_areas)
+
+    distribucion_con_porcentaje = []
+    for area in distribucion_areas:
+        porcentaje = (area.total_solicitudes / total_solicitudes_grafico * 100) if total_solicitudes_grafico > 0 else 0
+        distribucion_con_porcentaje.append({
+            'area': area,
+            'total': area.total_solicitudes,
+            'porcentaje': round(porcentaje, 1)
+        })
+
+    context = {
+        'kpis': kpis,
+        'solicitudes_sin_asignar': solicitudes_sin_asignar,
+        'total_sin_asignar': solicitudes_sin_asignar.count(),
+        'distribucion_apoyos': distribucion_con_porcentaje,
+    }
+    
+    return render(request, 'SIAPE/dashboard_admin.html', context)
 
 # ----------- Páginas de Asesor Pedagógco ------------
 
@@ -279,6 +348,16 @@ def panel_control_asesor(request):
         return redirect('home')
 
     perfil_asesor = request.user.perfil
+
+    # Obtener todas las fechas de citas para el calendario
+    citas_para_calendario = Entrevistas.objects.filter(
+        asesor_pedagogico=perfil_asesor
+    ).values_list('fecha_entrevista', flat=True)
+    
+    # Convertir a formato 'YYYY-MM-DD' y eliminar duplicados
+    fechas_citas = sorted(list(set([
+        dt.strftime('%Y-%m-%d') for dt in citas_para_calendario
+    ])))
     
     # Casos disponibles para asignar (sin asesor asignado)
     casos_disponibles = Solicitudes.objects.filter(
@@ -345,6 +424,7 @@ def panel_control_asesor(request):
         'categorias_ajustes': categorias_ajustes,
         'casos_asignados': casos_asignados,
         'casos_con_ajustes': casos_con_ajustes,
+        'fechas_citas_json': json.dumps(fechas_citas),
     }
     return render(request, 'SIAPE/panel_control_asesor.html', context)
 
@@ -407,6 +487,7 @@ def agendar_cita_asesor(request):
             messages.error(request, f'Error al agendar la cita: {str(e)}')
     
     return redirect('panel_control_asesor')
+
 
 @login_required
 def registrar_ajuste_razonable(request):
@@ -697,6 +778,8 @@ def dashboard_director(request):
         'carreras': carreras, 
     }
     return render(request, 'SIAPE/dashboard_director.html', context)
+
+
 
 
 # ----------- Vistas de los modelos ------------

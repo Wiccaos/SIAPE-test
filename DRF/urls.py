@@ -45,6 +45,9 @@ urlpatterns = [
     path('SIAPE/', include('SIAPE.urls')),
     path('formulario-solicitud/', views.vista_formulario_solicitud, name='formulario-solicitud'),
 
+    # URLs del Administrador
+    path('dashboard/admin/', views.dashboard_admin, name='dashboard_admin'),
+
     # URLs de Asesor Pedagógico
     path('dashboard/asesor/', views.dashboard_asesor, name='dashboard_asesor'),
     path('dashboard/asesor/casos/', views.casos_asesor, name='casos_asesor'),
@@ -58,6 +61,7 @@ urlpatterns = [
     path('dashboard/asesor/reagendar-cita/<int:entrevista_id>/', views.reagendar_cita_asesor, name='reagendar_cita_asesor'),
     path('dashboard/asesor/aprobar-solicitud/<int:solicitud_id>/', views.aprobar_solicitud_asesor, name='aprobar_solicitud_asesor'),
     path('dashboard/asesor/rechazar-solicitud/<int:solicitud_id>/', views.rechazar_solicitud_asesor, name='rechazar_solicitud_asesor'),
+    # path('citas-asesor-json/', views.citas_asesor_json, name='citas_asesor_json'),
 
     # URLs de Director de Carrera
     path('dashboard/director/', views.dashboard_director, name='dashboard_director'),

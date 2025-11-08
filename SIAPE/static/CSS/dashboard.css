@@ -888,3 +888,60 @@
         grid-template-columns: 1fr !important;
     }
 }
+
+/* ==============================================
+  ESTILOS ADICIONALES PARA CALENDARIO DEL PANEL
+=================================================
+*/
+
+/* Contenedor de navegación del calendario */
+.cal-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 15px;
+    padding: 15px;
+    border-top: 1px solid #eee;
+    border-bottom: 1px solid #eee;
+}
+
+/* Estilo para el día de "Hoy" */
+.cal-day.day-today {
+    background-color: #e7f3ff;
+    color: #007bff;
+    font-weight: bold;
+    border: 1px solid #007bff;
+}
+
+/* Prioridad si un día es "Hoy" y también tiene "Cita":
+  Mantenemos el fondo de la cita y el borde de "Hoy".
+*/
+.cal-day.day-entrevista.day-today {
+    background-color: #eaf6ec; /* Fondo de cita */
+    color: #28a745;         /* Color de cita */
+    border: 2px solid #007bff; /* Borde de "Hoy" */
+}
+
+/* Aseguramos que el grid del calendario en el panel 
+  tenga el espaciado correcto (ya definido en detalle_caso)
+*/
+#card-calendario-panel .calendario-grid {
+    gap: 5px;
+}
+
+#card-calendario-panel .cal-day {
+    width: 30px;
+    height: 30px;
+}
+
+/* Ajuste para la tarjeta de calendario en el panel 
+  para que el padding no sea excesivo 
+*/
+#card-calendario-panel {
+    padding: 0; 
+}
+
+#card-calendario-panel .calendario-header {
+    padding: 15px 15px 0 15px;
+}
+
