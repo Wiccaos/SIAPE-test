@@ -131,36 +131,50 @@
     </div> <!-- FIN .panel-control-container -->
 
     <!-- ========================================================
-         INICIO SECCIÓN CALENDARIO Y CITAS 
-         (Se quitó un </div> extra que estaba antes de esta línea)
+         INICIO SECCIÓN CALENDARIO Y CITAS (MODIFICADA)
     ========================================================= -->
     <div class="panel-section">
         <h3><i class="fas fa-calendar-alt"></i> Calendario de Citas</h3>
-        <div class="detalle-card" id="card-calendario-panel">
+        
+        <!-- Contenedor de 2 columnas para Calendario + Lista de Citas -->
+        <div class="cal-layout-container">
             
-            <div class="calendario-header" id="cal-header">
+            <!-- Columna 1: El Calendario -->
+            <div class="cal-widget">
+                <div class="detalle-card" id="card-calendario-panel">
+                    
+                    <div class="calendario-header" id="cal-header">
+                        <!-- El mes se inserta aquí por JS -->
+                    </div>
+                    
+                    <!-- Navegación movida encima de la grilla -->
+                    <div class="cal-nav">
+                        <button id="cal-prev" class="btn-accion btn-accion-gray btn-accion-small"><i class="fas fa-chevron-left"></i> Ant</button>
+                        <button id="cal-today" class="btn-accion btn-accion-gray btn-accion-small">Hoy</button>
+                        <button id="cal-next" class="btn-accion btn-accion-gray btn-accion-small">Sig <i class="fas fa-chevron-right"></i></button>
+                    </div>
+
+                    <div class="calendario-grid" id="cal-grid-body">
+                        <!-- Los días se insertan aquí por JS -->
+                    </div>
+                    <div class="calendario-leyenda" style="margin-top: 15px; padding: 0 15px;">
+                        <div><span class="dot dot-entrevista"></span> Día con Cita(s)</div>
+                    </div>
                 </div>
-            
-            <div class="cal-nav">
-                <button id="cal-prev" class="btn-accion btn-accion-gray btn-accion-small"><i class="fas fa-chevron-left"></i> Anterior</button>
-                <button id="cal-today" class="btn-accion btn-accion-gray btn-accion-small">Hoy</button>
-                <button id="cal-next" class="btn-accion btn-accion-gray btn-accion-small">Siguiente <i class="fas fa-chevron-right"></i></button>
             </div>
 
-            <div class="calendario-grid">
-                <div class="cal-day-header">L</div>
-                <div class="cal-day-header">M</div>
-                <div class="cal-day-header">X</div>
-                <div class="cal-day-header">J</div>
-                <div class="cal-day-header">V</div>
-                <div class="cal-day-header">S</div>
-                <div class="cal-day-header">D</div>
-            </div>
-            <div class="calendario-grid" id="cal-grid-body">
+            <!-- Columna 2: La Lista de Citas del Día -->
+            <div class="cal-citas-list">
+                <h4 id="cal-citas-titulo">Citas del Día</h4>
+                <div id="cal-citas-dia">
+                    <!-- El contenido se inserta aquí por JS -->
+                    <div class="empty-state" style="padding: 10px 0;">
+                        <i class="fas fa-calendar-day" style="font-size: 2rem; margin-bottom: 10px;"></i>
+                        <p style="font-size: 0.9rem;">Seleccione un día del calendario para ver las citas programadas.</p>
+                    </div>
                 </div>
-            <div class="calendario-leyenda" style="margin-top: 15px; padding: 0 15px;">
-                <div><span class="dot dot-entrevista"></span> Día con Cita(s)</div>
             </div>
+
         </div>
     </div>
 
@@ -751,52 +765,122 @@
         }
     }
 
-    // --- INICIO DE CÓDIGO AGREGADO PARA CALENDARIO ---
+    // --- INICIO DE CÓDIGO DEL CALENDARIO (MODIFICADO) ---
 
-    // 1. Obtener las fechas de las citas pasadas desde Django
-    // Usamos '|| "[]"' como respaldo por si 'fechas_citas_json' estuviera vacío
-    const fechasCitas = JSON.parse('{{ fechas_citas_json|escapejs }}' || "[]");
+    // Fechas que tienen *alguna* cita (para la clase 'day-entrevista')
+    const fechasConCitas = JSON.parse('{{ fechas_citas_json|escapejs }}' || "[]");
+    // Lista completa de todas las citas con sus detalles
+    const todasLasCitas = JSON.parse('{{ citas_data_json|escapejs }}' || "[]");
 
-    // 2. Variables globales del calendario
-    let navDate = new Date(); // Fecha para la navegación
-    const hoy = new Date(); // Fecha de hoy (no cambia)
+    // Variables globales del calendario
+    let navDate = new Date();
+    const hoy = new Date();
     const hoyStr = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+    let diaSeleccionado = null; 
+    let diaSeleccionadoStr = null;
 
-    // 3. Elementos del DOM
+    // Elementos del DOM
     const calHeader = document.getElementById('cal-header');
     const calGridBody = document.getElementById('cal-grid-body');
     const btnPrev = document.getElementById('cal-prev');
     const btnNext = document.getElementById('cal-next');
     const btnToday = document.getElementById('cal-today');
+    const citasDiaContainer = document.getElementById('cal-citas-dia');
+    const citasDiaTitulo = document.getElementById('cal-citas-titulo');
 
-    // Nombres de meses
     const meses = [
         "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
         "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
     ];
+    
+    // 4. (NUEVO) Mapear citas por fecha para acceso rápido
+    // Creamos un objeto: { "2025-11-08": [cita1, cita2], "2025-11-10": [cita3] }
+    const citasPorFecha = {};
+    for (const cita of todasLasCitas) {
+        if (!citasPorFecha[cita.fecha]) {
+            citasPorFecha[cita.fecha] = [];
+        }
+        citasPorFecha[cita.fecha].push(cita);
+    }
 
-    // 4. Función principal para renderizar el calendario
+    // 5. Función para mostrar las citas de un día
+    function mostrarCitasDelDia(fechaStr, diaEl) {
+        // Actualizar título
+        const [year, month, day] = fechaStr.split('-');
+        citasDiaTitulo.innerText = `Citas para ${day}/${month}/${year}`;
+
+        // Resaltar día seleccionado
+        if (diaSeleccionado) {
+            diaSeleccionado.classList.remove('cal-day-selected');
+        }
+        
+        // Si el elemento existe (no es null)
+        if(diaEl) {
+            diaEl.classList.add('cal-day-selected');
+            diaSeleccionado = diaEl;
+            diaSeleccionadoStr = fechaStr; // Guardamos la fecha
+        } else {
+            // Si diaEl es null (porque venimos de un re-render), buscamos el día
+            diaSeleccionado = calGridBody.querySelector(`[data-fecha="${fechaStr}"]`);
+            if (diaSeleccionado) {
+                diaSeleccionado.classList.add('cal-day-selected');
+            }
+        }
+
+
+        const citas = citasPorFecha[fechaStr] || [];
+        
+        if (citas.length === 0) {
+            citasDiaContainer.innerHTML = `
+                <div class="empty-state" style="padding: 10px 0;">
+                    <i class="fas fa-calendar-check" style="font-size: 2rem; margin-bottom: 10px;"></i>
+                    <p style="font-size: 0.9rem;">No hay citas programadas para este día.</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Construir HTML para la lista de citas
+        let html = '';
+        for (const cita of citas) {
+            html += `
+                <div class="cal-cita-item estado-${cita.estado_key}">
+                    <span class="cal-cita-hora"><i class="fas fa-clock"></i> ${cita.hora}</span>
+                    <strong class="cal-cita-estudiante">${cita.estudiante}</strong>
+                    <span class="cal-cita-asunto">${cita.asunto}</span>
+                    <span class="cal-cita-estado">Estado: ${cita.estado}</span>
+                </div>
+            `;
+        }
+        citasDiaContainer.innerHTML = html;
+    }
+
+    // 6. Función principal para renderizar el calendario (Modificada)
     function renderCalendar() {
         const year = navDate.getFullYear();
         const month = navDate.getMonth(); // 0-11
-
-        // Título del header (e.g., "Noviembre 2025")
         calHeader.innerText = `${meses[month]} ${year}`;
-
-        // Limpiar el grid
-        calGridBody.innerHTML = '';
-
-        // --- Calcular días ---
+        
+        // ======================= INICIO MODIFICACIÓN JS =======================
+        // Limpiamos la grilla e inyectamos los encabezados
+        calGridBody.innerHTML = `
+            <div class="cal-day-header">L</div>
+            <div class="cal-day-header">M</div>
+            <div class="cal-day-header">X</div>
+            <div class="cal-day-header">J</div>
+            <div class="cal-day-header">V</div>
+            <div class="cal-day-header">S</div>
+            <div class="cal-day-header">D</div>
+        `;
+        // ======================= FIN MODIFICACIÓN JS =======================
+        
         const primerDiaDelMes = new Date(year, month, 1);
         const ultimoDiaDelMes = new Date(year, month + 1, 0);
         const ultimoDiaNum = ultimoDiaDelMes.getDate();
-
-        // Obtener el día de la semana del primer día (0=Domingo, 1=Lunes, ..., 6=Sábado)
-        // Ajustamos para que la semana empiece en Lunes (0=Lunes, ..., 6=Domingo)
         let diaInicioSemana = (primerDiaDelMes.getDay() + 6) % 7;
-
-        // --- Renderizar días del mes anterior (padding) ---
         const ultimoDiaMesAnterior = new Date(year, month, 0).getDate();
+
+        // Días del mes anterior
         for (let i = diaInicioSemana; i > 0; i--) {
             const dia = ultimoDiaMesAnterior - i + 1;
             const dayDiv = document.createElement('div');
@@ -805,37 +889,56 @@
             calGridBody.appendChild(dayDiv);
         }
 
-        // --- Renderizar días del mes actual ---
+        // Días del mes actual
         for (let dia = 1; dia <= ultimoDiaNum; dia++) {
             const dayDiv = document.createElement('div');
             dayDiv.classList.add('cal-day');
             dayDiv.innerText = dia;
 
-            // Formato 'YYYY-MM-DD'
             const fechaStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+            dayDiv.dataset.fecha = fechaStr; // Añadimos data-fecha para encontrarlo
 
-            // Marcar si es "Hoy"
             if (fechaStr === hoyStr) {
                 dayDiv.classList.add('day-today');
             }
 
-            // Marcar si hay cita (usamos la clase CSS que ya existe)
-            if (fechasCitas.includes(fechaStr)) {
+            if (fechasConCitas.includes(fechaStr)) {
                 dayDiv.classList.add('day-entrevista');
             }
+            
+            dayDiv.addEventListener('click', () => mostrarCitasDelDia(fechaStr, dayDiv));
             
             calGridBody.appendChild(dayDiv);
         }
 
-        // --- Renderizar días del mes siguiente (padding) ---
+        // Días del mes siguiente
         const totalDiasGrid = calGridBody.children.length;
-        const diasSiguientes = (7 - (totalDiasGrid % 7)) % 7; // Cuántos faltan para completar la semana
-
+        const diasSiguientes = (7 - (totalDiasGrid % 7)) % 7;
         for (let i = 1; i <= diasSiguientes; i++) {
             const dayDiv = document.createElement('div');
             dayDiv.classList.add('cal-day', 'other-month');
             dayDiv.innerText = i;
             calGridBody.appendChild(dayDiv);
+        }
+        
+        // (NUEVO) Al re-renderizar, si un día estaba seleccionado, lo volvemos a mostrar
+        if (diaSeleccionadoStr) {
+            // Verificamos si el día sigue en el mes actual
+            const [selYear, selMonth] = diaSeleccionadoStr.split('-');
+            if (parseInt(selYear) === year && parseInt(selMonth) === (month + 1)) {
+                mostrarCitasDelDia(diaSeleccionadoStr, null); // Pasamos null para que la función lo busque
+            } else {
+                // Si el día ya no está visible, limpiamos
+                diaSeleccionado = null;
+                diaSeleccionadoStr = null;
+                citasDiaTitulo.innerText = `Citas del Día`;
+                citasDiaContainer.innerHTML = `
+                    <div class="empty-state" style="padding: 10px 0;">
+                        <i class="fas fa-calendar-day" style="font-size: 2rem; margin-bottom: 10px;"></i>
+                        <p style="font-size: 0.9rem;">Seleccione un día del calendario para ver las citas programadas.</p>
+                    </div>
+                `;
+            }
         }
     }
 

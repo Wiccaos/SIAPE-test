@@ -681,6 +681,29 @@ def panel_control_asesor(request):
 
     perfil_asesor = request.user.perfil
 
+    # Obtener todas las citas del asesor
+    citas_completas = Entrevistas.objects.filter(
+        asesor_pedagogico=perfil_asesor
+    ).select_related('solicitudes', 'solicitudes__estudiantes').order_by('fecha_entrevista')
+
+    # Formatear las citas para JSON
+    citas_data = []
+    for cita in citas_completas:
+        citas_data.append({
+            'id': cita.id,
+            'fecha': cita.fecha_entrevista.strftime('%Y-%m-%d'),
+            'hora': cita.fecha_entrevista.strftime('%H:%M'),
+            'estudiante': f"{cita.solicitudes.estudiantes.nombres} {cita.solicitudes.estudiantes.apellidos}",
+            'asunto': cita.solicitudes.asunto,
+            'estado': cita.get_estado_display(),
+            'estado_key': cita.estado # para styling
+        })
+
+    # Extraer fechas únicas de las citas
+    fechas_citas = sorted(list(set([
+        cita['fecha'] for cita in citas_data
+    ])))
+
     # Obtener todas las fechas de citas para el calendario
     citas_para_calendario = Entrevistas.objects.filter(
         asesor_pedagogico=perfil_asesor
@@ -757,6 +780,7 @@ def panel_control_asesor(request):
         'casos_asignados': casos_asignados,
         'casos_con_ajustes': casos_con_ajustes,
         'fechas_citas_json': json.dumps(fechas_citas),
+        'citas_data_json': json.dumps(citas_data),
     }
     return render(request, 'SIAPE/panel_control_asesor.html', context)
 
