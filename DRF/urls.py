@@ -68,7 +68,7 @@ urlpatterns = [
 
     # URLs de autenticación
     path('accounts/', include('django.contrib.auth.urls')),
-path('login/', auth_views.LoginView.as_view(
+    path('login/', auth_views.LoginView.as_view(
         template_name='registration/login.html',
         next_page=reverse_lazy('home')
     ), name='login'),
