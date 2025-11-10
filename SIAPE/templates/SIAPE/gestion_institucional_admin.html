@@ -29,18 +29,18 @@
 
     {% if messages %}
         {% for message in messages %}
-            <div class="alert alert-{{ message.tags }}" style="padding: 15px; margin-bottom: 20px; border-radius: 6px; background-color: {% if message.tags == 'success' %}#d4edda{% elif message.tags == 'error' %}#f8d7da{% else %}#fff3cd{% endif %}; color: {% if message.tags == 'success' %}#155724{% elif message.tags == 'error' %}#721c24{% else %}#856404{% endif %};">
+            <div class="alert alert-{{ message.tags }} custom-alert-{{ message.tags }}">
                 {{ message }}
             </div>
         {% endfor %}
     {% endif %}
 
-    <div class="panel-control-container" style="display: block; margin-top: 30px;">
+    <div class="panel-control-container">
 
         <!-- ======================= TABLA DE CARRERAS ======================= -->
-        <section class="table-container" style="margin-bottom: 30px;">
-            <div class="table-header" style="display: flex; justify-content: space-between; align-items: center;">
-                <h2 style="color: #333;"><i class="fas fa-graduation-cap"></i> Gestión de Carreras</h2>
+    <section class="table-container">
+            <div class="table-header">
+                <h2 class="titulo-carreras"><i class="fas fa-graduation-cap"></i> Gestión de Carreras</h2>
                 <button type="button" class="btn-accion btn-asignar" onclick="abrirModalAgregarCarrera()">
                     <i class="fas fa-plus"></i> Agregar Carrera
                 </button>
@@ -76,9 +76,9 @@
         </section>
 
         <!-- ======================= TABLA DE ASIGNATURAS ======================= -->
-        <section class="table-container" style="margin-bottom: 30px;">
-            <div class="table-header" style="display: flex; justify-content: space-between; align-items: center;">
-                <h2 style="color: #333;"><i class="fas fa-book"></i> Gestión de Asignaturas</h2>
+    <section class="table-container">
+            <div class="table-header">
+                <h2 class="titulo-asignaturas"><i class="fas fa-book"></i> Gestión de Asignaturas</h2>
                 <button type="button" class="btn-accion btn-asignar" onclick="abrirModalAgregarAsignatura()">
                     <i class="fas fa-plus"></i> Agregar Asignatura
                 </button>

@@ -1,3 +1,257 @@
+/* Modo oscuro: tarjetas internas de casos, citas y calendario */
+body.dark-mode .caso-item,
+body.dark-mode .cita-item,
+body.dark-mode .cal-widget,
+body.dark-mode .cal-citas-list,
+body.dark-mode .empty-state {
+    background-color: #181818 !important;
+    color: #e0e0e0 !important;
+    border-color: #444 !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25) !important;
+}
+body.dark-mode .caso-header,
+body.dark-mode .cita-header,
+body.dark-mode .caso-asunto,
+body.dark-mode .cita-fecha,
+body.dark-mode .caso-estudiante,
+body.dark-mode .cita-estudiante,
+body.dark-mode .kpi-label,
+body.dark-mode .kpi-detail,
+body.dark-mode .kpi-value {
+    color: #fff !important;
+}
+body.dark-mode .btn-accion {
+    color: #fff;
+}
+/* Fondo oscuro para el div principal del calendario en modo oscuro */
+body.dark-mode .panel-section .cal-layout-container {
+    background-color: #181818 !important;
+    border-radius: 18px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    border: 1.5px solid #333;
+}
+
+/* Restaurar colores de días con citas, seleccionados y día actual en modo oscuro */
+body.dark-mode .cal-day.day-entrevista {
+    background-color: #1d3c5a !important;
+    color: #fff !important;
+}
+body.dark-mode .cal-day.day-today {
+    background-color: #007bff !important;
+    color: #fff !important;
+    border-color: #007bff !important;
+}
+body.dark-mode .cal-day.cal-day-selected {
+    background-color: #cc0000 !important;
+    color: #fff !important;
+    border-color: #cc0000 !important;
+}
+body.dark-mode .cal-day.day-entrevista.day-today {
+    background-color: #007bff !important;
+    color: #fff !important;
+    border-color: #007bff !important;
+}
+
+/* Casos disponibles y asignados uno al lado del otro en desktop, apilados en móvil */
+.panel-control-container.casos-dos-columnas {
+    display: flex;
+    flex-direction: row;
+    gap: 30px;
+}
+.panel-control-container.casos-dos-columnas .panel-section {
+    flex: 1 1 0;
+    min-width: 0;
+}
+@media (max-width: 992px) {
+    .panel-control-container.casos-dos-columnas {
+        flex-direction: column;
+    }
+}
+
+/* Mejor contraste para casos disponibles y asignados en modo oscuro */
+body.dark-mode .panel-section.casos-disponibles,
+body.dark-mode .panel-section.casos-asignados {
+    background-color: #232323 !important;
+    color: #f0f0f0 !important;
+}
+/* Mejoras modo oscuro: fondo calendario y tipografía más clara en casos/citas */
+body.dark-mode .cal-layout-container,
+body.dark-mode .cal-widget {
+    background-color: #181818 !important;
+    color: #e0e0e0 !important;
+}
+body.dark-mode .caso-item,
+body.dark-mode .cita-item,
+body.dark-mode .cita-detalle-item,
+body.dark-mode .panel-section,
+body.dark-mode .citas-detalle {
+    color: #f0f0f0 !important;
+}
+body.dark-mode .caso-header,
+body.dark-mode .cita-header,
+body.dark-mode .caso-asunto,
+body.dark-mode .cita-fecha,
+body.dark-mode .caso-estudiante,
+body.dark-mode .cita-estudiante {
+    color: #fff !important;
+}
+/* === MODO OSCURO: Panel, Casos, Citas y Calendario === */
+body.dark-mode .panel-section,
+body.dark-mode .cal-layout-container,
+body.dark-mode .cal-widget,
+body.dark-mode .cal-citas-list,
+body.dark-mode .cita-detalle-item,
+body.dark-mode .empty-state,
+body.dark-mode .citas-detalle {
+    background-color: #232323 !important;
+    color: #e0e0e0 !important;
+    border-color: #444 !important;
+}
+body.dark-mode .table-container,
+body.dark-mode .custom-table,
+body.dark-mode .modal-content {
+    background-color: #232323 !important;
+    color: #e0e0e0 !important;
+    border-color: #444 !important;
+}
+body.dark-mode .custom-table th,
+body.dark-mode .custom-table td {
+    color: #e0e0e0 !important;
+}
+body.dark-mode .cal-day,
+body.dark-mode .cal-day-header {
+    background-color: #232323 !important;
+    color: #e0e0e0 !important;
+    border-color: #444 !important;
+}
+/* Panel Control Asesor clases para reemplazar estilos en línea */
+.ajustes-total {
+    color: #666;
+}
+.status-caso {
+    padding: 5px 10px;
+    border-radius: 6px;
+}
+.calendario-leyenda-mt {
+    margin-top: 15px;
+    padding: 0 15px;
+}
+.empty-state-10 {
+    padding: 10px 0;
+}
+/* Dashboard Admin clases para reemplazar estilos en línea */
+.table-mt-30 {
+    margin-top: 30px;
+}
+.casos-pendientes-titulo {
+    color: #cc0000;
+}
+.icono-check {
+    color: #28a745;
+}
+.support-mt-30 {
+    margin-top: 30px;
+}
+.support-row-3-1 {
+    grid-template-columns: 3fr 1fr;
+}
+.support-total-left {
+    text-align: left;
+}
+/* Alertas personalizadas para mensajes (reutilizadas) */
+.custom-alert-success {
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 6px;
+    background-color: #d4edda;
+    color: #155724;
+}
+.custom-alert-error {
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 6px;
+    background-color: #f8d7da;
+    color: #721c24;
+}
+.custom-alert-warning, .custom-alert-info, .custom-alert- {
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 6px;
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+
+
+.table-container {
+    margin-bottom: 30px;
+}
+
+.table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.titulo-carreras, .titulo-asignaturas {
+    color: #333;
+}
+/* Alertas personalizadas para mensajes */
+.custom-alert-success {
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 6px;
+    background-color: #d4edda;
+    color: #155724;
+}
+.custom-alert-error {
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 6px;
+    background-color: #f8d7da;
+    color: #721c24;
+}
+.custom-alert-warning, .custom-alert-info, .custom-alert- {
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 6px;
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+
+
+.table-container {
+    margin-bottom: 30px;
+}
+
+.table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.titulo-usuarios, .titulo-roles {
+    color: #333;
+}
+
+.status-en_proceso {
+    background-color: #e7f3ff;
+    color: #007bff;
+}
+
+.empty-state {
+    padding: 20px;
+}
+
+.nota-cambio-pass {
+    color: #777;
+    font-size: 0.8rem;
+}
+
+.modal-500 {
+    max-width: 500px;
+}
 /* --- ESTILOS GENERALES (del dashboard) --- */
 .main-content {
     width: 100%;
@@ -427,50 +681,25 @@
 /* La grilla principal (contiene encabezados Y días) */
 .calendario-grid {
     display: grid;
-    /* 7 columnas de un tamaño fijo (34px) */
     grid-template-columns: repeat(7, 34px);
-    /* Centra la grilla de 7 columnas */
     justify-content: center; 
-    /* Espacio entre los círculos */
     gap: 5px; 
-    /* Evita que se desborde en pantallas muy pequeñas */
     overflow-x: auto;
-    padding-bottom: 5px; /* Espacio si aparece scrollbar */
+    padding-bottom: 5px;
+    background: transparent !important;
 }
 
 /* Celdas de encabezado (L, M, X...) */
-.cal-day-header {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #999;
-    text-align: center;
-    /* Tamaño fijo que coincide con los días */
-    width: 34px;
-    height: 34px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+body.dark-mode .cal-day-header {
+    background: transparent !important;
+    color: #e0e0e0 !important;
 }
 
 /* Celdas de día (1, 2, 3...) */
-.cal-day {
-    font-size: 0.85rem;
-    font-weight: 500;
-    text-align: center;
-    
-    /* TAMAÑO FIJO para los círculos */
-    width: 34px;
-    height: 34px;
-    
-    /* Centrado perfecto del número */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    
-    border-radius: 50%;
-    margin: 0; /* Quitamos el margin: auto */
-    
-    transition: background-color 0.2s, color 0.2s;
+body.dark-mode .cal-day {
+    background: #232323 !important;
+    color: #e0e0e0 !important;
+    border: none !important;
 }
 
 .cal-day.other-month {
@@ -598,17 +827,15 @@
 */
 
 /* --- Contenedor Principal del Panel de Control --- */
-.panel-control-container {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    margin-bottom: 30px;
-}
+
 /* Responsivo para el panel de control */
-@media (max-width: 992px) {
-    .panel-control-container {
-        grid-template-columns: 1fr;
-    }
+
+/* Panel de control: apilar verticalmente los contenedores en todas las páginas */
+.panel-control-container {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+    margin-top: 30px;
 }
 
 

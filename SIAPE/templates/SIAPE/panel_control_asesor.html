@@ -29,15 +29,15 @@
 
     {% if messages %}
         {% for message in messages %}
-            <div class="alert alert-{{ message.tags }}" style="padding: 15px; margin-bottom: 20px; border-radius: 6px; background-color: {% if message.tags == 'success' %}#d4edda{% elif message.tags == 'error' %}#f8d7da{% else %}#fff3cd{% endif %}; color: {% if message.tags == 'success' %}#155724{% elif message.tags == 'error' %}#721c24{% else %}#856404{% endif %};">
+            <div class="alert alert-{{ message.tags }} custom-alert-{{ message.tags }}">
                 {{ message }}
             </div>
         {% endfor %}
     {% endif %}
 
-    <div class="panel-control-container">
+    <div class="panel-control-container casos-dos-columnas">
         <!-- Sección: Casos Disponibles para Asignar -->
-        <div class="panel-section">
+        <div class="panel-section casos-disponibles">
             <h3><i class="fas fa-list"></i> Casos Disponibles</h3>
             {% if casos_disponibles %}
                 {% for caso in casos_disponibles %}
@@ -66,7 +66,7 @@
         </div>
 
         <!-- Sección: Casos Asignados (para agendar citas y registrar ajustes) -->
-        <div class="panel-section">
+        <div class="panel-section casos-asignados">
             <h3><i class="fas fa-briefcase"></i> Mis Casos Asignados</h3>
             {% if casos_con_ajustes %}
                 {% for item in casos_con_ajustes %}
@@ -81,7 +81,7 @@
                                     <i class="fas fa-check-circle"></i> 
                                     <span><strong>Ajuste asignado:</strong> {{ item.ajuste_actual.ajuste_razonable.categorias_ajustes.nombre_categoria }}
                                     {% if item.total_ajustes > 1 %}
-                                        <span style="color: #666;">({{ item.total_ajustes }} ajustes)</span>
+                                        <span class="ajustes-total">({{ item.total_ajustes }} ajustes)</span>
                                     {% endif %}</span>
                                 </div>
                                 {% else %}
@@ -113,7 +113,7 @@
                                 <i class="fas fa-times-circle"></i> Rechazar
                             </button>
                             {% else %}
-                            <span class="status status-{{ caso.estado }}" style="padding: 5px 10px; border-radius: 6px;">
+                            <span class="status status-{{ caso.estado }} status-caso">
                                 {{ caso.get_estado_display }}
                             </span>
                             {% endif %}
@@ -157,7 +157,7 @@
                     <div class="calendario-grid" id="cal-grid-body">
                         <!-- Los días se insertan aquí por JS -->
                     </div>
-                    <div class="calendario-leyenda" style="margin-top: 15px; padding: 0 15px;">
+                    <div class="calendario-leyenda calendario-leyenda-mt">
                         <div><span class="dot dot-entrevista"></span> Día con Cita(s)</div>
                     </div>
                 </div>
@@ -168,7 +168,7 @@
                 <h4 id="cal-citas-titulo">Citas del Día</h4>
                 <div id="cal-citas-dia">
                     <!-- El contenido se inserta aquí por JS -->
-                    <div class="empty-state" style="padding: 10px 0;">
+                    <div class="empty-state empty-state-10">
                         <i class="fas fa-calendar-day" style="font-size: 2rem; margin-bottom: 10px;"></i>
                         <p style="font-size: 0.9rem;">Seleccione un día del calendario para ver las citas programadas.</p>
                     </div>

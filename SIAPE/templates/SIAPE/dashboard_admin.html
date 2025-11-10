@@ -114,9 +114,9 @@
 
     </section>
 
-    <section class="table-container" style="margin-top: 30px;">
+    <section class="table-container table-mt-30">
         <div class="table-header">
-            <h2 style="color: #cc0000;"><i class="fas fa-exclamation-triangle"></i> Casos Pendientes de Asignación</h2>
+            <h2 class="casos-pendientes-titulo"><i class="fas fa-exclamation-triangle"></i> Casos Pendientes de Asignación</h2>
         </div>
         
         <table class="custom-table">
@@ -143,8 +143,8 @@
                 {% empty %}
                 <tr>
                     <td colspan="5">
-                        <div class="empty-state" style="padding: 20px;">
-                            <i class="fas fa-check-circle" style="color: #28a745;"></i>
+                        <div class="empty-state">
+                            <i class="fas fa-check-circle icono-check"></i>
                             <p>¡Excelente! No hay solicitudes pendientes de asignación.</p>
                         </div>
                     </td>
@@ -158,17 +158,17 @@
         </div>
     </section>
 
-    <section class="support-grid-container" style="margin-top: 30px;">
+    <section class="support-grid-container support-mt-30">
         <h2>Distribución de Solicitudes por Área Académica</h2>
 
         {% if distribucion_apoyos %}
             {% for item in distribucion_apoyos %}
-                <div class="support-row" style="grid-template-columns: 3fr 1fr;">
+                <div class="support-row support-row-3-1">
                     <div class="support-title">
                         {{ item.area.nombre }}
                     </div>
                     
-                    <div class="support-total" style="text-align: left;">
+                    <div class="support-total support-total-left">
                         {{ item.total }} Casos ({{ item.porcentaje }}%)
                     </div>
                 </div>
