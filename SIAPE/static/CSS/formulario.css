@@ -1,3 +1,54 @@
+/* ====== ESTILOS CALENDARIO (IGUAL A PANEL ASESOR) ====== */
+.cal-day.day-today {
+    background-color: #e7f3ff;
+    color: #007bff;
+    font-weight: bold;
+    border: 1px solid #007bff;
+}
+.cal-day.cal-day-selected {
+    background-color: #cc0000;
+    color: #fff !important;
+    border: 1px solid #a70000;
+    font-weight: bold;
+}
+.cal-day:not(.other-month) {
+    cursor: pointer;
+}
+.cal-day:not(.other-month):hover {
+    background-color: #f0f0f0;
+}
+.cal-day.cal-day-selected:hover {
+    background-color: #cc0000;
+}
+
+/* Botones de horarios disponibles */
+.horarios-botones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+.btn-horario {
+    padding: 0.5rem 1.1rem;
+    border-radius: 6px;
+    border: none;
+    font-size: 1rem;
+    font-weight: 500;
+    background: #eaf6ec;
+    color: #28a745;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+.btn-horario.selected {
+    background: #cc0000;
+    color: #fff;
+}
+.btn-horario:disabled, .btn-horario.no-disponible {
+    background: #f0f0f0;
+    color: #aaa;
+    cursor: not-allowed;
+    border: 1px solid #ddd;
+}
 /* --- Contenedor Principal --- */
 .form-container {
     max-width: 900px;
@@ -215,4 +266,55 @@
     .button-group {
         flex-direction: column-reverse;
     }
+}
+
+/* Añade esto a formulario.css o base.css */
+.dot.dot-disponible { background-color: #28a745; }
+.dot.dot-lleno { background-color: #dc3545; }
+
+.cal-day.day-disponible {
+    background-color: #eaf6ec;
+    color: #28a745;
+    font-weight: bold;
+    cursor: pointer;
+}
+.cal-day.day-lleno {
+    background-color: #fdecec;
+    color: #dc3545;
+    text-decoration: line-through;
+    cursor: not-allowed;
+}
+.cal-day.day-inabil {
+    color: #ccc;
+    background-color: #f9f9f9;
+    cursor: not-allowed;
+}
+
+/* === Estilos de grilla para el calendario === */
+.calendario-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.calendario-grid .cal-day,
+.calendario-grid .cal-day-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    min-height: 32px;
+    font-size: 1rem;
+    border-radius: 6px;
+    margin: 1px;
+    background: #f9f9f9;
+    color: #333;
+}
+
+.calendario-grid .cal-day-header {
+    font-weight: bold;
+    background: #e9ecef;
+    color: #444;
 }

@@ -192,23 +192,45 @@ class Solicitudes(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    estudiantes = models.ForeignKey('Estudiantes', on_delete=models.CASCADE) 
-    asesores_pedagogicos = models.ForeignKey(
-        'PerfilUsuario', 
+    estudiantes = models.ForeignKey('Estudiantes', on_delete=models.CASCADE)
+    
+    coordinadora_asignada = models.ForeignKey(
+        'PerfilUsuario',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        limit_choices_to={'rol__nombre_rol': 'Asesor Pedagógico'}
+        limit_choices_to={'rol__nombre_rol': 'Coordinadora de Inclusión'},
+        related_name='solicitudes_como_coordinadora'
     )
+    asesor_tecnico_asignado = models.ForeignKey(
+        'PerfilUsuario',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        limit_choices_to={'rol__nombre_rol': 'Asesora Técnica'},
+        related_name='solicitudes_como_asesor_tecnico'
+    )
+    asesor_pedagogico_asignado = models.ForeignKey(
+        'PerfilUsuario',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        limit_choices_to={'rol__nombre_rol': 'Asesor Pedagógico'},
+        related_name='solicitudes_como_asesor_pedagogico'
+    )
+
     ESTADO_CHOICES = (
-        ('en_proceso', 'En proceso'),
-        ('aprobado', 'Aprobado'),
+        ('pendiente_entrevista', 'Pendiente de Entrevista (Coordinadora)'),
+        ('pendiente_formulacion', 'Pendiente de Formulación (Asesora Técnica)'),
+        ('pendiente_preaprobacion', 'Pendiente de Preaprobación (Asesor Pedagógico)'),
+        ('pendiente_aprobacion', 'Pendiente de Aprobación (Director)'),
+        ('aprobado', 'Aprobado e Informado'),
         ('rechazado', 'Rechazado'),
     )
     estado = models.CharField(
-        max_length=20, 
+        max_length=30,
         choices=ESTADO_CHOICES, 
-        default='en_proceso',
+        default='pendiente_entrevista',
         verbose_name="Estado de la Solicitud"
     )
     
@@ -230,7 +252,6 @@ class Evidencias(models.Model):
 
     def __str__(self):
         return self.archivo.name
-
 
 
 class Asignaturas(models.Model):
@@ -281,21 +302,12 @@ class Entrevistas(models.Model):
     solicitudes = models.ForeignKey(Solicitudes, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    asesor_pedagogico = models.ForeignKey(
+    coordinadora = models.ForeignKey(
         PerfilUsuario,
+        null=True,
+        blank=True,
         on_delete=models.CASCADE,
-        limit_choices_to={'rol__nombre_rol': 'Asesor Pedagógico'}
-        )
-    ESTADO_CHOICES = (
-        ('pendiente', 'Pendiente'),
-        ('realizada', 'Realizada'),
-        ('no_asistio', 'No asistió'),
-    )
-    estado = models.CharField(
-        max_length=20,
-        choices=ESTADO_CHOICES,
-        default='pendiente',
-        verbose_name="Estado de la Entrevista"
+        limit_choices_to={'rol__nombre_rol': 'Coordinadora de Inclusión'}
     )
 
     class Meta:

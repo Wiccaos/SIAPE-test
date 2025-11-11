@@ -39,11 +39,15 @@ schema_view = get_schema_view(
 urlpatterns = [
     # Admin site
     path('admin/', admin.site.urls),
-    path('', views.pag_inicio, name='home'),
 
     # URLs de la app SIAPE
     path('SIAPE/', include('SIAPE.urls')),
+    path('', include('SIAPE.urls')),
+
+    # URLs publicas
     path('formulario-solicitud/', views.vista_formulario_solicitud, name='formulario-solicitud'),
+    path('api/horarios-disponibles/', views.get_horarios_disponibles, name='api-horarios-disponibles'),
+    path('api/calendario-disponible/', views.get_calendario_disponible, name='api-calendario-disponible'),
 
     # URLs del Administrador
     path('dashboard/admin/', views.dashboard_admin, name='dashboard_admin'),
@@ -72,6 +76,9 @@ urlpatterns = [
     path('dashboard/asesor/reagendar-cita/<int:entrevista_id>/', views.reagendar_cita_asesor, name='reagendar_cita_asesor'),
     path('dashboard/asesor/aprobar-solicitud/<int:solicitud_id>/', views.aprobar_solicitud_asesor, name='aprobar_solicitud_asesor'),
     path('dashboard/asesor/rechazar-solicitud/<int:solicitud_id>/', views.rechazar_solicitud_asesor, name='rechazar_solicitud_asesor'),
+
+    # URLs de Coordinadora de Inclusión
+    path('dashboard/coordinador/', views.dashboard_coordinadora, name='dashboard_coordinadora'),
 
     # URLs de Director de Carrera
     path('dashboard/director/', views.dashboard_director, name='dashboard_director'),

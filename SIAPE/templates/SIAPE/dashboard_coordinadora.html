@@ -1,0 +1,108 @@
+{% extends "plantilla.html" %}
+{% load static %}
+
+{% block title %}
+    Panel Principal - Coordinadora | SIAPE
+{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="main-content"> 
+    <nav class="dashboard-nav">
+        <a href="{% url 'dashboard_coordinadora' %}" class="nav-item active">
+            <i class="fas fa-home"></i>
+            Panel Principal
+        </a>
+        <a href="{% url 'casos_coordinadora' %}" class="nav-item">
+            <i class="fas fa-folder-open"></i>
+            Casos
+        </a>
+        <a href="{% url 'panel_control_coordinadora' %}" class="nav-item">
+            <i class="fas fa-tachometer-alt"></i>
+            Panel de Control
+        </a>
+    </nav>
+
+    <section class="kpi-container">
+        <div class="kpi-card">
+            <div class="kpi-icon icon-solicitudes">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ total_solicitudes|default:0 }}</span>
+                <span class="kpi-label">Total Solicitudes</span>
+                </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-resueltos">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ casos_resueltos|default:0 }}</span>
+                <span class="kpi-label">Casos resueltos</span>
+                </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-proceso">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ casos_en_proceso|default:0 }}</span>
+                <span class="kpi-label">En Proceso</span>
+                </div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-icon icon-citas">
+                <i class="fas fa-calendar-check"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ citas_semana|default:0 }}</span>
+                <span class="kpi-label">Citas esta semana</span>
+                </div>
+        </div>
+    </section>
+
+    <section class="support-grid-container">
+        <h2>Distribución de apoyo personalizado</h2>
+
+        {% if distribucion_apoyos %}
+            {% for item in distribucion_apoyos %}
+                <div class="support-row">
+                    <div class="support-title">
+                        {{ item.categoria.nombre_categoria }}
+                    </div>
+                    <div class="support-stats">
+                        <div class="stat-box approved">
+                            <strong>{{ item.aprobados }}</strong>
+                            <span>aprobados</span>
+                        </div>
+                        <div class="stat-box pending">
+                            <strong>{{ item.pendientes }}</strong>
+                            <span>Pendientes</span>
+                        </div>
+                        <div class="stat-box rejected">
+                            <strong>{{ item.rechazados }}</strong>
+                            <span>Rechazados</span>
+                        </div>
+                    </div>
+                    <div class="support-total">
+                        {{ item.total }} casos ({{ item.porcentaje }}%)
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-inbox"></i>
+                <p>No hay datos de distribución de apoyos disponibles</p>
+            </div>
+        {% endif %}
+
+    </section>
+
+</div>
+{% endblock %}

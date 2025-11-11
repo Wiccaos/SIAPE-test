@@ -4,6 +4,10 @@ from .models import (
     Carreras, Estudiantes, Solicitudes, Evidencias, Asignaturas, 
     AsignaturasEnCurso, Entrevistas, AjusteRazonable, AjusteAsignado
 )
+from datetime import datetime, time
+from django.utils import timezone
+
+ROL_COORDINADORA = 'Coordinadora de Apoyos'
 
 class UsuarioSerializer(serializers.ModelSerializer):
     # --- Lectura y Escritura ---
@@ -416,17 +420,18 @@ class PublicaSolicitudSerializer(serializers.Serializer):
         label="Carrera"
     )
     
-    # --- Campos para el modelo Solicitudes ---
+    # --- Campos para el modelo Solicitudes (simplificado) ---
     asunto = serializers.CharField(max_length=191)
-    descripcion = serializers.CharField(
-        style={'base_template': 'textarea.html'}, 
-        label="Descripción Detallada"
-    )
+    # 'descripcion' se elimina, ahora la llena la coordinadora
     autorizacion_datos = serializers.BooleanField(
         label="Autorizo el tratamiento de mis datos personales"
     )
     
-    # --- Campos para las relaciones ---
+    # --- Campos NUEVOS para la Cita (no van al modelo Solicitud) ---
+    fecha_cita = serializers.DateField(write_only=True)
+    hora_cita = serializers.CharField(write_only=True) # Recibirá "HH:MM"
+    
+    # --- Campos para las relaciones (Evidencias) ---
     documentos_adjuntos = serializers.ListField(
         child=serializers.FileField(),
         label="Documentos adjuntos (evidencia)",
@@ -443,16 +448,46 @@ class PublicaSolicitudSerializer(serializers.Serializer):
             )
         return value
         
-    # def validate_rut(self):
-    #     """
-    #     Función para validar el rut POR DESARROLLAR
-    #     de momento no se agrega para poder crear ejemplos sin que tire error
-    #     """
-    #     return value
+    def validate(self, data):
+        """
+        Validación cruzada para la fecha y hora de la cita.
+        Previene que dos personas tomen la misma hora (race condition).
+        """
+        fecha = data.get('fecha_cita')
+        hora_str = data.get('hora_cita') # "HH:MM"
+
+        if not fecha or not hora_str:
+            raise serializers.ValidationError("Debe seleccionar una fecha y hora para la cita.")
+            
+        try:
+            hora_obj = datetime.strptime(hora_str, '%H:%M').time()
+        except ValueError:
+            raise serializers.ValidationError("Formato de hora inválido.")
+
+        # 1. Combinar fecha y hora en un datetime consciente de la zona horaria
+        fecha_hora_cita = timezone.make_aware(datetime.combine(fecha, hora_obj))
+
+        # 2. Re-validar que la hora no esté tomada
+        coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
+        
+        cita_tomada = Entrevistas.objects.filter(
+            coordinadora__in=coordinadoras,
+            fecha_entrevista=fecha_hora_cita
+        ).exists()
+
+        if cita_tomada:
+            raise serializers.ValidationError(
+                f"Lo sentimos, la hora de las {hora_str} el {fecha.strftime('%d-%m-%Y')} acaba de ser tomada. Por favor, seleccione otra."
+            )
+            
+        # 3. Pasar el datetime completo al método .create()
+        data['fecha_entrevista_completa'] = fecha_hora_cita
+        return data
 
     def create(self, validated_data):
-        """ Crea Estudiante, Solicitud y Evidencias asociadas. """
+        """ Crea Estudiante, Solicitud y la Entrevista inicial. """
 
+        # 1. Datos del Estudiante
         datos_estudiante = {
             'nombres': validated_data['nombres'],
             'apellidos': validated_data['apellidos'],
@@ -460,27 +495,45 @@ class PublicaSolicitudSerializer(serializers.Serializer):
             'numero': validated_data.get('numero'),
             'carreras': validated_data['carrera_id']
         }
+        
+        # 2. Datos de la Solicitud (simplificada)
         datos_solicitud = {
             'asunto': validated_data['asunto'],
-            'descripcion': validated_data['descripcion'],
+            'descripcion': validated_data.get('descripcion', ''), # Ya no viene del form, pero el modelo lo puede requerir
             'autorizacion_datos': validated_data['autorizacion_datos'],
+            'estado': 'pendiente_entrevista' # <-- Estado inicial del flujo
         }
+        
         archivos = validated_data.get('documentos_adjuntos', [])
-        asignaturas_objs = validated_data.get('asignaturas_solicitadas_ids', []) # Ya son objetos
 
+        # 3. Crear/Actualizar Estudiante
         estudiante, created = Estudiantes.objects.update_or_create(
             rut=validated_data['rut'],
             defaults=datos_estudiante
         )
 
+        # 4. Crear Solicitud
         solicitud = Solicitudes.objects.create(
             estudiantes=estudiante, 
             **datos_solicitud
         )
 
-        if asignaturas_objs:
-            solicitud.asignaturas_solicitadas.set(asignaturas_objs)
+        # 5. Crear la Entrevista (¡NUEVO!)
+        
+        # Asignar una coordinadora (ej. la primera disponible)
+        coordinadora_asignada = PerfilUsuario.objects.filter(
+            rol__nombre_rol=ROL_COORDINADORA
+        ).first()
+
+        Entrevistas.objects.create(
+            solicitudes=solicitud,
+            coordinadora=coordinadora_asignada, # Asigno la coordinadora
+            fecha_entrevista=validated_data['fecha_entrevista_completa'], # Uso la fecha validada
+            modalidad="No definida", # La coordinadora lo llenará después
+            estado='pendiente' # Estado de la *entrevista*
+        )
             
+        # 6. Guardar Evidencias (si las hay)
         for archivo in archivos:
             Evidencias.objects.create(
                 solicitudes=solicitud,

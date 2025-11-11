@@ -6,9 +6,12 @@
 
 {% comment %} 
   Bloque para los estilos CSS específicos de esta página.
-  Enlaza al archivo CSS que te di en la respuesta anterior.
 {% endcomment %}
 {% block extra_head %}
+    <!-- 
+      Asegúrate de que base.css se cargue primero (desde plantilla.html)
+      y que formulario.css contenga los estilos del calendario.
+    -->
     <link rel="stylesheet" href="{% static 'css/formulario.css' %}">
 {% endblock %}
 
@@ -18,8 +21,8 @@
     <div class="form-container">
         
         <div class="form-header">
-            <h1>Información de la Solicitud</h1>
-            <p>Proporciona los detalles de tu solicitud de apoyo</p>
+            <h1>Solicitud de Entrevista de Apoyo</h1>
+            <p>Ingresa tus datos y el asunto para agendar una entrevista con la Coordinación de Inclusión.</p>
         </div>
 
         <form id="solicitud-form" enctype="multipart/form-data">
@@ -41,7 +44,6 @@
 
                 
                 <div class="form-group">
-                    <!-- Mantenemos este campo requerido por el backend -->
                     <label for="carrera_id">Tu Carrera <span>*</span></label>
                     <select id="carrera_id" name="carrera_id" required>
                         <option value="">-- Selecciona tu carrera --</option>
@@ -58,7 +60,6 @@
                 </div>
 
                 <div class="form-group">
-                    <!-- Adaptamos el campo 'rut' para que coincida con el mockup -->
                     <label for="rut">RUT<span>*</span></label>
                     <input type="text" id="rut" name="rut" placeholder="Ej: 12345678-K" required>
                 </div>
@@ -69,27 +70,70 @@
                 </div>
             </div>
 
-            <!-- Campos de ancho completo -->
+            <!-- Asunto (Ancho completo) -->
+            <div class="form-group">
+                <label for="asunto">Asunto o Motivo de la Solicitud <span>*</span></label>
+                <input type="text" id="asunto" name="asunto" placeholder="Ej: Dificultades de concentración, Apoyo por discapacidad auditiva" required>
+            </div>
             
-            <div class="form-group">
-                <!-- Mantenemos este campo requerido por el backend -->
-                <label for="asunto">Asunto o Título de la Solicitud <span>*</span></label>
-                <input type="text" id="asunto" name="asunto" placeholder="Ej: Solicitud de apoyo por discapacidad auditiva" required>
-            </div>
+            <!-- EL CAMPO 'descripcion' SE ELIMINA DE AQUÍ -->
 
+            <!-- === SECCIÓN DE AGENDAMIENTO (NUEVA CON CALENDARIO) === -->
             <div class="form-group">
-                <label for="descripcion">Descripción Detallada <span>*</span></label>
-                <textarea id="descripcion" name="descripcion" rows="5" placeholder="Describe detalladamente tu situación, las dificultades que enfrentas y cómo el apoyo solicitado podría ayudarte..." required></textarea>
-                <small>Mínimo 50 caracteres. Incluye toda la información relevante.</small>
-            </div>
+                <label>Agendamiento de Entrevista</label>
+                <p style="font-size: 0.9em; color: #555; margin-top: -10px;">
+                    Por favor, selecciona un día y hora para tu entrevista con la Coordinadora de Inclusión.
+                    (Horario de Lunes a Viernes, de 9:00 a 18:00).
+                </p>
 
-            <!-- Zona de Carga de Archivos -->
+                <!-- Contenedor copiado de 'panel_control_asesor.html' -->
+                <div class="cal-layout-container">
+                    
+                    <!-- Columna 1: El Calendario -->
+                    <div class="cal-widget">
+                        <div class="detalle-card" id="card-calendario-panel">
+                            <div class="calendario-header" id="cal-header">
+                                Cargando mes...
+                            </div>
+                            <div class="cal-nav">
+                                <button type="button" id="cal-prev" class="btn-accion btn-accion-gray btn-accion-small"><i class="fas fa-chevron-left"></i> Ant</button>
+                                <button type="button" id="cal-today" class="btn-accion btn-accion-gray btn-accion-small">Hoy</button>
+                                <button type="button" id="cal-next" class="btn-accion btn-accion-gray btn-accion-small">Sig <i class="fas fa-chevron-right"></i></button>
+                            </div>
+                            <div class="calendario-grid" id="cal-grid-body">
+                                <!-- Los días se insertan aquí por JS -->
+                            </div>
+                            <div class="calendario-leyenda calendario-leyenda-mt">
+                                <div><span class="dot dot-disponible"></span> Día Disponible</div>
+                                <div><span class="dot dot-lleno"></span> Día Completo</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Columna 2: El Selector de Hora -->
+                    <div class="cal-citas-list">
+                        <h4 id="cal-citas-titulo">2. Horarios disponibles</h4>
+                        <div id="cal-citas-dia">
+                            <div id="horario-loader" style="font-size: 0.9em; margin-top: 5px;"></div>
+                            <div class="horarios-botones" id="horarios-botones"></div>
+                            <input type="hidden" id="hora_cita" name="hora_cita" required>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Input oculto para enviar la fecha seleccionada -->
+                <input type="hidden" id="fecha_cita" name="fecha_cita">
+            </div>
+            <!-- === FIN SECCIÓN DE AGENDAMIENTO === -->
+
+
+            <!-- Zona de Carga de Archivos (Opcional) -->
             <div class="form-group">
                 <label>Documentos de Apoyo (Opcional)</label>
                 <div class="drop-zone" id="drop-zone">
                     <input type="file" id="documentos_adjuntos" name="documentos_adjuntos" multiple>
                     <p class="drop-zone__prompt">Arrastra archivos aquí o <strong>haz clic para seleccionar</strong></p>
-                    <small>Máximo 5 archivos. Formatos PDF, DOC, JPG, PNG (max 10MB)</small>
+                    <small>Si ya tienes un diagnóstico o informe, puedes adjuntarlo aquí.</small>
                 </div>
                 <div id="file-list"></div>
             </div>
@@ -106,15 +150,15 @@
             <div class="info-box">
                 <h4>Importante:</h4>
                 <ul>
-                    <li>Tu solicitud será revisada en un plazo máximo de 3 días hábiles.</li>
-                    <li>Recibirás notificaciones sobre el estado de tu solicitud.</li>
+                    <li>Tu solicitud y entrevista quedarán agendadas al enviar este formulario.</li>
+                    <li>Recibirás una confirmación por correo electrónico.</li>
                     <li>La información proporcionada debe ser veraz y completa.</li>
                 </ul>
             </div>
 
             <!-- Botones de Acción -->
             <div class="button-group">
-                <button type="submit" id="submit-button" class="btn btn-primary">Enviar Solicitud</button>
+                <button type="submit" id="submit-button" class="btn btn-primary">Enviar Solicitud y Agendar</button>
             </div>
         </form>
 
@@ -123,54 +167,32 @@
 
     <!-- El script se queda aquí, al final del bloque de contenido -->
     <script>
+        // --- LÓGICA DEL FORMULARIO (Sección 1) ---
         const form = document.getElementById('solicitud-form');
         const mensajeDiv = document.getElementById('mensaje');
         const submitButton = document.getElementById('submit-button');
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
         
+        // --- Lógica de Drag & Drop (se mantiene) ---
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('documentos_adjuntos');
         const fileList = document.getElementById('file-list');
         let droppedFiles = [];
-
-        // --- Lógica de Drag & Drop ---
-
-        // Abrir selector de archivos al hacer clic en la zona
-        dropZone.addEventListener('click', () => {
-            fileInput.click();
-        });
-
-        // Evento al cambiar el input de archivo (por si lo seleccionan manualmente)
+        dropZone.addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', () => {
             droppedFiles = Array.from(fileInput.files);
             updateFileList();
         });
-
-        // Resaltar zona al arrastrar
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('dragover');
-        });
-
-        // Quitar resaltado
-        dropZone.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('dragover');
-        });
-
-        // Manejar archivos soltados
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
             dropZone.classList.remove('dragover');
-            
-            // Usamos dataTransfer.files para obtener los archivos
             droppedFiles = Array.from(e.dataTransfer.files);
             updateFileList();
         });
-
-        // Actualizar la lista de archivos visibles
         function updateFileList() {
-            fileList.innerHTML = ''; // Limpiar lista
+            fileList.innerHTML = '';
             if (droppedFiles.length > 0) {
                 fileList.innerHTML = '<strong>Archivos seleccionados:</strong>';
                 droppedFiles.forEach(file => {
@@ -181,8 +203,197 @@
             }
         }
 
-        // --- Lógica de Envío de Formulario ---
+        // --- LÓGICA DEL CALENDARIO (Sección 2) ---
+        
+        // Variables globales del calendario
+        let navDate = new Date();
+        const hoy = new Date();
+        const hoyStr = hoy.toISOString().split('T')[0]; // "YYYY-MM-DD"
+        let diaSeleccionadoEl = null; 
+        let calendarioData = {}; // Guardará la data de la API
+
+        // Elementos del DOM del calendario
+        const calHeader = document.getElementById('cal-header');
+        const calGridBody = document.getElementById('cal-grid-body');
+        const btnPrev = document.getElementById('cal-prev');
+        const btnNext = document.getElementById('cal-next');
+        const btnToday = document.getElementById('cal-today');
+        
+        // Elementos del DOM del selector de hora
+        const horaSelect = document.getElementById('hora_cita');
+        const horaLabel = document.getElementById('hora_label');
+        const horarioLoader = document.getElementById('horario-loader');
+        const fechaHiddenInput = document.getElementById('fecha_cita');
+
+        const meses = [
+            "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+        ];
+
+        // 1. Función para buscar datos del mes
+        async function fetchCalendarioDelMes(year, month) {
+            calHeader.innerText = `Cargando ${meses[month]} ${year}...`;
+            calGridBody.innerHTML = ''; // Limpiar
+            
+            try {
+                const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+                // Usamos la URL que definimos en urls.py
+                const response = await fetch(`/api/calendario-disponible/?month=${monthStr}`);
+                
+                if (!response.ok) throw new Error('Error de red');
+                
+                calendarioData = await response.json();
+                renderCalendar(year, month); // Llama a renderizar con los nuevos datos
+
+            } catch (error) {
+                console.error('Error fetching calendario:', error);
+                calHeader.innerText = "Error al cargar calendario";
+            }
+        }
+        
+        // 2. Función para renderizar el calendario (ADAPTADA)
+        function renderCalendar(year, month) {
+            calHeader.innerText = `${meses[month]} ${year}`;
+            calGridBody.innerHTML = `
+                <div class="cal-day-header">L</div> <div class="cal-day-header">M</div>
+                <div class="cal-day-header">X</div> <div class="cal-day-header">J</div>
+                <div class="cal-day-header">V</div> <div class="cal-day-header">S</div>
+                <div class="cal-day-header">D</div>
+            `;
+            const primerDiaDelMes = new Date(year, month, 1);
+            const ultimoDiaDelMes = new Date(year, month + 1, 0);
+            const ultimoDiaNum = ultimoDiaDelMes.getDate();
+            let diaInicioSemana = (primerDiaDelMes.getDay() + 6) % 7; // Lunes=0
+            const ultimoDiaMesAnterior = new Date(year, month, 0).getDate();
+            // Días mes anterior
+            for (let i = diaInicioSemana; i > 0; i--) {
+                const dayDiv = document.createElement('div');
+                dayDiv.classList.add('cal-day', 'other-month');
+                dayDiv.innerText = ultimoDiaMesAnterior - i + 1;
+                calGridBody.appendChild(dayDiv);
+            }
+            // Días mes actual (todos seleccionables, como en panel asesor)
+            for (let dia = 1; dia <= ultimoDiaNum; dia++) {
+                const dayDiv = document.createElement('div');
+                dayDiv.classList.add('cal-day');
+                dayDiv.innerText = dia;
+                const fechaStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+                dayDiv.dataset.fecha = fechaStr;
+                // Resaltar día actual (azul)
+                if (fechaStr === hoyStr) {
+                    dayDiv.classList.add('day-today');
+                }
+                // Resaltar día seleccionado (rojo)
+                if (diaSeleccionadoEl && diaSeleccionadoEl.dataset.fecha === fechaStr) {
+                    dayDiv.classList.add('cal-day-selected');
+                }
+                // Colorear según disponibilidad
+                if (calendarioData.fechasConDisponibilidad?.includes(fechaStr)) {
+                    dayDiv.classList.add('day-disponible');
+                } else if (calendarioData.diasCompletos?.includes(fechaStr)) {
+                    dayDiv.classList.add('day-lleno');
+                }
+                // Permitir seleccionar cualquier día del mes actual (no días pasados)
+                if (fechaStr >= hoyStr) {
+                    dayDiv.addEventListener('click', () => seleccionarDia(dayDiv, fechaStr));
+                } else {
+                    dayDiv.classList.add('day-inabil');
+                }
+                calGridBody.appendChild(dayDiv);
+            }
+            // Días mes siguiente
+            const totalDiasGrid = calGridBody.children.length;
+            const diasSiguientes = (7 - (totalDiasGrid % 7)) % 7;
+            for (let i = 1; i <= diasSiguientes; i++) {
+                const dayDiv = document.createElement('div');
+                dayDiv.classList.add('cal-day', 'other-month');
+                dayDiv.innerText = i;
+                calGridBody.appendChild(dayDiv);
+            }
+        }
+
+        // 3. Función para manejar el clic en un día
+        function seleccionarDia(dayEl, fechaStr) {
+            // Resaltar día seleccionado (rojo) y día actual (azul)
+            if (diaSeleccionadoEl) {
+                diaSeleccionadoEl.classList.remove('cal-day-selected');
+            }
+            dayEl.classList.add('cal-day-selected');
+            diaSeleccionadoEl = dayEl;
+            // Guardar fecha en el input oculto
+            fechaHiddenInput.value = fechaStr;
+            // Mostrar horarios como botones
+            const horariosBotones = document.getElementById('horarios-botones');
+            horariosBotones.innerHTML = '';
+            const slotsDisponibles = calendarioData.slotsDetallados[fechaStr] || [];
+            const allSlots = [];
+            for (let h = 9; h <= 17; h++) {
+                const hora = `${h.toString().padStart(2, '0')}:00`;
+                allSlots.push(hora);
+            }
+            let hayDisponibles = false;
+            let selectedHora = document.getElementById('hora_cita').value;
+            for (const slot of allSlots) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'btn-horario';
+                btn.textContent = `${slot} - ${parseInt(slot.split(':')[0]) + 1}:00`;
+                btn.dataset.hora = slot;
+                if (slotsDisponibles.includes(slot)) {
+                    btn.disabled = false;
+                    hayDisponibles = true;
+                    btn.addEventListener('click', function() {
+                        horariosBotones.querySelectorAll('.btn-horario').forEach(b => b.classList.remove('selected'));
+                        btn.classList.add('selected');
+                        document.getElementById('hora_cita').value = slot;
+                        console.log('[DEBUG] Hora seleccionada:', slot);
+                        console.log('[DEBUG] Valor input hora_cita:', document.getElementById('hora_cita').value);
+                    });
+                    if (selectedHora === slot) {
+                        btn.classList.add('selected');
+                    }
+                } else {
+                    btn.disabled = true;
+                    btn.classList.add('no-disponible');
+                }
+                horariosBotones.appendChild(btn);
+            }
+            if (!hayDisponibles) {
+                document.getElementById('horario-loader').innerHTML = '<strong style="color: #fd7e14;">No hay horas disponibles para este día.</strong>';
+            } else {
+                document.getElementById('horario-loader').innerHTML = '';
+            }
+        }
+
+        // 4. Listeners de navegación del calendario
+        btnPrev.addEventListener('click', () => {
+            navDate.setMonth(navDate.getMonth() - 1);
+            fetchCalendarioDelMes(navDate.getFullYear(), navDate.getMonth());
+        });
+        btnNext.addEventListener('click', () => {
+            navDate.setMonth(navDate.getMonth() + 1);
+            fetchCalendarioDelMes(navDate.getFullYear(), navDate.getMonth());
+        });
+        btnToday.addEventListener('click', () => {
+            navDate = new Date();
+            fetchCalendarioDelMes(navDate.getFullYear(), navDate.getMonth());
+        });
+
+        // 5. Carga inicial del calendario
+        fetchCalendarioDelMes(navDate.getFullYear(), navDate.getMonth());
+
+
+        // --- LÓGICA DE ENVÍO (Sección 3) ---
         form.addEventListener('submit', async function(e) {
+            // Validar que se haya seleccionado una hora
+            console.log('[DEBUG] Valor input hora_cita al enviar:', document.getElementById('hora_cita').value);
+            if (!document.getElementById('hora_cita').value) {
+                mensajeDiv.className = 'error';
+                mensajeDiv.innerHTML = '<strong>Error de Validación:</strong><ul><li><strong>HORA_CITA:</strong> Debe seleccionar un horario disponible.</li></ul>';
+                mensajeDiv.style.display = 'block';
+                e.preventDefault();
+                return;
+            }
             
             e.preventDefault();
             
@@ -192,42 +403,56 @@
 
             const formData = new FormData(form);
             
-            // --- Lógica para campos Múltiples ---
-
-            // Archivos (variable 'droppedFiles')
+            // --- Lógica para archivos ---
             formData.delete('documentos_adjuntos'); 
             for (const file of droppedFiles) {
                 formData.append('documentos_adjuntos', file);
             }
 
             try {
-                // Endpoint público: /SIAPE/solicitud-publica/
                 const response = await fetch('/SIAPE/solicitud-publica/', {
                     method: 'POST',
                     body: formData,
-                    headers: {
-                        'X-CSRFToken': csrfToken
-                        // No es necesario 'Content-Type' cuando se usa FormData
-                    }
+                    headers: { 'X-CSRFToken': csrfToken }
                 });
 
                 const data = await response.json();
 
                 if (response.ok) { 
-                    // Éxito (HTTP 201 Created)
                     mensajeDiv.className = 'exito';
                     mensajeDiv.innerHTML = `<strong>¡Solicitud enviada con éxito!</strong> El proceso ha iniciado. Tu <strong>ID de seguimiento de caso es: ${data.solicitud_id}</strong>.`;
                     mensajeDiv.style.display = 'block';
                     form.reset(); 
                     droppedFiles = [];
                     updateFileList();
-                } else {
-                    // Error de validación (HTTP 400 Bad Request)
-                    mensajeDiv.className = 'error';
                     
+                    // Resetear calendario
+                    fechaHiddenInput.value = '';
+                    horaSelect.innerHTML = '<option value="">-- Seleccione un día primero --</option>';
+                    horaSelect.disabled = true;
+                    horaLabel.innerText = "Por favor, seleccione un día disponible del calendario.";
+                    if (diaSeleccionadoEl) diaSeleccionadoEl.classList.remove('cal-day-selected');
+                    // Recargar el mes actual
+                    fetchCalendarioDelMes(new Date().getFullYear(), new Date().getMonth());
+
+                } else {
+                    // Error de validación (HTTP 400)
+                    mensajeDiv.className = 'error';
                     let errores = "<strong>Error de Validación:</strong><ul>";
+                    
+                    // Manejo del error de "hora tomada" (race condition)
+                    if (data.non_field_errors) {
+                         errores += `<li><strong>HORA:</strong> ${data.non_field_errors[0]}</li>`;
+                         // Refrescar el mes, porque la data está desactualizada
+                         fetchCalendarioDelMes(navDate.getFullYear(), navDate.getMonth());
+                         horaSelect.innerHTML = '<option value="">-- Hora no válida --</option>';
+                         horaSelect.disabled = true;
+                    }
+
                     for (const [campo, mensajes] of Object.entries(data)) {
-                        errores += `<li><strong>${campo.toUpperCase()}:</strong> ${mensajes[0]}</li>`;
+                        if (campo !== 'non_field_errors') {
+                           errores += `<li><strong>${campo.toUpperCase()}:</strong> ${mensajes[0]}</li>`;
+                        }
                     }
                     errores += "</ul>";
                     mensajeDiv.innerHTML = errores;
@@ -235,7 +460,6 @@
                 }
 
             } catch (error) {
-                // Error de red o del servidor
                 mensajeDiv.className = 'error';
                 mensajeDiv.innerText = 'Error de conexión con el servidor. Inténtalo de nuevo.';
                 mensajeDiv.style.display = 'block';
@@ -243,8 +467,7 @@
             }
 
             submitButton.disabled = false;
-            submitButton.innerText = "Enviar Solicitud de Apoyo";
+            submitButton.innerText = "Enviar Solicitud y Agendar";
         });
     </script>
 {% endblock %}
-
