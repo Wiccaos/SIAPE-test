@@ -38,7 +38,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from .permissions import IsAsesorPedagogico
 
 # ------------ CONSTANTES ------------
-ROL_ASESOR = 'Asesor Pedagógico'
+ROL_ASESOR = 'Asesora Pedagógica'
 ROL_DIRECTOR = 'Director de Carrera'
 ROL_DOCENTE = 'Docente'
 ROL_ADMIN = 'Administrador'
