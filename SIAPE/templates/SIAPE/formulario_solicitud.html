@@ -322,10 +322,13 @@
             diaSeleccionadoEl = dayEl;
             // Guardar fecha en el input oculto
             fechaHiddenInput.value = fechaStr;
-            // Mostrar horarios como botones
+            // Limpiar selección previa de hora
+            document.getElementById('hora_cita').value = '';
+            // Mostrar horarios como botones (igual que panel de control)
             const horariosBotones = document.getElementById('horarios-botones');
             horariosBotones.innerHTML = '';
-            const slotsDisponibles = calendarioData.slotsDetallados[fechaStr] || [];
+            const slotsDisponibles = calendarioData.slotsDetallados?.[fechaStr] || [];
+            const slotsNoDisponibles = calendarioData.slotsNoDisponibles?.[fechaStr] || [];
             const allSlots = [];
             for (let h = 9; h <= 17; h++) {
                 const hora = `${h.toString().padStart(2, '0')}:00`;
@@ -339,6 +342,7 @@
                 btn.className = 'btn-horario';
                 btn.textContent = `${slot} - ${parseInt(slot.split(':')[0]) + 1}:00`;
                 btn.dataset.hora = slot;
+                // Si está en slotsDisponibles: habilitado
                 if (slotsDisponibles.includes(slot)) {
                     btn.disabled = false;
                     hayDisponibles = true;
@@ -346,15 +350,20 @@
                         horariosBotones.querySelectorAll('.btn-horario').forEach(b => b.classList.remove('selected'));
                         btn.classList.add('selected');
                         document.getElementById('hora_cita').value = slot;
-                        console.log('[DEBUG] Hora seleccionada:', slot);
-                        console.log('[DEBUG] Valor input hora_cita:', document.getElementById('hora_cita').value);
+                        mensajeDiv.style.display = 'none';
                     });
                     if (selectedHora === slot) {
                         btn.classList.add('selected');
                     }
                 } else {
+                    // Si está en slotsNoDisponibles: mostrar como no disponible (por cita tomada)
                     btn.disabled = true;
                     btn.classList.add('no-disponible');
+                    if (slotsNoDisponibles.includes(slot)) {
+                        btn.title = 'Hora no disponible (ya tomada o fuera de horario)';
+                    } else {
+                        btn.title = 'Hora no disponible';
+                    }
                 }
                 horariosBotones.appendChild(btn);
             }
@@ -386,23 +395,23 @@
         // --- LÓGICA DE ENVÍO (Sección 3) ---
         form.addEventListener('submit', async function(e) {
             // Validar que se haya seleccionado una hora
-            console.log('[DEBUG] Valor input hora_cita al enviar:', document.getElementById('hora_cita').value);
-            if (!document.getElementById('hora_cita').value) {
+            const horaCitaInput = document.getElementById('hora_cita');
+            if (!horaCitaInput.value) {
                 mensajeDiv.className = 'error';
                 mensajeDiv.innerHTML = '<strong>Error de Validación:</strong><ul><li><strong>HORA_CITA:</strong> Debe seleccionar un horario disponible.</li></ul>';
                 mensajeDiv.style.display = 'block';
                 e.preventDefault();
                 return;
             }
-            
+
             e.preventDefault();
-            
+
             submitButton.disabled = true;
             submitButton.innerText = "Enviando Solicitud, espere...";
             mensajeDiv.style.display = 'none';
 
             const formData = new FormData(form);
-            
+
             // --- Lógica para archivos ---
             formData.delete('documentos_adjuntos'); 
             for (const file of droppedFiles) {
@@ -425,13 +434,12 @@
                     form.reset(); 
                     droppedFiles = [];
                     updateFileList();
-                    
+
                     // Resetear calendario
                     fechaHiddenInput.value = '';
-                    horaSelect.innerHTML = '<option value="">-- Seleccione un día primero --</option>';
-                    horaSelect.disabled = true;
-                    horaLabel.innerText = "Por favor, seleccione un día disponible del calendario.";
+                    horaCitaInput.value = '';
                     if (diaSeleccionadoEl) diaSeleccionadoEl.classList.remove('cal-day-selected');
+                    document.getElementById('horarios-botones').innerHTML = '';
                     // Recargar el mes actual
                     fetchCalendarioDelMes(new Date().getFullYear(), new Date().getMonth());
 
@@ -439,14 +447,13 @@
                     // Error de validación (HTTP 400)
                     mensajeDiv.className = 'error';
                     let errores = "<strong>Error de Validación:</strong><ul>";
-                    
+
                     // Manejo del error de "hora tomada" (race condition)
                     if (data.non_field_errors) {
                          errores += `<li><strong>HORA:</strong> ${data.non_field_errors[0]}</li>`;
                          // Refrescar el mes, porque la data está desactualizada
                          fetchCalendarioDelMes(navDate.getFullYear(), navDate.getMonth());
-                         horaSelect.innerHTML = '<option value="">-- Hora no válida --</option>';
-                         horaSelect.disabled = true;
+                         horaCitaInput.value = '';
                     }
 
                     for (const [campo, mensajes] of Object.entries(data)) {

@@ -38,7 +38,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from .permissions import IsAsesorPedagogico
 
 # ------------ CONSTANTES ------------
-ROL_ASESOR = 'Asesor Pedagógico'
+ROL_ASESOR = 'Asesora Pedagógica'
 ROL_DIRECTOR = 'Director de Carrera'
 ROL_DOCENTE = 'Docente'
 ROL_ADMIN = 'Administrador'
@@ -135,7 +135,7 @@ def get_horarios_disponibles(request):
         end_of_day = timezone.make_aware(datetime.combine(selected_date, time.max))
 
         citas_existentes = Entrevistas.objects.filter(
-            asesor_pedagogico__in=coordinadoras, # 'asesor_pedagogico' ahora es la coordinadora
+            coordinadora__in=coordinadoras,
             fecha_entrevista__range=(start_of_day, end_of_day)
         ).values_list('fecha_entrevista', flat=True)
 
@@ -318,7 +318,7 @@ def dashboard_admin(request):
 
     # --- Tabla: Casos Críticos (Sin Asignar) ---
     solicitudes_sin_asignar = Solicitudes.objects.filter(
-        asesores_pedagogicos__isnull=True,
+        asesor_pedagogico_asignado__isnull=True,
         estado='en_proceso'
     ).select_related(
         'estudiantes', 
@@ -644,8 +644,8 @@ def asignar_caso_asesor(request, solicitud_id):
     if request.method == 'POST':
         solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
         perfil_asesor = request.user.perfil
-        if solicitud.asesores_pedagogicos is None:
-            solicitud.asesores_pedagogicos = perfil_asesor
+        if solicitud.asesor_pedagogico_asignado is None:
+            solicitud.asesor_pedagogico_asignado = perfil_asesor
             solicitud.save()
             messages.success(request, f'Caso asignado correctamente: {solicitud.asunto}')
         else:
@@ -673,7 +673,7 @@ def agendar_cita_asesor(request):
             fecha_entrevista = datetime.strptime(fecha_entrevista_str, '%Y-%m-%dT%H:%M')
             fecha_entrevista = timezone.make_aware(fecha_entrevista)
             Entrevistas.objects.create(
-                solicitudes=solicitud, asesor_pedagogico=perfil_asesor,
+                solicitudes=solicitud, coordinadora=perfil_asesor,
                 fecha_entrevista=fecha_entrevista, modalidad=modalidad, notas=notas
             )
             messages.success(request, 'Cita agendada correctamente.')
@@ -698,7 +698,7 @@ def registrar_ajuste_razonable(request):
         nueva_categoria = request.POST.get('nueva_categoria', '').strip()
         reasignar = request.POST.get('reasignar', 'false') == 'true'
         try:
-            solicitud = get_object_or_404(Solicitudes, id=solicitud_id, asesores_pedagogicos=request.user.perfil)
+            solicitud = get_object_or_404(Solicitudes, id=solicitud_id, asesor_pedagogico_asignado=request.user.perfil)
             if nueva_categoria:
                 categoria = CategoriasAjustes.objects.create(nombre_categoria=nueva_categoria)
             elif categoria_id:
@@ -730,7 +730,7 @@ def rechazar_solicitud_asesor(request, solicitud_id):
     if request.method == 'POST':
         motivo_rechazo = request.POST.get('motivo_rechazo', '').strip()
         try:
-            solicitud = get_object_or_404(Solicitudes, id=solicitud_id, asesores_pedagogicos=request.user.perfil)
+            solicitud = get_object_or_404(Solicitudes, id=solicitud_id, asesor_pedagogico_asignado=request.user.perfil)
             if solicitud.estado != 'en_proceso':
                 messages.warning(request, 'Solo se pueden rechazar solicitudes en proceso.')
                 return redirect('panel_control_asesor')
@@ -756,7 +756,7 @@ def aprobar_solicitud_asesor(request, solicitud_id):
         return redirect('home')
     if request.method == 'POST':
         try:
-            solicitud = get_object_or_404(Solicitudes, id=solicitud_id, asesores_pedagogicos=request.user.perfil)
+            solicitud = get_object_or_404(Solicitudes, id=solicitud_id, asesor_pedagogico_asignado=request.user.perfil)
             if solicitud.estado != 'en_proceso':
                 messages.warning(request, 'Solo se pueden aprobar solicitudes en proceso.')
                 return redirect('panel_control_asesor')
@@ -988,8 +988,12 @@ class PerfilUsuarioViewSet(viewsets.ModelViewSet):
 
 @login_required
 def casos_coordinadora(request):
-    # Similar a casos_asesor pero para coordinadora
-    solicitudes = Solicitudes.objects.select_related('estudiantes').order_by('-created_at')
+    # Mostrar solo solicitudes asignadas a la coordinadora logueada
+    if hasattr(request.user, 'perfil'):
+        perfil = request.user.perfil
+        solicitudes = Solicitudes.objects.filter(coordinadora_asignada=perfil).select_related('estudiantes').order_by('-created_at')
+    else:
+        solicitudes = Solicitudes.objects.none()
     context = {'solicitudes': solicitudes, 'total_casos': solicitudes.count()}
     return render(request, 'SIAPE/casos_coordinadora.html', context)
 

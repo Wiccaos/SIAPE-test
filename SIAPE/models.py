@@ -296,10 +296,23 @@ class AsignaturasEnCurso(models.Model):
         return f"{self.estudiantes} cursando {self.asignaturas} ({self.get_estado_display()})"
 
 class Entrevistas(models.Model):
+    ESTADO_ENTREVISTA_CHOICES = [
+        ("pendiente", "Pendiente"),
+        ("realizada", "Realizada"),
+        ("cancelada", "Cancelada"),
+        ("no_asistio", "No asistió"),
+    ]
+
     fecha_entrevista = models.DateTimeField()
     modalidad = models.CharField(max_length=100)
     notas = models.CharField(max_length=500, blank=True, default='')
     solicitudes = models.ForeignKey(Solicitudes, on_delete=models.CASCADE)
+    estado = models.CharField(
+        max_length=20,
+        choices=ESTADO_ENTREVISTA_CHOICES,
+        default="pendiente",
+        verbose_name="Estado de la Entrevista"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     coordinadora = models.ForeignKey(

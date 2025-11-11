@@ -354,9 +354,14 @@ body.dark-mode .cal-day-header {
 /* --- GRILLA DE DISTRIBUCIÓN (Support Grid) --- */
 .support-grid-container {
     background-color: #ffffff;
-    border-radius: 8px;
-    padding: 25px;
+    border-radius: 12px;
+    padding: 32px 24px 32px 24px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    margin-top: 30px;
+    margin-bottom: 30px;
+}
+.support-grid-container + .support-grid-container {
+    margin-top: 18px;
 }
 .support-grid-container h2 {
     margin-top: 0;
@@ -472,26 +477,37 @@ body.dark-mode .cal-day-header {
     width: 100%;
     border-collapse: collapse; /* Bordes limpios */
     min-width: 600px; /* Evita que la tabla se colapse mucho */
+    margin-top: 18px;
+    margin-bottom: 18px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f9f9fb;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.03);
 }
 
 .custom-table th,
 .custom-table td {
-    padding: 15px;
+    padding: 12px 16px;
     text-align: left;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid #ececec;
     white-space: nowrap; /* Evita que el texto se rompa */
 }
 
 .custom-table th {
-    color: #666;
-    font-size: 0.85rem;
+    background: #f3f6fa;
+    color: #222;
+    font-size: 0.95rem;
     font-weight: 600;
     text-transform: uppercase;
+    border-bottom: 1.5px solid #e5e7eb;
 }
 
 .custom-table td {
     font-size: 0.95rem;
     color: #333;
+}
+.custom-table tr:not(:last-child) td {
+    border-bottom: 1px solid #ececec;
 }
 
 /* Link rojo "Ver más" */
@@ -1056,13 +1072,15 @@ body.dark-mode .cal-day {
 .empty-state {
     text-align: center;
     padding: 40px 20px;
-    color: #999;
+    color: #b0b0b0;
+    font-size: 1.1em;
+    margin: 32px 0 32px 0;
 }
 
 .empty-state i {
-    font-size: 3rem;
-    margin-bottom: 15px;
-    color: #ddd;
+    font-size: 2.5em;
+    margin-bottom: 10px;
+    color: #e0e0e0;
 }
 
 /* --- Estilos adicionales para elementos específicos --- */

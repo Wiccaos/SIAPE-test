@@ -179,10 +179,12 @@ class EstudiantesSerializer(serializers.ModelSerializer):
 
 class SolicitudesSerializer(serializers.ModelSerializer):
     asunto = serializers.StringRelatedField(read_only=True)
-    estudiante = serializers.StringRelatedField(source = 'estudiantes', read_only=True)
+    estudiante = serializers.StringRelatedField(source='estudiantes', read_only=True)
     descripcion = serializers.CharField(read_only=True)
     created_at = serializers.CharField(read_only=True)
-    asesores_pedagogicos = serializers.CharField(read_only=True)
+    coordinadora_asignada = serializers.StringRelatedField(read_only=True)
+    asesor_tecnico_asignado = serializers.StringRelatedField(read_only=True)
+    asesor_pedagogico_asignado = serializers.StringRelatedField(read_only=True)
 
     class Meta:
         model = Solicitudes
@@ -192,7 +194,9 @@ class SolicitudesSerializer(serializers.ModelSerializer):
             'descripcion',
             'estudiante',
             'created_at',
-            'asesores_pedagogicos'
+            'coordinadora_asignada',
+            'asesor_tecnico_asignado',
+            'asesor_pedagogico_asignado',
         ]
 
 class EvidenciasSerializer(serializers.ModelSerializer):
@@ -299,14 +303,13 @@ class AsignaturasEnCursoSerializer(serializers.ModelSerializer):
 class EntrevistasSerializer(serializers.ModelSerializer):
     # --- Campos de LECTURA (Read-only) ---
     solicitud_info = serializers.StringRelatedField(source='solicitudes', read_only=True, label="Solicitud")
-    asesor_info = serializers.StringRelatedField(source='asesor_pedagogico', read_only=True, label="Asesor Pedagógico")
-
+    coordinadora_info = serializers.StringRelatedField(source='coordinadora', read_only=True, label="Coordinadora")
     # --- Campos de ESCRITURA (Write-only) ---
     solicitudes = serializers.PrimaryKeyRelatedField(queryset=Solicitudes.objects.all(), write_only=True, label="Solicitud")
-    asesor_pedagogico = serializers.PrimaryKeyRelatedField(
-        queryset=PerfilUsuario.objects.filter(rol__nombre_rol='Asesor Pedagógico'),
+    coordinadora = serializers.PrimaryKeyRelatedField(
+        queryset=PerfilUsuario.objects.filter(rol__nombre_rol='Coordinadora de Inclusión'),
         write_only=True,
-        label="Asesor Pedagógico Asignado"
+        label="Coordinadora de Inclusión"
     )
     fecha_entrevista = serializers.DateTimeField(
         format="%d-%m-%Y %H:%M",
@@ -322,14 +325,14 @@ class EntrevistasSerializer(serializers.ModelSerializer):
     class Meta:
         model = Entrevistas
         fields = [
-            'id', 
+            'id',
             'solicitud_info',
-            'asesor_info',
+            'coordinadora_info',
             'fecha_entrevista',
             'modalidad',
             'notas',
             'solicitudes',
-            'asesor_pedagogico'
+            'coordinadora',
         ]
 
 class AjusteRazonableSerializer(serializers.ModelSerializer):

@@ -68,6 +68,41 @@
     </section>
 
     <section class="support-grid-container">
+        <h2>Citas del día</h2>
+        {% if citas_hoy %}
+            <table class="custom-table">
+                <head>
+                    <tr>
+                        <th>Hora</th>
+                        <th>Estudiante</th>
+                        <th>Asunto</th>
+                        <th>Modalidad</th>
+                    </tr>
+                </head>
+                <body>
+                    {% for cita in citas_hoy %}
+                    <tr>
+                        <td>{{ cita.fecha_entrevista|date:"H:i" }}</td>
+                        <td>{{ cita.solicitudes.estudiantes.nombres }} {{ cita.solicitudes.estudiantes.apellidos }}</td>
+                        <td>{{ cita.solicitudes.asunto }}</td>
+                        <td>{{ cita.modalidad|default:'No definida' }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4">No hay citas agendadas para hoy.</td>
+                    </tr>
+                    {% endfor %}
+                </body>
+            </table>
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-calendar-times"></i>
+                <p>No hay citas agendadas para hoy.</p>
+            </div>
+        {% endif %}
+    </section>
+
+    <section class="support-grid-container">
         <h2>Distribución de apoyo personalizado</h2>
 
         {% if distribucion_apoyos %}
