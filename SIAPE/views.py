@@ -9,6 +9,7 @@ from datetime import timedelta, datetime, time, date
 from django.db.models import Count, Q
 import json
 import calendar # Importar para el calendario mensual
+from django.views.decorators.http import require_POST
 
 from rest_framework import (
     viewsets, mixins, status
@@ -255,15 +256,30 @@ def get_calendario_disponible(request):
 def redireccionamiento_por_rol(request):
     """
     Redirecciona al dashboard correspondiente según el rol del usuario.
+    Versión robusta para evitar bucles de redirección.
     """
     rol = None
-    if hasattr(request.user, 'perfil') and request.user.perfil.rol:
-        rol = request.user.perfil.rol.nombre_rol
+    
+    # 1. Intentamos obtener el rol
+    try:
+        if request.user.perfil.rol:
+            rol = request.user.perfil.rol.nombre_rol
+    except AttributeError:
+        pass 
 
+    # 2. Redireccionamos según el rol
     if rol == ROL_COORDINADORA:
         return redirect('dashboard_coordinadora')
+    
+    # --- ¡ERROR ARREGLADO AQUÍ! ---
     elif rol == ROL_ASESORA_TECNICA:
-        return redirect('panel_control_asesora_tecnica')
+        # Tu código intentaba redirigir a 'panel_control_asesora_tecnica',
+        # pero esa vista no existe en tu views.py y causaba el crash.
+        # La redirijo a 'home' por ahora.
+        messages.warning(request, 'El panel para Asesora Técnica aún no está implementado.')
+        return redirect('home') 
+        # return redirect('panel_control_asesora_tecnica') # <-- Esta es la línea que falla
+    
     elif rol == ROL_ASESOR:
         return redirect('dashboard_asesor')
     elif rol == ROL_DIRECTOR:
@@ -271,11 +287,14 @@ def redireccionamiento_por_rol(request):
     elif rol == ROL_ADMIN:
         return redirect('dashboard_admin')
 
+    # 3. Si sigue sin rol, chequeamos si es admin/superuser
     if request.user.is_superuser or request.user.is_staff:
         return redirect('admin:index')
 
+    # 4. ÚLTIMO RECURSO: (El usuario no tiene rol)
+    logout(request)
+    messages.error(request, 'Tu usuario está activo pero no tiene un rol asignado. Contacta al administrador.')
     return redirect('login')
-    
 
 def vista_protegida(request):
     """    Redirecciona a login si el usuario no está autenticado """
@@ -1002,3 +1021,78 @@ def panel_control_coordinadora(request):
     # Similar a panel_control_asesor pero para coordinadora
     # Puedes personalizar la lógica según lo que deba ver la coordinadora
     return render(request, 'SIAPE/panel_control_coordinadora.html')
+
+@login_required
+@require_POST # <-- Necesita el import de arriba
+def aprobar_solicitud_director(request, solicitud_id):
+    """
+    Vista para que el Director apruebe una solicitud.
+    Cambia el estado de 'pendiente_aprobacion' a 'aprobado'.
+    """
+    try:
+        perfil_director = request.user.perfil
+        if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para esta acción.')
+            return redirect('home')
+
+        # Buscamos la solicitud Y nos aseguramos de que sea del director
+        solicitud = get_object_or_404(
+            Solicitudes, 
+            id=solicitud_id,
+            estado='pendiente_aprobacion'
+        )
+
+        # Doble chequeo de seguridad
+        if solicitud.estudiantes.carreras.director != perfil_director:
+            messages.error(request, 'No puedes aprobar esta solicitud (no pertenece a tu carrera).')
+            return redirect('dashboard_director')
+
+        # --- ACCIÓN ---
+        solicitud.estado = 'aprobado'
+        solicitud.save()
+        
+        messages.success(request, f"Solicitud de {solicitud.estudiantes.nombres} ha sido APROBADA.")
+        
+    except Exception as e:
+        messages.error(request, f'Error al aprobar la solicitud: {str(e)}')
+        
+    return redirect('dashboard_director')
+
+
+@login_required
+@require_POST # <-- Necesita el import de arriba
+def rechazar_solicitud_director(request, solicitud_id):
+    """
+    Vista para que el Director rechace (devuelva) una solicitud.
+    La devuelve al 'Asesor Pedagógico' para corrección.
+    Cambia el estado de 'pendiente_aprobacion' a 'pendiente_preaprobacion'.
+    """
+    try:
+        perfil_director = request.user.perfil
+        if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para esta acción.')
+            return redirect('home')
+
+        solicitud = get_object_or_404(
+            Solicitudes, 
+            id=solicitud_id,
+            estado='pendiente_aprobacion'
+        )
+
+        # Doble chequeo de seguridad
+        if solicitud.estudiantes.carreras.director != perfil_director:
+            messages.error(request, 'No puedes rechazar esta solicitud (no pertenece a tu carrera).')
+            return redirect('dashboard_director')
+
+        # --- ACCIÓN ---
+        # Como "se devuelve al coordinador de asesoría pedagógica",
+        # volvemos al estado 'pendiente_preaprobacion' (el del Asesor).
+        solicitud.estado = 'pendiente_preaprobacion' 
+        solicitud.save()
+        
+        messages.info(request, f"Solicitud de {solicitud.estudiantes.nombres} ha sido DEVUELTA al Asesor Pedagógico para revisión.")
+        
+    except Exception as e:
+        messages.error(request, f'Error al rechazar la solicitud: {str(e)}')
+        
+    return redirect('dashboard_director')
