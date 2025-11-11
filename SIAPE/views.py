@@ -1173,3 +1173,142 @@ class PerfilUsuarioViewSet(viewsets.ModelViewSet):
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
+<<<<<<< HEAD
+=======
+@login_required
+def casos_coordinadora(request):
+    # Mostrar solo solicitudes asignadas a la coordinadora logueada
+    if hasattr(request.user, 'perfil'):
+        perfil = request.user.perfil
+        solicitudes = Solicitudes.objects.filter(coordinadora_asignada=perfil).select_related('estudiantes').order_by('-created_at')
+    else:
+        solicitudes = Solicitudes.objects.none()
+    context = {'solicitudes': solicitudes, 'total_casos': solicitudes.count()}
+    return render(request, 'SIAPE/casos_coordinadora.html', context)
+
+@login_required
+def panel_control_coordinadora(request):
+    """
+    Panel de control para la Coordinadora de Inclusión.
+    Muestra casos disponibles, casos asignados, citas y calendario.
+    """
+    try:
+        if request.user.perfil.rol.nombre_rol != ROL_COORDINADORA:
+            messages.error(request, 'No tienes permisos para acceder a este panel.')
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+    
+    perfil_coordinadora = request.user.perfil
+    
+    # 1. Obtener todas las citas de TODAS las coordinadoras (para el calendario)
+    # Esto permite ver todas las citas del sistema
+    todas_las_coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
+    todas_las_entrevistas = Entrevistas.objects.filter(
+        coordinadora__in=todas_las_coordinadoras
+    ).select_related('solicitudes', 'solicitudes__estudiantes', 'coordinadora').order_by('fecha_entrevista')
+    
+    # 2. Preparar datos para el calendario
+    fechas_con_citas = set()
+    citas_data = []
+    
+    for entrevista in todas_las_entrevistas:
+        fecha_str = timezone.localtime(entrevista.fecha_entrevista).strftime('%Y-%m-%d')
+        hora_str = timezone.localtime(entrevista.fecha_entrevista).strftime('%H:%M')
+        fechas_con_citas.add(fecha_str)
+        
+        citas_data.append({
+            'fecha': fecha_str,
+            'hora': hora_str,
+            'estudiante': f"{entrevista.solicitudes.estudiantes.nombres} {entrevista.solicitudes.estudiantes.apellidos}",
+            'asunto': entrevista.solicitudes.asunto,
+            'estado': entrevista.get_estado_display(),
+            'estado_key': entrevista.estado,
+        })
+    
+    # Convertir a listas para JSON
+    fechas_citas_json = json.dumps(list(fechas_con_citas))
+    citas_data_json = json.dumps(citas_data)
+    
+    # 3. Obtener casos disponibles (solicitudes sin asesor asignado)
+    casos_disponibles = Solicitudes.objects.filter(
+        asesor_pedagogico_asignado__isnull=True
+    ).select_related('estudiantes').order_by('-created_at')
+    
+    # 4. Obtener casos asignados a esta coordinadora
+    # Incluye solicitudes que tienen entrevistas asignadas a esta coordinadora
+    # o que tienen coordinadora_asignada = esta coordinadora
+    casos_asignados_ids = Entrevistas.objects.filter(
+        coordinadora=perfil_coordinadora
+    ).values_list('solicitudes_id', flat=True).distinct()
+    
+    casos_asignados_por_coordinadora = Solicitudes.objects.filter(
+        coordinadora_asignada=perfil_coordinadora
+    ).values_list('id', flat=True)
+    
+    todos_los_casos_ids = set(list(casos_asignados_ids) + list(casos_asignados_por_coordinadora))
+    
+    casos_asignados = Solicitudes.objects.filter(
+        id__in=todos_los_casos_ids
+    ).select_related('estudiantes').prefetch_related('ajusteasignado_set__ajuste_razonable__categorias_ajustes').order_by('-created_at')
+    
+    casos_con_ajustes = []
+    for caso in casos_asignados:
+        ajustes = caso.ajusteasignado_set.all()
+        tiene_ajuste = ajustes.exists()
+        ajuste_actual = ajustes.first() if tiene_ajuste else None
+        total_ajustes = ajustes.count()
+        
+        casos_con_ajustes.append({
+            'caso': caso,
+            'tiene_ajuste': tiene_ajuste,
+            'ajuste_actual': ajuste_actual,
+            'total_ajustes': total_ajustes,
+        })
+    
+    # 5. Obtener citas de esta coordinadora para las listas
+    ahora = timezone.now()
+    
+    # Citas pendientes de confirmar (pasadas y aún pendientes)
+    citas_pendientes_confirmar = Entrevistas.objects.filter(
+        coordinadora=perfil_coordinadora,
+        estado='pendiente',
+        fecha_entrevista__lt=ahora
+    ).select_related('solicitudes', 'solicitudes__estudiantes').order_by('fecha_entrevista')
+    
+    # Próximas citas (futuras y pendientes)
+    proximas_citas = Entrevistas.objects.filter(
+        coordinadora=perfil_coordinadora,
+        estado='pendiente',
+        fecha_entrevista__gte=ahora
+    ).select_related('solicitudes', 'solicitudes__estudiantes').order_by('fecha_entrevista')
+    
+    # Citas realizadas
+    citas_realizadas = Entrevistas.objects.filter(
+        coordinadora=perfil_coordinadora,
+        estado='realizada'
+    ).select_related('solicitudes', 'solicitudes__estudiantes').order_by('-fecha_entrevista')[:10]
+    
+    # Citas no asistidas
+    citas_no_asistio = Entrevistas.objects.filter(
+        coordinadora=perfil_coordinadora,
+        estado='no_asistio'
+    ).select_related('solicitudes', 'solicitudes__estudiantes').order_by('-fecha_entrevista')[:10]
+    
+    # 6. Obtener categorías de ajustes
+    categorias_ajustes = CategoriasAjustes.objects.all().order_by('nombre_categoria')
+    
+    context = {
+        'casos_disponibles': casos_disponibles,
+        'casos_con_ajustes': casos_con_ajustes,
+        'fechas_citas_json': fechas_citas_json,
+        'citas_data_json': citas_data_json,
+        'citas_pendientes_confirmar': citas_pendientes_confirmar,
+        'proximas_citas': proximas_citas,
+        'citas_realizadas': citas_realizadas,
+        'citas_no_asistio': citas_no_asistio,
+        'categorias_ajustes': categorias_ajustes,
+    }
+    
+    return render(request, 'SIAPE/panel_control_coordinadora.html', context)
+>>>>>>> b0eac857ed533683658cf23ebad25e4e719eb7ff
