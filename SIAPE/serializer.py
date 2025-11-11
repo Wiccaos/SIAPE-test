@@ -488,7 +488,7 @@ class PublicaSolicitudSerializer(serializers.Serializer):
         return data
 
     def create(self, validated_data):
-        """ Crea Estudiante, Solicitud y la Entrevista inicial. """
+        """ Crea Estudiante, Solicitud y la Entrevista inicial, asignando coordinadora. """
 
         # 1. Datos del Estudiante
         datos_estudiante = {
@@ -498,50 +498,48 @@ class PublicaSolicitudSerializer(serializers.Serializer):
             'numero': validated_data.get('numero'),
             'carreras': validated_data['carrera_id']
         }
-        
-        # 2. Datos de la Solicitud (simplificada)
+
+        # 2. Buscar coordinadora disponible
+        coordinadora_asignada = PerfilUsuario.objects.filter(rol__nombre_rol='Coordinadora de Inclusión').first()
+
+        # 3. Datos de la Solicitud (incluye coordinadora)
         datos_solicitud = {
             'asunto': validated_data['asunto'],
-            'descripcion': validated_data.get('descripcion', ''), # Ya no viene del form, pero el modelo lo puede requerir
+            'descripcion': validated_data.get('descripcion', ''),
             'autorizacion_datos': validated_data['autorizacion_datos'],
-            'estado': 'pendiente_entrevista' # <-- Estado inicial del flujo
+            'estado': 'pendiente_entrevista',
+            'coordinadora_asignada': coordinadora_asignada
         }
-        
+
         archivos = validated_data.get('documentos_adjuntos', [])
 
-        # 3. Crear/Actualizar Estudiante
+        # 4. Crear/Actualizar Estudiante
         estudiante, created = Estudiantes.objects.update_or_create(
             rut=validated_data['rut'],
             defaults=datos_estudiante
         )
 
-        # 4. Crear Solicitud
+        # 5. Crear Solicitud (con coordinadora asignada)
         solicitud = Solicitudes.objects.create(
-            estudiantes=estudiante, 
+            estudiantes=estudiante,
             **datos_solicitud
         )
 
-        # 5. Crear la Entrevista (¡NUEVO!)
-        
-        # Asignar una coordinadora (ej. la primera disponible)
-        coordinadora_asignada = PerfilUsuario.objects.filter(
-            rol__nombre_rol=ROL_COORDINADORA
-        ).first()
-
+        # 6. Crear la Entrevista con la coordinadora y la fecha/hora seleccionadas
         Entrevistas.objects.create(
             solicitudes=solicitud,
-            coordinadora=coordinadora_asignada, # Asigno la coordinadora
-            fecha_entrevista=validated_data['fecha_entrevista_completa'], # Uso la fecha validada
-            modalidad="No definida", # La coordinadora lo llenará después
-            estado='pendiente' # Estado de la *entrevista*
+            coordinadora=coordinadora_asignada,
+            fecha_entrevista=validated_data['fecha_entrevista_completa'],
+            modalidad="No definida",
+            estado='pendiente'
         )
-            
-        # 6. Guardar Evidencias (si las hay)
+
+        # 7. Guardar Evidencias (si las hay)
         for archivo in archivos:
             Evidencias.objects.create(
                 solicitudes=solicitud,
                 estudiantes=estudiante,
                 archivo=archivo
             )
-            
+
         return solicitud

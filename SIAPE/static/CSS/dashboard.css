@@ -1176,7 +1176,7 @@ body.dark-mode .cal-day {
 }
 
 .input-readonly {
-    background-color: #f5f5ff5;
+    background-color: #f5f5ff;
 }
 
 .hidden {
@@ -1392,4 +1392,207 @@ body.dark-mode .cal-day {
     .form-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* =============================================================
+   NUEVOS ESTILOS PARA FILTROS DE BÚSQUEDA (casos_generales.html)
+================================================================ */
+
+.filter-bar {
+    display: flex;
+    flex-wrap: wrap; /* Para que se adapte en móviles */
+    gap: 15px;
+    align-items: flex-end; /* Alinea los botones y el input en la parte inferior */
+    width: 100%;
+}
+
+.main-search-group {
+    flex: 1 1 350px; /* Crece para tomar el espacio, con una base de 350px */
+    margin-bottom: 0 !important; /* Sobrescribe el margen de .form-group */
+}
+
+.main-search-group input {
+    background-color: #fff; /* Fondo blanco para destacarlo */
+}
+
+/* Botones en la barra principal */
+.filter-bar .btn-accion {
+    flex-shrink: 0; /* Evita que los botones se encojan */
+}
+
+.btn-filter-toggle {
+    /* Estilo para el botón de Filtros */
+    background-color: #f0f0f0;
+    color: #333;
+    border: 1px solid #ccc;
+}
+.btn-filter-toggle:hover {
+    background-color: #e0e0e0;
+}
+
+/* Contenedor colapsable de filtros */
+.collapsible-filters {
+    display: none; /* Oculto por defecto */
+    background-color: #f9f9f9;
+    border-radius: 0 0 8px 8px; /* Redondeo solo abajo */
+    border: 1px solid #eee;
+    border-top: none; /* Quitamos el borde superior */
+    padding: 20px;
+    margin-top: -8px; /* Lo "pega" a la barra de arriba */
+    margin-bottom: 20px;
+}
+
+.collapsible-filters.show {
+    display: block; /* Se muestra con JS */
+}
+
+/* Modo oscuro para los nuevos filtros */
+body.dark-mode .main-search-group input {
+    background-color: #f0f0f0;
+    color: #111;
+}
+
+body.dark-mode .btn-filter-toggle {
+    background-color: #555;
+    color: #fff;
+    border: 1px solid #777;
+}
+body.dark-mode .btn-filter-toggle:hover {
+    background-color: #666;
+}
+
+body.dark-mode .collapsible-filters {
+    background-color: #3a3a3a;
+    border-color: #555;
+}
+
+body.dark-mode .collapsible-filters .form-actions {
+    border-top-color: #555 !important;
+}
+
+/* =============================================================
+   NUEVOS ESTILOS PARA DETALLE DE CASO (detalle_casos_coordinadora.html)
+================================================================ */
+
+.detalle-caso-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Dos columnas de igual tamaño */
+    gap: 25px;
+    align-items: flex-start; /* Alinea las tarjetas en la parte superior */
+}
+
+.detalle-col-left,
+.detalle-col-right {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+}
+
+.detalle-card-full-width {
+    grid-column: 1 / -1; /* Ocupa todo el ancho */
+}
+
+.detalle-card-content p {
+    margin: 0 0 10px 0;
+    font-size: 0.95rem;
+    color: #444;
+}
+.detalle-card-content p strong {
+    color: #111;
+}
+
+.detalle-card-content ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.detalle-card-content .empty-state {
+    margin: 0;
+}
+
+/* Tarjetas anidadas (para entrevistas, ajustes) */
+.detalle-sub-card {
+    background-color: #f9f9f9;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 10px;
+}
+.detalle-sub-card:last-child {
+    margin-bottom: 0;
+}
+
+/* Caja para mostrar notas con formato */
+.notas-box {
+    background-color: #f4f4f4;
+    padding: 10px;
+    border-radius: 4px;
+    font-family: inherit; /* Usa la fuente de la página */
+    white-space: pre-wrap; /* Respeta saltos de línea y espacios */
+    font-size: 0.9rem;
+    color: #333;
+    border: 1px solid #ddd;
+}
+
+/* Formulario de Descripción del Caso */
+.form-descripcion-caso textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px;
+    font-size: 0.95rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    min-height: 150px;
+    resize: vertical;
+}
+
+/* Responsividad para la página de detalle */
+@media (max-width: 992px) {
+    .detalle-caso-grid {
+        grid-template-columns: 1fr; /* Una sola columna en tablets y móviles */
+    }
+}
+
+/* Estilos para modo oscuro */
+body.dark-mode .detalle-card-content p strong {
+    color: #fff;
+}
+body.dark-mode .detalle-card-content p {
+    color: #ccc;
+}
+body.dark-mode .detalle-sub-card {
+    background-color: #181818;
+    border-color: #444;
+}
+body.dark-mode .notas-box {
+    background-color: #111;
+    color: #eee;
+    border-color: #444;
+}
+body.dark-mode .form-descripcion-caso textarea {
+    background-color: #333;
+    border-color: #555;
+    color: #fff;
+}
+
+/* --- Estilos para el nuevo layout del Panel de Control --- */
+
+.panel-col-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 30px; /* Espacio entre las tarjetas de la columna */
+}
+
+/* Ajuste para el calendario en el panel de control */
+#card-calendario-panel {
+    padding: 15px;
+    overflow-x: visible;
+}
+#card-calendario-panel .calendario-header {
+    padding: 0 0 15px 0;
+}
+#card-calendario-panel .cal-nav {
+    padding: 0;
+    border: none;
+    margin-bottom: 15px;
 }

@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block title %}
-    Detalle de Caso - Coordinadora | SIAPE
+    Detalle de Caso | SIAPE
 {% endblock %}
 
 {% block extra_head %}
@@ -11,137 +11,179 @@
 
 {% block content %}
 <div class="main-content">
+
     <nav class="dashboard-nav">
-        <a href="{% url 'dashboard_coordinadora' %}" class="nav-item">
-            <i class="fas fa-home"></i>
-            Panel Principal
-        </a>
-        <a href="{% url 'casos_coordinadora' %}" class="nav-item active"> <i class="fas fa-folder-open"></i>
-            Casos
-        </a>
-        <a href="{% url 'panel_control_coordinadora' %}" class="nav-item">
-            <i class="fas fa-tachometer-alt"></i>
-            Panel de Control
-        </a>
+        {% if user.perfil.rol.nombre_rol == "Coordinadora de Inclusión" %}
+            <a href="{% url 'dashboard_coordinadora' %}" class="nav-item">
+                <i class="fas fa-home"></i> Panel Principal
+            </a>
+            <a href="{% url 'casos_generales' %}" class="nav-item active"> <i class="fas fa-folder-open"></i> Casos
+            </a>
+            <a href="{% url 'panel_control_coordinadora' %}" class="nav-item">
+                <i class="fas fa-tachometer-alt"></i> Panel de Control
+            </a>
+        {% elif user.perfil.rol.nombre_rol == "Asesora Pedagógica" %}
+            <a href="{% url 'dashboard_asesor' %}" class="nav-item">
+                <i class="fas fa-home"></i> Panel Principal
+            </a>
+            <a href="{% url 'casos_generales' %}" class="nav-item active"> <i class="fas fa-folder-open"></i> Casos
+            </a>
+            <a href="{% url 'panel_control_coordinadora' %}" class="nav-item">
+                <i class="fas fa-tachometer-alt"></i> Panel de Control
+            </a>
+        {% else %}
+            <a href="{% url 'home' %}" class="nav-item">
+                <i class="fas fa-home"></i> Panel Principal
+            </a>
+            <a href="{% url 'casos_generales' %}" class="nav-item active"> <i class="fas fa-folder-open"></i> Casos
+            </a>
+        {% endif %}
     </nav>
-    <div class="detalle-grid-container">
-        <div class="detalle-card" id="card-info-estudiante">
-            <h3 class="detalle-titulo">NOMBRE DEL ESTUDIANTE</h3>
-            <p>{{ estudiante.nombres }} {{ estudiante.apellidos }}</p>
-            <h3 class="detalle-titulo">RUT:</h3>
-            <p>{{ estudiante.rut }}</p>
-            <h3 class="detalle-titulo">CONDICIÓN/ES:</h3>
-            <p>
-                {% for ajuste in ajustes %}
-                    {{ ajuste.ajuste_razonable.categorias_ajustes.nombre_categoria }}{% if not forloop.last %}, {% endif %}
-                {% empty %}
-                    No especificadas
-                {% endfor %}
-            </p>
-        </div>
-        <div class="detalle-card" id="card-estado-caso">
-            {% if solicitud.estado == 'aprobado' %}
-                <div class="detalle-status status-aprobado">
-                    {{ solicitud.get_estado_display|upper }}
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} custom-alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="detalle-caso-grid">
+
+        <div class="detalle-col-left">
+
+            <div class="panel-section">
+                <h3><i class="fas fa-user-graduate"></i> Información del Estudiante</h3>
+                <div class="detalle-card-content">
+                    <p><strong>Nombre:</strong> {{ estudiante.nombres }} {{ estudiante.apellidos }}</p>
+                    <p><strong>RUT:</strong> {{ estudiante.rut }}</p>
+                    <p><strong>Email:</strong> {{ estudiante.email }}</p>
+                    <p><strong>Teléfono:</strong> {{ estudiante.numero|default:'No especificado' }}</p>
+                    <p><strong>Carrera:</strong> {{ estudiante.carreras.nombre }}</p>
                 </div>
-            {% elif solicitud.estado == 'rechazado' %}
-                <div class="detalle-status status-rechazado">
-                    {{ solicitud.get_estado_display|upper }}
+            </div>
+
+            <div class="panel-section">
+                <h3><i class="fas fa-clipboard-check"></i> Estado del Caso</h3>
+                <div class="detalle-card-content">
+                    <p><strong>Estado Actual:</strong> 
+                        {% if solicitud.estado == 'aprobado' %}
+                            <span class="status status-aprobado">{{ solicitud.get_estado_display }}</span>
+                        {% elif solicitud.estado == 'rechazado' %}
+                            <span class="status status-rechazado">{{ solicitud.get_estado_display }}</span>
+                        {% else %}
+                            <span class="status status-en_proceso">{{ solicitud.get_estado_display }}</span>
+                        {% endif %}
+                    </p>
+                    <p><strong>Asunto (Estudiante):</strong> {{ solicitud.asunto }}</p>
+                    <p><strong>Fecha Solicitud:</strong> {{ solicitud.created_at|date:"d/m/Y H:i" }}</p>
                 </div>
-            {% else %}
-                <div class="detalle-status status-en_proceso">
-                    {{ solicitud.get_estado_display|upper }}
+            </div>
+
+            <div class="panel-section">
+                <h3><i class="fas fa-paperclip"></i> Evidencias Adjuntas</h3>
+                <div class="detalle-card-content">
+                    {% if evidencias %}
+                        <ul>
+                        {% for evidencia in evidencias %}
+                            <li>
+                                <a href="{{ evidencia.archivo.url }}" target="_blank" class="link-rojo">
+                                    <i class="fas fa-file-alt"></i> {{ evidencia.archivo.name|cut:"evidencias/" }}
+                                </a>
+                            </li>
+                        {% endfor %}
+                        </ul>
+                    {% else %}
+                        <div class="empty-state" style="padding: 10px 0;">
+                            <p style="font-size: 0.9rem;">No hay evidencias adjuntas.</p>
+                        </div>
+                    {% endif %}
                 </div>
-            {% endif %}
-        </div>
-        <div class="detalle-card" id="card-docs-estado">
-            <h3 class="detalle-titulo">ESTADO DEL CASO</h3>
-            <div class="doc-status-box">
-                <span>DOCUMENTOS DE IDENTIFICACIÓN</span>
-                {% if evidencias %}
-                    <strong class_A"status-tag status-identificado">ESTUDIANTE IDENTIFICADO</strong>
-                {% else %}
-                    <strong class="status-tag status-pendiente">PENDIENTE</strong>
-                {% endif %}
             </div>
-            <div class="doc-status-box">
-                <span>SITUACIÓN ACADEMICA</span>
-                <strong class="status-tag status-en-proceso">DOCUMENTOS EN PROCESO</strong>
+
+        </div> <div class="detalle-col-right">
+
+            <div class="panel-section">
+                <h3><i class="fas fa-comments"></i> Historial de Entrevistas</h3>
+                <div class="detalle-card-content">
+                    {% if entrevistas_list %}
+                        {% for entrevista in entrevistas_list %}
+                        <div class="detalle-sub-card">
+                            <p><strong>Fecha:</strong> {{ entrevista.fecha_entrevista|date:"d/m/Y H:i" }}</p>
+                            <p><strong>Modalidad:</strong> {{ entrevista.modalidad }}</p>
+                            <p><strong>Estado:</strong> {{ entrevista.get_estado_display }}</p>
+                            <p><strong>Realizada por:</strong> {{ entrevista.coordinadora.usuario.first_name }} {{ entrevista.coordinadora.usuario.last_name }}</p>
+                            <p><strong>Notas:</strong></p>
+                            <pre class="notas-box">{{ entrevista.notas|default:'Sin notas.' }}</pre>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state" style="padding: 10px 0;">
+                            <p style="font-size: 0.9rem;">No hay entrevistas registradas.</p>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
-        </div>
-        <div class="detalle-card" id="card-soluciones">
-            <h3 class="detalle-titulo">SOLUCIONES:</h3>
-            <ul>
-                {% for ajuste in ajustes %}
-                    <li>{{ ajuste.ajuste_razonable.descripcion }}</li>
-                {% empty %}
-                    <li>Aún no se han asignado soluciones.</li>
-                {% endfor %}
-            </ul>
-        </div>
-        <div class="detalle-card" id="card-asunto">
-            <h3 class="detalle-titulo">ASUNTO PRINCIPAL:</h3>
-            <p>{{ solicitud.descripcion|default:solicitud.asunto }}</p>
-        </div>
-        <div class="detalle-card" id="card-calendario">
-            <div class="calendario-header">
-                <strong>Noviembre 2025</strong>
+
+            <div class="panel-section">
+                <h3><i class="fas fa-tools"></i> Ajustes Asignados</h3>
+                <div class="detalle-card-content">
+                    {% if ajustes_asignados %}
+                        {% for item in ajustes_asignados %}
+                        <div class="detalle-sub-card">
+                            <p><strong>Categoría:</strong> {{ item.ajuste_razonable.categorias_ajustes.nombre_categoria }}</p>
+                            <p><strong>Descripción:</strong></p>
+                            <pre class="notas-box">{{ item.ajuste_razonable.descripcion }}</pre>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state" style="padding: 10px 0;">
+                            <p style="font-size: 0.9rem;">Aún no se han asignado ajustes.</p>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
-            <div class="calendario-grid">
-                <div class="cal-day-header">L</div>
-                <div class="cal-day-header">M</div>
-                <div class="cal-day-header">X</div>
-                <div class="cal-day-header">J</div>
-                <div class="cal-day-header">V</div>
-                <div class="cal-day-header">S</div>
-                <div class="cal-day-header">D</div>
-                <div class="cal-day other-month">27</div>
-                <div class="cal-day other-month">28</div>
-                <div class="cal-day other-month">29</div>
-                <div class="cal-day other-month">30</div>
-                <div class="cal-day other-month">31</div>
-                <div class="cal-day">1</div>
-                <div class="cal-day">2</div>
-                <div class="cal-day">3</div>
-                <div class="cal-day">4</div>
-                <div class="cal-day">5</div>
-                <div class="cal-day">6</div>
-                <div class="cal-day day-entrevista">7</div>
-                <div class="cal-day">8</div>
-                <div class="cal-day">9</div>
-                <div class="cal-day">10</div>
-                <div class="cal-day day-interrupcion">11</div>
-                <div class="cal-day">12</div>
-                <div class="cal-day day-habil">13</div>
-                <div class="cal-day">14</div>
-                <div class="cal-day">15</div>
-                <div class="cal-day">16</div>
-                <div class="cal-day">17</div>
-                <div class="cal-day">18</div>
-                <div class="cal-day">19</div>
-                <div class="cal-day">20</div>
-                <div class="cal-day">21</div>
-                <div class="cal-day">22</div>
-                <div class="cal-day">23</div>
-                <div class="cal-day">24</div>
-                <div class="cal-day">25</div>
-                <div class="cal-day">26</div>
-                <div class="cal-day">27</div>
-                <div class="cal-day">28</div>
-                <div class="cal-day">29</div>
-                <div class="cal-day">30</div>
-            </div>
-            <div class="calendario-leyenda">
-                <div><span class="dot dot-entrevista"></span> Fecha entrevista</div>
-                <div><span class="dot dot-habil"></span> Fecha hábil</div>
-                <div><span class="dot dot-interrupcion"></span> Interrupción</div>
+
+        </div> <div class="detalle-card-full-width">
+            <div class="panel-section">
+                <h3>
+                    <i class="fas fa-file-medical-alt"></i> Descripción del Caso (Formulación Profesional)
+                </h3>
+                
+                <form method="POST" action="{% url 'actualizar_descripcion_caso' solicitud.id %}" class="form-descripcion-caso">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label for="descripcion_caso">
+                            Aquí puedes registrar la descripción del caso, el análisis de la entrevista y la formulación para los siguientes roles.
+                        </label>
+                        <textarea name="descripcion_caso" id="descripcion_caso" rows="10">{{ solicitud.descripcion }}</textarea>
+                    </div>
+                    <div class="form-actions" style="justify-content: flex-end;">
+                        <button type="submit" class="btn-accion btn-agendar">
+                            <i class="fas fa-save"></i> Guardar Descripción
+                        </button>
+                    </div>
+                </form>
+                
+                <hr style="border: 0; border-top: 1px solid #eee; margin: 25px 0;">
+                
+                <h3 style="border: none; margin-bottom: 15px;">Acciones del Caso</h3>
+                <div class="acciones-casos">
+                    <button type="button" class="btn-accion btn-agendar" onclick="abrirModalAgendar({{ solicitud.id }}, '{{ solicitud.asunto }}')">
+                        <i class="fas fa-calendar-plus"></i> Agendar (Nueva) Cita
+                    </button>
+                    <button type="button" class="btn-accion btn-accion-green">
+                        <i class="fas fa-arrow-right"></i> Enviar a Asesora Técnica
+                    </button>
+                </div>
+
             </div>
         </div>
-        <div id="card-volver">
-            <a href="{% url 'casos_coordinadora' %}" class="btn-volver">
-                <i class="fas fa-chevron-left"></i> Volver
+        
+        <div style="grid-column: 1 / -1; margin-top: 15px;">
+            <a href="{% url 'casos_generales' %}" class="btn-volver">
+                <i class="fas fa-chevron-left"></i> Volver a la lista de Casos
             </a>
         </div>
-    </div>
-</div>
-{% endblock %}
+
+    </div> </div> {% endblock %}

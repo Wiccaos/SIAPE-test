@@ -1,0 +1,157 @@
+{% extends "plantilla.html" %}
+{% load static %}
+
+{% block title %}
+    Gestión de Casos | SIAPE
+{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="main-content"> 
+    
+    <nav class="dashboard-nav">
+        {% if user.perfil.rol.nombre_rol == "Coordinadora de Inclusión" %}
+            <a href="{% url 'dashboard_coordinadora' %}" class="nav-item">
+                <i class="fas fa-home"></i> Panel Principal
+            </a>
+            <a href="{% url 'casos_generales' %}" class="nav-item active"> 
+                <i class="fas fa-folder-open"></i> Casos
+            </a>
+            <a href="{% url 'panel_control_coordinadora' %}" class="nav-item">
+                <i class="fas fa-tachometer-alt"></i> Panel de Control
+            </a>
+        {% elif user.perfil.rol.nombre_rol == "Asesora Pedagógica" %}
+            <a href="{% url 'dashboard_asesor' %}" class="nav-item">
+                <i class="fas fa-home"></i> Panel Principal
+            </a>
+            <a href="{% url 'casos_generales' %}" class="nav-item active"> 
+                <i class="fas fa-folder-open"></i> Casos
+            </a>
+            <a href="{% url 'panel_control_asesor' %}" class="nav-item">
+                <i class="fas fa-tachometer-alt"></i> Panel de Control
+            </a>
+        {% else %}
+            <a href="{% url 'home' %}" class="nav-item">
+                <i class="fas fa-home"></i> Panel Principal
+            </a>
+            <a href="{% url 'casos_generales' %}" class="nav-item active"> 
+                <i class="fas fa-folder-open"></i> Casos
+            </a>
+        {% endif %}
+    </nav>
+
+    <section class="table-container" style="padding: 20px 25px 15px 25px;">
+        <form method="GET" action="{% url 'casos_generales' %}">
+            
+            <div class="filter-bar">
+                <div class="form-group main-search-group">
+                    <label for="q_nombre">Buscar por Estudiante (Nombre, Apellido o RUT):</label>
+                    <input type="text" id="q_nombre" name="q_nombre" value="{{ filtros_aplicados.q_nombre }}" placeholder="Escribe un nombre, apellido o RUT...">
+                </div>
+                
+                <button type="button" class="btn-accion btn-accion-gray btn-filter-toggle" id="toggle-filters-btn">
+                    <i class="fas fa-filter"></i> Filtros
+                </button>
+                
+                <button type="submit" class="btn-accion btn-agendar">
+                    <i class="fas fa-search"></i> Buscar
+                </button>
+            </div>
+
+            <div class="collapsible-filters" id="collapsible-filters-content">
+                <div class="form-grid" style="margin-bottom: 0; padding-bottom: 0;">
+                    <div class="form-group">
+                        <label for="q_fecha">Fecha de Solicitud:</label>
+                        <input type="date" id="q_fecha" name="q_fecha" value="{{ filtros_aplicados.q_fecha }}">
+                    </div>
+            
+                    <div class="form-group">
+                        <label for="q_ajuste">Tipo de Ajuste Aplicado:</label>
+                        <select id="q_ajuste" name="q_ajuste">
+                            <option value="">-- Todos los tipos --</option>
+                            {% for cat in categorias_ajustes %}
+                            <option value="{{ cat.id }}" {% if filtros_aplicados.q_ajuste == cat.id|stringformat:"s" %}selected{% endif %}>
+                                {{ cat.nombre_categoria }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-actions" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee; justify-content: flex-start;">
+                    <a href="{% url 'casos_generales' %}" class="btn-accion btn-accion-gray">Limpiar Filtros</a>
+                </div>
+            </div>
+        </form>
+    </section>
+    <section class="table-container" style="margin-top: 20px;">
+        <div class="table-header">
+            <h2>Casos Encontrados</h2>
+        </div>
+        
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Nombre Estudiante</th>
+                    <th>RUT</th>
+                    <th>Fecha Solicitud</th>
+                    <th>Estado</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for solicitud in solicitudes %}
+                <tr>
+                    <td>{{ solicitud.estudiantes.nombres }} {{ solicitud.estudiantes.apellidos }}</td>
+                    <td>{{ solicitud.estudiantes.rut }}</td>
+                    <td>{{ solicitud.created_at|date:"d/m/Y" }}</td>
+                    <td>
+                        {% if solicitud.estado == 'aprobado' %}
+                            <span class="status status-aprobado">{{ solicitud.get_estado_display }}</span>
+                        {% elif solicitud.estado == 'rechazado' %}
+                            <span class="status status-rechazado">{{ solicitud.get_estado_display }}</span>
+                        {% else %}
+                            <span class="status status-en_proceso">{{ solicitud.get_estado_display }}</span>
+{% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'detalle_casos_coordinadora' solicitud.id %}" class="link-rojo">Ver más »</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5">
+                        <div class="empty-state" style="padding: 20px;">
+                            <i class="fas fa-search" style="color: #ccc; font-size: 1.5rem;"></i>
+                            <p style="font-size: 1rem; color: #777;">No se encontraron solicitudes con esos filtros.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="table-footer">
+            <span>Mostrando {{ total_casos|default:0 }} de {{ total_casos|default:0 }} entradas</span>
+        </div>
+    </section>
+
+</div>
+
+<script>
+    // Script para manejar el botón de colapsar filtros
+    document.addEventListener('DOMContentLoaded', function() {
+        const toggleBtn = document.getElementById('toggle-filters-btn');
+        const filtersContent = document.getElementById('collapsible-filters-content');
+
+        if (toggleBtn && filtersContent) {
+            toggleBtn.addEventListener('click', function() {
+                filtersContent.classList.toggle('show');
+            });
+        }
+    });
+</script>
+
+{% endblock %}
