@@ -1,24 +1,230 @@
-/* ====== ESTILOS CALENDARIO (IGUAL A PANEL ASESOR) ====== */
+/* ====== ESTILOS CALENDARIO (IGUAL A PANEL COORDINADOR) ====== */
+
+/* Estilo para la tarjeta del calendario (igual que panel coordinador) */
+.detalle-card {
+    background-color: #ffffff;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Contenedor de 2 columnas (Calendario + Lista) */
+.cal-layout-container {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 25px;
+    align-items: flex-start; 
+}
+
+/* Ajuste responsivo: en pantallas pequeñas, se apilan */
+@media (max-width: 992px) {
+    .cal-layout-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Columna 1: El widget del calendario */
+.cal-widget {
+    max-width: 400px;
+    min-width: 300px;
+    margin: 0 auto;
+}
+
+/* Columna 2: La lista de horarios */
+.cal-citas-list {
+    background-color: #f8f9fa; 
+    border-radius: 8px;
+    padding: 20px;
+    border: 1px solid #eee;
+    min-height: 400px; 
+}
+
+.cal-citas-list h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #cc0000; 
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+}
+
+/* Calendario Header */
+.calendario-header {
+    text-align: center;
+    font-weight: bold;
+    margin-bottom: 15px;
+    padding: 0 15px;
+}
+
+/* La grilla principal (contiene encabezados Y días) */
+.calendario-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 34px);
+    justify-content: center; 
+    gap: 5px; 
+    overflow-x: auto;
+    padding-bottom: 5px;
+    background: transparent !important;
+}
+
+.cal-day.other-month {
+    color: #ccc;
+    background-color: transparent !important;
+}
+
+/* Colores de estado de los días */
+.day-entrevista {
+    background-color: #eaf6ec;
+    color: #28a745;
+    font-weight: bold;
+}
+
+.day-disponible {
+    background-color: #eaf6ec;
+    color: #28a745;
+    font-weight: bold;
+}
+
+.day-lleno {
+    background-color: #fdecec;
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.day-inabil {
+    color: #ccc;
+    background-color: #f9f9f9;
+    cursor: not-allowed;
+}
+
+.calendario-leyenda {
+    margin-top: 20px;
+    font-size: 0.8rem;
+    color: #555;
+    padding: 0 15px;
+}
+
+.calendario-leyenda-mt {
+    margin-top: 20px;
+}
+
+.calendario-leyenda div {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.dot.dot-entrevista { 
+    background-color: #28a745; 
+}
+
+.dot.dot-disponible { 
+    background-color: #28a745; 
+}
+
+.dot.dot-lleno { 
+    background-color: #dc3545; 
+}
+
+/* Contenedor de navegación del calendario */
+.cal-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding: 0 15px;
+    border: none;
+}
+
+/* Estilo para el día de "Hoy" */
 .cal-day.day-today {
     background-color: #e7f3ff;
     color: #007bff;
     font-weight: bold;
     border: 1px solid #007bff;
 }
+
+/* Día seleccionado */
 .cal-day.cal-day-selected {
     background-color: #cc0000;
-    color: #fff !important;
+    color: #ffffff !important;
     border: 1px solid #a70000;
     font-weight: bold;
 }
+
+/* Hacer que los días clickeables tengan cursor */
 .cal-day:not(.other-month) {
     cursor: pointer;
 }
+
 .cal-day:not(.other-month):hover {
     background-color: #f0f0f0;
 }
+
+/* El seleccionado no debe cambiar en hover */
 .cal-day.cal-day-selected:hover {
     background-color: #cc0000;
+}
+
+/* Prioridad si un día es "Hoy" y también tiene disponibilidad */
+.cal-day.day-disponible.day-today {
+    background-color: #eaf6ec; 
+    color: #28a745;
+    border: 2px solid #007bff;
+}
+
+/* Ajustes al 'card' del calendario */
+#card-calendario-panel {
+    padding: 15px;
+    overflow-x: visible;
+}
+
+#card-calendario-panel .calendario-header {
+    padding: 0 0 15px 0;
+}
+
+#card-calendario-panel .cal-nav {
+    padding: 0;
+    border: none;
+    margin-bottom: 15px;
+}
+
+/* Estilos de botones para navegación del calendario (igual que panel coordinador) */
+.btn-accion {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.btn-accion-small {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+}
+
+.btn-accion-gray {
+    background-color: #e9ecef;
+    color: #495057;
+    border: 1px solid #ced4da;
+}
+
+.btn-accion-gray:hover {
+    background-color: #dee2e6;
+    border-color: #adb5bd;
 }
 
 /* Botones de horarios disponibles */
@@ -28,26 +234,63 @@
     gap: 10px;
     margin-top: 10px;
 }
+
 .btn-horario {
-    padding: 0.5rem 1.1rem;
+    padding: 0.75rem 1.25rem;
     border-radius: 6px;
-    border: none;
-    font-size: 1rem;
+    border: 1px solid #ddd;
+    font-size: 0.95rem;
     font-weight: 500;
-    background: #eaf6ec;
+    background: #ffffff;
     color: #28a745;
     cursor: pointer;
-    transition: background 0.2s, color 0.2s;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
+
+.btn-horario:hover:not(:disabled):not(.no-disponible) {
+    background: #eaf6ec;
+    border-color: #28a745;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+}
+
 .btn-horario.selected {
     background: #cc0000;
     color: #fff;
+    border-color: #a70000;
+    font-weight: 600;
 }
-.btn-horario:disabled, .btn-horario.no-disponible {
-    background: #f0f0f0;
+
+.btn-horario:disabled, 
+.btn-horario.no-disponible {
+    background: #f5f5f5;
     color: #aaa;
     cursor: not-allowed;
     border: 1px solid #ddd;
+    opacity: 0.6;
+}
+
+/* Empty state para cuando no hay horarios */
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #777;
+}
+
+.empty-state-10 {
+    padding: 10px 0;
+}
+
+.empty-state i {
+    font-size: 2rem;
+    margin-bottom: 10px;
+    color: #ccc;
+}
+
+.empty-state p {
+    font-size: 0.9rem;
+    margin: 0;
 }
 /* --- Contenedor Principal --- */
 .form-container {
@@ -268,53 +511,3 @@
     }
 }
 
-/* Añade esto a formulario.css o base.css */
-.dot.dot-disponible { background-color: #28a745; }
-.dot.dot-lleno { background-color: #dc3545; }
-
-.cal-day.day-disponible {
-    background-color: #eaf6ec;
-    color: #28a745;
-    font-weight: bold;
-    cursor: pointer;
-}
-.cal-day.day-lleno {
-    background-color: #fdecec;
-    color: #dc3545;
-    text-decoration: line-through;
-    cursor: not-allowed;
-}
-.cal-day.day-inabil {
-    color: #ccc;
-    background-color: #f9f9f9;
-    cursor: not-allowed;
-}
-
-/* === Estilos de grilla para el calendario === */
-.calendario-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 2px;
-    margin-top: 10px;
-    margin-bottom: 10px;
-}
-
-.calendario-grid .cal-day,
-.calendario-grid .cal-day-header {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 32px;
-    min-height: 32px;
-    font-size: 1rem;
-    border-radius: 6px;
-    margin: 1px;
-    background: #f9f9f9;
-    color: #333;
-}
-
-.calendario-grid .cal-day-header {
-    font-weight: bold;
-    background: #e9ecef;
-    color: #444;
-}

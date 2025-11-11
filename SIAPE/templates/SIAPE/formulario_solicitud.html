@@ -93,8 +93,9 @@
                     <div class="cal-widget">
                         <div class="detalle-card" id="card-calendario-panel">
                             <div class="calendario-header" id="cal-header">
-                                Cargando mes...
+                                <!-- El mes se inserta aquí por JS -->
                             </div>
+                            <!-- Navegación movida encima de la grilla -->
                             <div class="cal-nav">
                                 <button type="button" id="cal-prev" class="btn-accion btn-accion-gray btn-accion-small"><i class="fas fa-chevron-left"></i> Ant</button>
                                 <button type="button" id="cal-today" class="btn-accion btn-accion-gray btn-accion-small">Hoy</button>
@@ -112,10 +113,14 @@
 
                     <!-- Columna 2: El Selector de Hora -->
                     <div class="cal-citas-list">
-                        <h4 id="cal-citas-titulo">2. Horarios disponibles</h4>
+                        <h4 id="cal-citas-titulo">Horarios Disponibles</h4>
                         <div id="cal-citas-dia">
-                            <div id="horario-loader" style="font-size: 0.9em; margin-top: 5px;"></div>
-                            <div class="horarios-botones" id="horarios-botones"></div>
+                            <!-- El contenido se inserta aquí por JS -->
+                            <div class="empty-state empty-state-10">
+                                <i class="fas fa-calendar-day" style="font-size: 2rem; margin-bottom: 10px;"></i>
+                                <p style="font-size: 0.9rem;">Seleccione un día del calendario para ver los horarios disponibles.</p>
+                            </div>
+                            <div class="horarios-botones" id="horarios-botones" style="display: none;"></div>
                             <input type="hidden" id="hora_cita" name="hora_cita" required>
                         </div>
                     </div>
@@ -208,8 +213,9 @@
         // Variables globales del calendario
         let navDate = new Date();
         const hoy = new Date();
-        const hoyStr = hoy.toISOString().split('T')[0]; // "YYYY-MM-DD"
-        let diaSeleccionadoEl = null; 
+        const hoyStr = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+        let diaSeleccionado = null; 
+        let diaSeleccionadoStr = null;
         let calendarioData = {}; // Guardará la data de la API
 
         // Elementos del DOM del calendario
@@ -218,11 +224,9 @@
         const btnPrev = document.getElementById('cal-prev');
         const btnNext = document.getElementById('cal-next');
         const btnToday = document.getElementById('cal-today');
-        
-        // Elementos del DOM del selector de hora
-        const horaSelect = document.getElementById('hora_cita');
-        const horaLabel = document.getElementById('hora_label');
-        const horarioLoader = document.getElementById('horario-loader');
+        const citasDiaContainer = document.getElementById('cal-citas-dia');
+        const citasDiaTitulo = document.getElementById('cal-citas-titulo');
+        const horariosBotones = document.getElementById('horarios-botones');
         const fechaHiddenInput = document.getElementById('fecha_cita');
 
         const meses = [
@@ -233,130 +237,97 @@
         // 1. Función para buscar datos del mes
         async function fetchCalendarioDelMes(year, month) {
             calHeader.innerText = `Cargando ${meses[month]} ${year}...`;
-            calGridBody.innerHTML = ''; // Limpiar
             
             try {
                 const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
-                // Usamos la URL que definimos en urls.py
                 const response = await fetch(`/api/calendario-disponible/?month=${monthStr}`);
                 
                 if (!response.ok) throw new Error('Error de red');
                 
                 calendarioData = await response.json();
-                renderCalendar(year, month); // Llama a renderizar con los nuevos datos
+                renderCalendar(year, month);
 
             } catch (error) {
                 console.error('Error fetching calendario:', error);
                 calHeader.innerText = "Error al cargar calendario";
             }
         }
-        
-        // 2. Función para renderizar el calendario (ADAPTADA)
-        function renderCalendar(year, month) {
-            calHeader.innerText = `${meses[month]} ${year}`;
-            calGridBody.innerHTML = `
-                <div class="cal-day-header">L</div> <div class="cal-day-header">M</div>
-                <div class="cal-day-header">X</div> <div class="cal-day-header">J</div>
-                <div class="cal-day-header">V</div> <div class="cal-day-header">S</div>
-                <div class="cal-day-header">D</div>
-            `;
-            const primerDiaDelMes = new Date(year, month, 1);
-            const ultimoDiaDelMes = new Date(year, month + 1, 0);
-            const ultimoDiaNum = ultimoDiaDelMes.getDate();
-            let diaInicioSemana = (primerDiaDelMes.getDay() + 6) % 7; // Lunes=0
-            const ultimoDiaMesAnterior = new Date(year, month, 0).getDate();
-            // Días mes anterior
-            for (let i = diaInicioSemana; i > 0; i--) {
-                const dayDiv = document.createElement('div');
-                dayDiv.classList.add('cal-day', 'other-month');
-                dayDiv.innerText = ultimoDiaMesAnterior - i + 1;
-                calGridBody.appendChild(dayDiv);
-            }
-            // Días mes actual (todos seleccionables, como en panel asesor)
-            for (let dia = 1; dia <= ultimoDiaNum; dia++) {
-                const dayDiv = document.createElement('div');
-                dayDiv.classList.add('cal-day');
-                dayDiv.innerText = dia;
-                const fechaStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-                dayDiv.dataset.fecha = fechaStr;
-                // Resaltar día actual (azul)
-                if (fechaStr === hoyStr) {
-                    dayDiv.classList.add('day-today');
-                }
-                // Resaltar día seleccionado (rojo)
-                if (diaSeleccionadoEl && diaSeleccionadoEl.dataset.fecha === fechaStr) {
-                    dayDiv.classList.add('cal-day-selected');
-                }
-                // Colorear según disponibilidad
-                if (calendarioData.fechasConDisponibilidad?.includes(fechaStr)) {
-                    dayDiv.classList.add('day-disponible');
-                } else if (calendarioData.diasCompletos?.includes(fechaStr)) {
-                    dayDiv.classList.add('day-lleno');
-                }
-                // Permitir seleccionar cualquier día del mes actual (no días pasados)
-                if (fechaStr >= hoyStr) {
-                    dayDiv.addEventListener('click', () => seleccionarDia(dayDiv, fechaStr));
-                } else {
-                    dayDiv.classList.add('day-inabil');
-                }
-                calGridBody.appendChild(dayDiv);
-            }
-            // Días mes siguiente
-            const totalDiasGrid = calGridBody.children.length;
-            const diasSiguientes = (7 - (totalDiasGrid % 7)) % 7;
-            for (let i = 1; i <= diasSiguientes; i++) {
-                const dayDiv = document.createElement('div');
-                dayDiv.classList.add('cal-day', 'other-month');
-                dayDiv.innerText = i;
-                calGridBody.appendChild(dayDiv);
-            }
-        }
 
-        // 3. Función para manejar el clic en un día
-        function seleccionarDia(dayEl, fechaStr) {
-            // Resaltar día seleccionado (rojo) y día actual (azul)
-            if (diaSeleccionadoEl) {
-                diaSeleccionadoEl.classList.remove('cal-day-selected');
+        // 2. Función para mostrar los horarios de un día
+        function mostrarHorariosDelDia(fechaStr, diaEl) {
+            // Actualizar título
+            const [year, month, day] = fechaStr.split('-');
+            citasDiaTitulo.innerText = `Horarios para ${day}/${month}/${year}`;
+
+            // Resaltar día seleccionado
+            if (diaSeleccionado) {
+                diaSeleccionado.classList.remove('cal-day-selected');
             }
-            dayEl.classList.add('cal-day-selected');
-            diaSeleccionadoEl = dayEl;
+            
+            if(diaEl) {
+                diaEl.classList.add('cal-day-selected');
+                diaSeleccionado = diaEl;
+                diaSeleccionadoStr = fechaStr;
+            } else {
+                diaSeleccionado = calGridBody.querySelector(`[data-fecha="${fechaStr}"]`);
+                if (diaSeleccionado) {
+                    diaSeleccionado.classList.add('cal-day-selected');
+                }
+            }
+
             // Guardar fecha en el input oculto
             fechaHiddenInput.value = fechaStr;
-            // Limpiar selección previa de hora
             document.getElementById('hora_cita').value = '';
-            // Mostrar horarios como botones (igual que panel de control)
-            const horariosBotones = document.getElementById('horarios-botones');
-            horariosBotones.innerHTML = '';
+
             const slotsDisponibles = calendarioData.slotsDetallados?.[fechaStr] || [];
             const slotsNoDisponibles = calendarioData.slotsNoDisponibles?.[fechaStr] || [];
+            
+            // Limpiar contenido previo
+            const existingEmptyState = citasDiaContainer.querySelector('.empty-state');
+            if (existingEmptyState) {
+                existingEmptyState.remove();
+            }
+            horariosBotones.innerHTML = '';
+            
+            if (slotsDisponibles.length === 0) {
+                citasDiaContainer.insertAdjacentHTML('afterbegin', `
+                    <div class="empty-state empty-state-10">
+                        <i class="fas fa-calendar-check" style="font-size: 2rem; margin-bottom: 10px;"></i>
+                        <p style="font-size: 0.9rem;">No hay horarios disponibles para este día.</p>
+                    </div>
+                `);
+                horariosBotones.style.display = 'none';
+                return;
+            }
+
+            // Mostrar botones
+            horariosBotones.style.display = 'flex';
+
+            // Generar todos los slots de 9:00 a 17:00
             const allSlots = [];
             for (let h = 9; h <= 17; h++) {
-                const hora = `${h.toString().padStart(2, '0')}:00`;
-                allSlots.push(hora);
+                allSlots.push(`${h.toString().padStart(2, '0')}:00`);
             }
-            let hayDisponibles = false;
-            let selectedHora = document.getElementById('hora_cita').value;
+
+            // Crear botones para cada horario
             for (const slot of allSlots) {
                 const btn = document.createElement('button');
                 btn.type = 'button';
                 btn.className = 'btn-horario';
-                btn.textContent = `${slot} - ${parseInt(slot.split(':')[0]) + 1}:00`;
+                const horaInicio = parseInt(slot.split(':')[0]);
+                const horaFin = horaInicio + 1;
+                btn.textContent = `${slot} - ${horaFin.toString().padStart(2, '0')}:00`;
                 btn.dataset.hora = slot;
-                // Si está en slotsDisponibles: habilitado
+
                 if (slotsDisponibles.includes(slot)) {
                     btn.disabled = false;
-                    hayDisponibles = true;
                     btn.addEventListener('click', function() {
                         horariosBotones.querySelectorAll('.btn-horario').forEach(b => b.classList.remove('selected'));
                         btn.classList.add('selected');
                         document.getElementById('hora_cita').value = slot;
                         mensajeDiv.style.display = 'none';
                     });
-                    if (selectedHora === slot) {
-                        btn.classList.add('selected');
-                    }
                 } else {
-                    // Si está en slotsNoDisponibles: mostrar como no disponible (por cita tomada)
                     btn.disabled = true;
                     btn.classList.add('no-disponible');
                     if (slotsNoDisponibles.includes(slot)) {
@@ -367,22 +338,122 @@
                 }
                 horariosBotones.appendChild(btn);
             }
-            if (!hayDisponibles) {
-                document.getElementById('horario-loader').innerHTML = '<strong style="color: #fd7e14;">No hay horas disponibles para este día.</strong>';
-            } else {
-                document.getElementById('horario-loader').innerHTML = '';
+        }
+        
+        // 3. Función principal para renderizar el calendario
+        function renderCalendar(year, month) {
+            calHeader.innerText = `${meses[month]} ${year}`;
+            
+            // Limpiamos la grilla e inyectamos los encabezados
+            calGridBody.innerHTML = `
+                <div class="cal-day-header">L</div>
+                <div class="cal-day-header">M</div>
+                <div class="cal-day-header">X</div>
+                <div class="cal-day-header">J</div>
+                <div class="cal-day-header">V</div>
+                <div class="cal-day-header">S</div>
+                <div class="cal-day-header">D</div>
+            `;
+            
+            const primerDiaDelMes = new Date(year, month, 1);
+            const ultimoDiaDelMes = new Date(year, month + 1, 0);
+            const ultimoDiaNum = ultimoDiaDelMes.getDate();
+            let diaInicioSemana = (primerDiaDelMes.getDay() + 6) % 7;
+            const ultimoDiaMesAnterior = new Date(year, month, 0).getDate();
+
+            // Días del mes anterior
+            for (let i = diaInicioSemana; i > 0; i--) {
+                const dia = ultimoDiaMesAnterior - i + 1;
+                const dayDiv = document.createElement('div');
+                dayDiv.classList.add('cal-day', 'other-month');
+                dayDiv.innerText = dia;
+                calGridBody.appendChild(dayDiv);
+            }
+
+            // Días del mes actual
+            for (let dia = 1; dia <= ultimoDiaNum; dia++) {
+                const dayDiv = document.createElement('div');
+                dayDiv.classList.add('cal-day');
+                dayDiv.innerText = dia;
+
+                const fechaStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+                dayDiv.dataset.fecha = fechaStr;
+
+                const fechaDate = new Date(year, month, dia);
+                const diaSemana = fechaDate.getDay(); // 0 = Domingo, 6 = Sábado
+                const esFinDeSemana = diaSemana === 0 || diaSemana === 6;
+                const hoyDate = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+                const esDiaPasado = fechaDate < hoyDate;
+                const esSeleccionable = !esFinDeSemana && !esDiaPasado;
+
+                if (fechaStr === hoyStr) {
+                    dayDiv.classList.add('day-today');
+                }
+
+                // Colorear según disponibilidad (solo días hábiles)
+                if (esSeleccionable) {
+                    if (calendarioData.fechasConDisponibilidad?.includes(fechaStr)) {
+                        dayDiv.classList.add('day-disponible');
+                    } else if (calendarioData.diasCompletos?.includes(fechaStr)) {
+                        dayDiv.classList.add('day-lleno');
+                    }
+                } else if (esFinDeSemana) {
+                    // Fines de semana no disponibles
+                    dayDiv.classList.add('day-inabil');
+                } else if (esDiaPasado) {
+                    // Días pasados no disponibles
+                    dayDiv.classList.add('day-inabil');
+                }
+
+                // Solo permitir seleccionar días hábiles futuros o hoy
+                if (esSeleccionable) {
+                    dayDiv.addEventListener('click', () => mostrarHorariosDelDia(fechaStr, dayDiv));
+                }
+                
+                calGridBody.appendChild(dayDiv);
+            }
+
+            // Días del mes siguiente
+            const totalDiasGrid = calGridBody.children.length;
+            const diasSiguientes = (7 - (totalDiasGrid % 7)) % 7;
+            for (let i = 1; i <= diasSiguientes; i++) {
+                const dayDiv = document.createElement('div');
+                dayDiv.classList.add('cal-day', 'other-month');
+                dayDiv.innerText = i;
+                calGridBody.appendChild(dayDiv);
+            }
+            
+            // Al re-renderizar, si un día estaba seleccionado, lo volvemos a mostrar
+            if (diaSeleccionadoStr) {
+                const [selYear, selMonth] = diaSeleccionadoStr.split('-');
+                if (parseInt(selYear) === year && parseInt(selMonth) === (month + 1)) {
+                    mostrarHorariosDelDia(diaSeleccionadoStr, null);
+                } else {
+                    diaSeleccionado = null;
+                    diaSeleccionadoStr = null;
+                    citasDiaTitulo.innerText = `Horarios Disponibles`;
+                    citasDiaContainer.innerHTML = `
+                        <div class="empty-state empty-state-10">
+                            <i class="fas fa-calendar-day" style="font-size: 2rem; margin-bottom: 10px;"></i>
+                            <p style="font-size: 0.9rem;">Seleccione un día del calendario para ver los horarios disponibles.</p>
+                        </div>
+                    `;
+                    horariosBotones.style.display = 'none';
+                }
             }
         }
 
-        // 4. Listeners de navegación del calendario
+        // 4. Event Listeners para navegación
         btnPrev.addEventListener('click', () => {
             navDate.setMonth(navDate.getMonth() - 1);
             fetchCalendarioDelMes(navDate.getFullYear(), navDate.getMonth());
         });
+
         btnNext.addEventListener('click', () => {
             navDate.setMonth(navDate.getMonth() + 1);
             fetchCalendarioDelMes(navDate.getFullYear(), navDate.getMonth());
         });
+
         btnToday.addEventListener('click', () => {
             navDate = new Date();
             fetchCalendarioDelMes(navDate.getFullYear(), navDate.getMonth());
@@ -438,10 +509,19 @@
                     // Resetear calendario
                     fechaHiddenInput.value = '';
                     horaCitaInput.value = '';
-                    if (diaSeleccionadoEl) diaSeleccionadoEl.classList.remove('cal-day-selected');
-                    document.getElementById('horarios-botones').innerHTML = '';
+                    diaSeleccionado = null;
+                    diaSeleccionadoStr = null;
+                    citasDiaTitulo.innerText = `Horarios Disponibles`;
+                    citasDiaContainer.innerHTML = `
+                        <div class="empty-state empty-state-10">
+                            <i class="fas fa-calendar-day" style="font-size: 2rem; margin-bottom: 10px;"></i>
+                            <p style="font-size: 0.9rem;">Seleccione un día del calendario para ver los horarios disponibles.</p>
+                        </div>
+                    `;
+                    horariosBotones.style.display = 'none';
                     // Recargar el mes actual
-                    fetchCalendarioDelMes(new Date().getFullYear(), new Date().getMonth());
+                    navDate = new Date();
+                    fetchCalendarioDelMes(navDate.getFullYear(), navDate.getMonth());
 
                 } else {
                     // Error de validación (HTTP 400)
