@@ -1,3 +1,5 @@
+from django.shortcuts import get_object_or_404
+from django.contrib.auth.decorators import login_required
 # Django
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -9,6 +11,8 @@ from datetime import timedelta, datetime, time, date
 from django.db.models import Count, Q
 import json
 import calendar # Importar para el calendario mensual
+import logging
+from django.views.decorators.http import require_POST
 
 from rest_framework import (
     viewsets, mixins, status
@@ -93,10 +97,6 @@ def vista_formulario_solicitud(request):
     return render(request, 'SIAPE/formulario_solicitud.html', context)
 
 
-# ----------------------------------------------
-#           NUEVAS VISTAS DE API (PÚBLICAS)
-# ----------------------------------------------
-
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_horarios_disponibles(request):
@@ -130,20 +130,32 @@ def get_horarios_disponibles(request):
         if not coordinadoras.exists():
             return Response({"error": "No hay coordinadoras configuradas."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # 4. Encontrar citas ya tomadas para esa fecha por CUALQUIER coordinadora
+        # 4. Calcular horarios disponibles: un horario está disponible si AL MENOS UNA coordinadora lo tiene libre
         start_of_day = timezone.make_aware(datetime.combine(selected_date, time.min))
         end_of_day = timezone.make_aware(datetime.combine(selected_date, time.max))
 
-        citas_existentes = Entrevistas.objects.filter(
-            coordinadora__in=coordinadoras,
-            fecha_entrevista__range=(start_of_day, end_of_day)
-        ).values_list('fecha_entrevista', flat=True)
-
-        # 5. Filtrar la lista
-        taken_slots = set()
-        for dt in citas_existentes:
-            taken_slots.add(dt.astimezone(timezone.get_current_timezone()).strftime('%H:%M')) # Formato HH:MM
-        available_slots = [slot for slot in all_slots if slot not in taken_slots]
+        # Para cada slot, verificar si al menos una coordinadora lo tiene disponible
+        available_slots = []
+        for slot in all_slots:
+            # Convertir el slot (ej: "10:00") a datetime
+            hora_obj = datetime.strptime(slot, '%H:%M').time()
+            slot_datetime = timezone.make_aware(datetime.combine(selected_date, hora_obj))
+            
+            # Verificar si al menos una coordinadora tiene este horario libre
+            # Un horario está disponible si AL MENOS UNA coordinadora NO tiene cita en ese horario
+            slot_disponible = False
+            for coord in coordinadoras:
+                tiene_cita = Entrevistas.objects.filter(
+                    coordinadora=coord,
+                    fecha_entrevista=slot_datetime
+                ).exclude(coordinadora__isnull=True).exists()
+                if not tiene_cita:
+                    slot_disponible = True
+                    break
+            
+            if slot_disponible:
+                available_slots.append(slot)
+        
         return Response(available_slots, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": f"Error interno del servidor: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -160,9 +172,9 @@ def get_calendario_disponible(request):
     # 1. Obtener el mes y año de la consulta
     month_str = request.GET.get('month')
     try:
-        # Si no se provee mes, usa el mes actual
+        # Si no se provee mes, usa el mes actual (en zona horaria de Chile)
         if not month_str:
-            target_date = date.today()
+            target_date = timezone.localtime(timezone.now()).date()
         else:
             target_date = datetime.strptime(month_str, '%Y-%m').date()
     except ValueError:
@@ -176,25 +188,67 @@ def get_calendario_disponible(request):
     if not coordinadoras.exists():
         return Response({"error": "No hay coordinadoras configuradas."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # 3. Obtener todas las citas ya tomadas en ese mes
-    citas_del_mes = Entrevistas.objects.filter(
+    # 3. Obtener todas las citas ya tomadas en ese mes, agrupadas por coordinadora y día
+    # Estructura: {coordinadora_id: {dia_str: set([hora1, hora2, ...])}}
+    citas_por_coordinadora_dia = {}
+    
+    # Obtener TODAS las citas del mes de TODAS las coordinadoras de una vez
+    # Usar rango de fechas en lugar de __year y __month para evitar problemas de zona horaria
+    # Calcular el primer y último día del mes en la zona horaria local
+    primer_dia_mes = timezone.make_aware(datetime(year, month, 1, 0, 0, 0))
+    if month == 12:
+        ultimo_dia_mes = timezone.make_aware(datetime(year + 1, 1, 1, 0, 0, 0))
+    else:
+        ultimo_dia_mes = timezone.make_aware(datetime(year, month + 1, 1, 0, 0, 0))
+    
+    print(f"[DEBUG] Buscando citas entre {primer_dia_mes} y {ultimo_dia_mes}")
+    
+    # Filtrar por rango de fechas (esto funciona correctamente con zonas horarias)
+    todas_las_citas = Entrevistas.objects.filter(
         coordinadora__in=coordinadoras,
-        fecha_entrevista__year=year,
-        fecha_entrevista__month=month
-    ).values_list('fecha_entrevista', flat=True)
-
-    # Agrupar citas por día
-    citas_por_dia = {}
-    for dt in citas_del_mes:
-        dia_str = dt.astimezone(timezone.get_current_timezone()).strftime('%Y-%m-%d')
-        hora_str = dt.astimezone(timezone.get_current_timezone()).strftime('%H:%M')
-        if dia_str not in citas_por_dia:
-            citas_por_dia[dia_str] = set()
-        citas_por_dia[dia_str].add(hora_str)
+        fecha_entrevista__gte=primer_dia_mes,
+        fecha_entrevista__lt=ultimo_dia_mes
+    ).exclude(coordinadora__isnull=True).select_related('coordinadora').values_list('coordinadora_id', 'fecha_entrevista')
+    
+    # Debug: mostrar todas las citas encontradas
+    total_citas = todas_las_citas.count()
+    print(f"[DEBUG] Total de citas encontradas en {year}-{month:02d}: {total_citas}")
+    for coord_id, dt in todas_las_citas:
+        dt_local = timezone.localtime(dt)
+        print(f"[DEBUG] Cita encontrada: Coord={coord_id}, Fecha UTC={dt}, Fecha Local={dt_local.strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.debug(f"Total de citas encontradas en {year}-{month:02d}: {total_citas}")
+    
+    # Inicializar el diccionario para todas las coordinadoras
+    for coord in coordinadoras:
+        citas_por_coordinadora_dia[coord.id] = {}
+    
+    # Procesar cada cita
+    for coord_id, dt in todas_las_citas:
+        # Convertir a la zona horaria local de forma consistente
+        dt_local = timezone.localtime(dt)
+        dia_str = dt_local.strftime('%Y-%m-%d')
+        # Normalizar la hora a solo la hora en punto (ej: "10:30" -> "10:00")
+        # Esto es necesario porque los slots son de hora en punto
+        hora_str = f"{dt_local.hour:02d}:00"
+        
+        if coord_id not in citas_por_coordinadora_dia:
+            citas_por_coordinadora_dia[coord_id] = {}
+        if dia_str not in citas_por_coordinadora_dia[coord_id]:
+            citas_por_coordinadora_dia[coord_id][dia_str] = set()
+        citas_por_coordinadora_dia[coord_id][dia_str].add(hora_str)
+        
+        print(f"[DEBUG] Cita encontrada: Coordinadora {coord_id}, Día {dia_str}, Hora {hora_str} (original: {dt_local.strftime('%Y-%m-%d %H:%M:%S')})")
+        logger.debug(f"Cita encontrada: Coordinadora {coord_id}, Día {dia_str}, Hora {hora_str} (original: {dt_local.strftime('%Y-%m-%d %H:%M:%S')})")
+    
+    # Debug: Log de citas encontradas por coordinadora
+    for coord in coordinadoras:
+        if coord.id in citas_por_coordinadora_dia:
+            logger.debug(f"Coordinadora {coord.id}: {sum(len(horas) for horas in citas_por_coordinadora_dia[coord.id].values())} horas ocupadas")
+            for dia, horas in citas_por_coordinadora_dia[coord.id].items():
+                logger.debug(f"  Día {dia}: horas ocupadas {sorted(horas)}")
 
     # 4. Definir los slots base y preparar la respuesta
     slots_base_por_hora = range(9, 18) # 9:00 a 17:00
-    slots_base_set = set([f"{h:02d}:00" for h in slots_base_por_hora])
     
     respuesta_api = {
         "fechasConDisponibilidad": [], # Días con al menos 1 hora libre
@@ -214,34 +268,81 @@ def get_calendario_disponible(request):
         dia_actual_date = date(year, month, dia)
         dia_actual_str = dia_actual_date.strftime('%Y-%m-%d')
 
-        # Omitir fines de semana y días pasados
-        if dia_actual_date.weekday() >= 5 or dia_actual_date < date.today():
+        # Omitir fines de semana y días pasados (usar fecha actual en zona horaria de Chile)
+        hoy_chile = timezone.localtime(timezone.now()).date()
+        if dia_actual_date.weekday() >= 5 or dia_actual_date < hoy_chile:
             continue
 
-        citas_tomadas_ese_dia = citas_por_dia.get(dia_actual_str, set())
         slots_libres = []
         slots_no_disponibles = []
+        
         for h in slots_base_por_hora:
             hora_str = f"{h:02d}:00"
-            # Si la hora ya está tomada, no disponible
-            if hora_str in citas_tomadas_ese_dia:
-                slots_no_disponibles.append(hora_str)
-                continue
+            
             # Si es hoy, solo permitir con 2 horas de anticipación
             if dia_actual_str == hoy_str:
                 if h <= now.hour + 1:  # Debe ser al menos 2 horas después de la actual
                     slots_no_disponibles.append(hora_str)
                     continue
-            slots_libres.append(hora_str)
+            
+            # Verificar si alguna coordinadora tiene una cita en este horario
+            # IMPORTANTE: Si CUALQUIERA de las coordinadoras tiene una cita en este horario,
+            # el horario NO está disponible (solo hay 1 horario disponible por día)
+            # Un horario está disponible SOLO si NINGUNA coordinadora tiene una cita en ese horario
+            slot_ocupado = False
+            coordinadora_ocupada = None
+            if coordinadoras.exists():
+                for coord in coordinadoras:
+                    citas_coord_dia = citas_por_coordinadora_dia.get(coord.id, {}).get(dia_actual_str, set())
+                    # Debug: verificar qué hay en el set
+                    if citas_coord_dia:
+                        print(f"[DEBUG] Coordinadora {coord.id}, Día {dia_actual_str}: horas en set = {sorted(citas_coord_dia)}, buscando {hora_str}")
+                        logger.debug(f"Coordinadora {coord.id}, Día {dia_actual_str}: horas en set = {sorted(citas_coord_dia)}, buscando {hora_str}")
+                    # Si esta coordinadora tiene una cita en este horario, el slot está ocupado
+                    if hora_str in citas_coord_dia:
+                        slot_ocupado = True
+                        coordinadora_ocupada = coord.id
+                        print(f"[DEBUG] ✓ Slot {hora_str} del día {dia_actual_str} está ocupado por coordinadora {coord.id}")
+                        logger.debug(f"✓ Slot {hora_str} del día {dia_actual_str} está ocupado por coordinadora {coord.id}")
+                        break
+            
+            # Si ninguna coordinadora tiene el horario ocupado, está disponible
+            if not slot_ocupado and coordinadoras.exists():
+                slots_libres.append(hora_str)
+                logger.debug(f"  Slot {hora_str} del día {dia_actual_str} está DISPONIBLE")
+            else:
+                # Al menos una coordinadora tiene este horario ocupado (o no hay coordinadoras)
+                slots_no_disponibles.append(hora_str)
+                if slot_ocupado:
+                    print(f"[DEBUG] Slot {hora_str} del día {dia_actual_str} agregado a slots_no_disponibles (ocupado por coord {coordinadora_ocupada})")
+                    logger.debug(f"  Slot {hora_str} del día {dia_actual_str} agregado a slots_no_disponibles (ocupado por coord {coordinadora_ocupada})")
+                else:
+                    print(f"[DEBUG] Slot {hora_str} del día {dia_actual_str} agregado a slots_no_disponibles (no hay coordinadoras)")
+                    logger.debug(f"  Slot {hora_str} del día {dia_actual_str} agregado a slots_no_disponibles (no hay coordinadoras)")
 
+        # Siempre agregar los slots detallados, incluso si no hay disponibles
+        # Esto permite que el frontend muestre correctamente qué horarios están ocupados
+        respuesta_api["slotsDetallados"][dia_actual_str] = slots_libres
+        respuesta_api["slotsNoDisponibles"][dia_actual_str] = slots_no_disponibles
+        
+        # Debug: Log de slots para este día
+        if slots_no_disponibles:
+            print(f"[DEBUG] Día {dia_actual_str}: {len(slots_no_disponibles)} slots no disponibles: {sorted(slots_no_disponibles)}")
+            logger.debug(f"Día {dia_actual_str}: {len(slots_no_disponibles)} slots no disponibles: {sorted(slots_no_disponibles)}")
+        
         if len(slots_libres) > 0:
             respuesta_api["fechasConDisponibilidad"].append(dia_actual_str)
-            respuesta_api["slotsDetallados"][dia_actual_str] = slots_libres
-            respuesta_api["slotsNoDisponibles"][dia_actual_str] = slots_no_disponibles
         else:
             respuesta_api["diasCompletos"].append(dia_actual_str)
-            respuesta_api["slotsNoDisponibles"][dia_actual_str] = slots_no_disponibles
 
+    # Debug: Imprimir resumen final
+    print(f"[DEBUG] Resumen final - Días con disponibilidad: {len(respuesta_api['fechasConDisponibilidad'])}")
+    print(f"[DEBUG] Resumen final - Días completos: {len(respuesta_api['diasCompletos'])}")
+    print(f"[DEBUG] Resumen final - Total días procesados: {len(respuesta_api['slotsDetallados'])}")
+    for dia, slots in list(respuesta_api['slotsNoDisponibles'].items())[:5]:  # Mostrar primeros 5 días
+        if slots:
+            print(f"[DEBUG] Día {dia}: {len(slots)} slots no disponibles: {sorted(slots)}")
+    
     return Response(respuesta_api, status=status.HTTP_200_OK)
 
 
@@ -286,6 +387,72 @@ def vista_protegida(request):
 def logout_view(request):
     logout(request)
     return redirect('login') 
+
+@login_required
+def casos_generales(request):
+    """
+    Vista unificada para buscar y filtrar todos los casos del sistema.
+    Accesible por todos los roles de asesoría.
+    """
+
+    try:
+        perfil = request.user.perfil
+        ROLES_PERMITIDOS = [
+            ROL_COORDINADORA,
+            ROL_ASESORA_TECNICA,
+            ROL_ASESOR,
+            ROL_DIRECTOR,
+            ROL_ADMIN
+        ]
+        if perfil.rol.nombre_rol not in ROLES_PERMITIDOS:
+            messages.error(request, 'No tienes permisos para acceder a esta vista.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+
+    solicitudes_list = Solicitudes.objects.all().select_related(
+        'estudiantes', 
+        'estudiantes__carreras'
+    ).prefetch_related(
+        'ajusteasignado_set__ajuste_razonable__categorias_ajustes'
+    ).distinct().order_by('-created_at')
+
+    q_nombre = request.GET.get('q_nombre', None)
+    q_fecha = request.GET.get('q_fecha', None)
+    q_ajuste = request.GET.get('q_ajuste', None)
+    
+    filtros = Q()
+
+    if q_nombre:
+        filtros &= (
+            Q(estudiantes__nombres__icontains=q_nombre) | 
+            Q(estudiantes__apellidos__icontains=q_nombre) |
+            Q(estudiantes__rut__icontains=q_nombre)
+        )
+
+    if q_fecha:
+        try:
+            fecha_obj = datetime.strptime(q_fecha, '%Y-%m-%d').date()
+            filtros &= Q(created_at__date=fecha_obj)
+        except ValueError:
+            messages.error(request, "Formato de fecha inválido.")
+
+    if q_ajuste:
+        filtros &= Q(ajusteasignado__ajuste_razonable__categorias_ajustes__id=q_ajuste)
+
+    solicitudes_list = solicitudes_list.filter(filtros)
+
+    categorias_ajustes = CategoriasAjustes.objects.all().order_by('nombre_categoria')
+
+    context = {
+        'solicitudes': solicitudes_list,
+        'total_casos': solicitudes_list.count(),
+        'categorias_ajustes': categorias_ajustes,
+        'filtros_aplicados': request.GET
+    }
+    
+    return render(request, 'SIAPE/casos_generales.html', context)
 
 # ------------- Páginas del Admin ------------
 @login_required
@@ -613,179 +780,322 @@ def editar_asignatura_admin(request, asignatura_id):
             messages.error(request, f'Error al actualizar la asignatura: {str(e)}')
     return redirect('gestion_institucional_admin')
 
-# ------------- Páginas de Asesoría Pedagógica ------------
+# --- VISTA COORDINADORA DE INCLUSIÓN ---
+logger = logging.getLogger(__name__)
 
 @login_required
-def dashboard_asesor(request):
-    return dashboard_coordinadora(request)
-
-@login_required
-def casos_asesor(request):
-    return redirect('dashboard_coordinadora')
-
-@login_required
-def detalle_caso_asesor(request, solicitud_id):
-    return redirect('dashboard_coordinadora')
-
-@login_required
-def panel_control_asesor(request):
-    return redirect('dashboard_coordinadora')
-
-
-@login_required
-def asignar_caso_asesor(request, solicitud_id):
-    # ... (tu código original) ...
+def dashboard_coordinadora(request):
+    """
+    Dashboard principal para la Coordinadora de Inclusión.
+    Muestra KPIs y la lista de citas para el día de hoy.
+    """
+    
+    # 1. --- Verificación de Permisos ---
     try:
-        if request.user.perfil.rol.nombre_rol != ROL_ASESOR:
-            messages.error(request, 'No tienes permisos para realizar esta acción.')
-            return redirect('panel_control_asesor')
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_COORDINADORA:
+            # Si no es coordinadora, redirige a home
+            messages.error(request, 'No tienes permisos para acceder a este panel.')
+            return redirect('home')
+    except AttributeError:
+        # Si el usuario no tiene perfil o rol
+        logger.warning(f"Usuario {request.user.email} sin perfil/rol intentó acceder al dashboard de coordinadora.")
+        return redirect('home')
+
+    # 2. --- Configuración de Fechas ---
+    now = timezone.localtime(timezone.now())
+    today = now.date()
+    start_of_today = timezone.make_aware(datetime.combine(today, datetime.min.time()))
+    end_of_today = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+    
+    # Cálculo de la semana (Lunes a Domingo)
+    start_of_week = today - timedelta(days=today.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
+    start_of_week_dt = timezone.make_aware(datetime.combine(start_of_week, datetime.min.time()))
+    end_of_week_dt = timezone.make_aware(datetime.combine(end_of_week, datetime.max.time()))
+
+    # 3. --- Obtener Datos para KPIs ---
+    
+    # Base de entrevistas para todas las coordinadoras (filtramos por rol)
+    # Como todas las coordinadoras deben ver todas las entrevistas del rol
+    todas_las_coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
+    entrevistas_coordinadora = Entrevistas.objects.filter(
+        coordinadora__in=todas_las_coordinadoras
+    ).exclude(coordinadora__isnull=True)
+    
+    # KPI 1: Citas del día (Query que usaremos también para la lista)
+    citas_hoy_qs = entrevistas_coordinadora.filter(
+        fecha_entrevista__range=(start_of_today, end_of_today)
+    ).select_related(
+        'solicitudes', 
+        'solicitudes__estudiantes', 
+        'solicitudes__estudiantes__carreras'
+    ).order_by('fecha_entrevista')
+    
+    kpi_citas_hoy = citas_hoy_qs.count()
+
+    # KPI 2: Citas canceladas (Historial total de esta coordinadora)
+    kpi_citas_canceladas = entrevistas_coordinadora.filter(
+        estado='cancelada'
+    ).count()
+
+    # KPI 3: Solicitudes pendientes de entrevista
+    # Contamos las entrevistas 'pendientes' de esta coordinadora
+    # que correspondan a solicitudes 'pendientes_entrevista'
+    kpi_solicitudes_pendientes = entrevistas_coordinadora.filter(
+        estado='pendiente',
+        solicitudes__estado='pendiente_entrevista'
+    ).count()
+    
+    # KPI 4: Citas de la semana
+    kpi_citas_semana = entrevistas_coordinadora.filter(
+        fecha_entrevista__range=(start_of_week_dt, end_of_week_dt),
+        estado__in=['pendiente', 'realizada'] # Contamos solo las programadas o hechas
+    ).count()
+
+    # 4. --- Preparar Contexto ---
+    context = {
+        'nombre_usuario': request.user.first_name,
+        'kpis': {
+            'citas_hoy': kpi_citas_hoy,
+            'citas_canceladas': kpi_citas_canceladas,
+            'solicitudes_pendientes': kpi_solicitudes_pendientes,
+            'citas_semana': kpi_citas_semana,
+        },
+        'citas_del_dia_list': citas_hoy_qs, # Esta es la lista para la sección principal
+    }
+
+    # 5. --- Renderizar Template ---
+    return render(request, 'SIAPE/dashboard_coordinadora.html', context)
+
+@login_required
+def detalle_casos_coordinadora(request, solicitud_id):
+    """
+    Muestra el detalle de un caso específico.
+    Accesible por todos los roles de asesoría.
+    """
+    
+    # 1. --- Verificación de Permisos (Ampliado) ---
+    try:
+        perfil = request.user.perfil
+        ROLES_PERMITIDOS = [
+            ROL_COORDINADORA,
+            ROL_ASESORA_TECNICA,
+            ROL_ASESOR,
+            ROL_DIRECTOR,
+            ROL_ADMIN
+        ]
+        if perfil.rol.nombre_rol not in ROLES_PERMITIDOS:
+            messages.error(request, 'No tienes permisos para ver esta página.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+
+    # 2. --- Obtener Datos del Caso ---
+    solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
+    estudiante = solicitud.estudiantes
+    
+    # Obtenemos todos los ajustes asignados
+    ajustes = AjusteAsignado.objects.filter(solicitudes=solicitud).select_related(
+        'ajuste_razonable', 
+        'ajuste_razonable__categorias_ajustes'
+    )
+    
+    # Obtenemos todas las evidencias
+    evidencias = Evidencias.objects.filter(solicitudes=solicitud)
+    
+    # Obtenemos TODAS las entrevistas relacionadas con esta solicitud
+    entrevistas = Entrevistas.objects.filter(solicitudes=solicitud).order_by('-fecha_entrevista')
+    
+    # Obtenemos las categorías para el modal (si queremos añadir ajustes)
+    categorias_ajustes = CategoriasAjustes.objects.all().order_by('nombre_categoria')
+
+    context = {
+        'solicitud': solicitud,
+        'estudiante': estudiante,
+        'ajustes_asignados': ajustes,
+        'evidencias': evidencias,
+        'entrevistas_list': entrevistas,
+        'categorias_ajustes': categorias_ajustes, # Para el modal
+    }
+    
+    return render(request, 'SIAPE/detalle_casos_coordinadora.html', context)
+
+@require_POST # Solo permite esta vista vía POST
+@login_required
+def actualizar_descripcion_caso(request, solicitud_id):
+    """
+    Vista de acción para actualizar la descripción principal (el "caso")
+    de una solicitud.
+    """
+    # 1. --- Verificación de Permisos (Ampliado) ---
+    try:
+        perfil = request.user.perfil
+        ROLES_PERMITIDOS = [
+            ROL_COORDINADORA,
+            ROL_ASESORA_TECNICA,
+            ROL_ASESOR,
+            ROL_ADMIN
+        ]
+        if perfil.rol.nombre_rol not in ROLES_PERMITIDOS:
+            messages.error(request, 'No tienes permisos para esta acción.')
+            return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+
+    # 2. --- Actualizar la Descripción ---
+    solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
+    nueva_descripcion = request.POST.get('descripcion_caso')
+    
+    if nueva_descripcion is not None:
+        solicitud.descripcion = nueva_descripcion
+        solicitud.save()
+        messages.success(request, 'Descripción del caso actualizada correctamente.')
+    else:
+        messages.error(request, 'No se recibió la descripción.')
+        
+    # 3. --- Redirigir de vuelta a la página de detalle ---
+    return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+
+@login_required
+def panel_control_coordinadora(request):
+    """
+    Panel de control para la Coordinadora de Inclusión.
+    Muestra citas (hoy, semana), calendario interactivo y acciones de cita.
+    """
+    try:
+        if request.user.perfil.rol.nombre_rol != ROL_COORDINADORA:
+            messages.error(request, 'No tienes permisos para acceder a este panel.')
+            return redirect('home')
     except AttributeError:
         return redirect('home')
-    if request.method == 'POST':
-        solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
-        perfil_asesor = request.user.perfil
-        if solicitud.asesor_pedagogico_asignado is None:
-            solicitud.asesor_pedagogico_asignado = perfil_asesor
-            solicitud.save()
-            messages.success(request, f'Caso asignado correctamente: {solicitud.asunto}')
-        else:
-            messages.warning(request, 'Este caso ya está asignado a otro asesor.')
-    return redirect('panel_control_asesor')
+    
+    perfil_coordinadora = request.user.perfil
+    
+    # 1. --- Definición de Fechas ---
+    now = timezone.localtime(timezone.now())
+    today = now.date()
+    start_of_today = timezone.make_aware(datetime.combine(today, datetime.min.time()))
+    end_of_today = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+    
+    start_of_week = today - timedelta(days=today.weekday()) # Lunes
+    end_of_week = start_of_week + timedelta(days=6) # Domingo
+    start_of_week_dt = timezone.make_aware(datetime.combine(start_of_week, datetime.min.time()))
+    end_of_week_dt = timezone.make_aware(datetime.combine(end_of_week, datetime.max.time()))
 
+    # 2. --- Obtener Citas para Todas las Coordinadoras (Rol Completo) ---
+    
+    # Verificar que el perfil de la coordinadora existe
+    if not perfil_coordinadora:
+        messages.error(request, 'Error: No se pudo obtener el perfil de la coordinadora.')
+        return redirect('home')
+    
+    # Base de entrevistas para todas las coordinadoras del rol
+    # Todas las coordinadoras deben ver todas las entrevistas agendadas del rol
+    todas_las_coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
+    entrevistas_coordinadora = Entrevistas.objects.filter(
+        coordinadora__in=todas_las_coordinadoras
+    ).exclude(coordinadora__isnull=True).select_related('solicitudes', 'solicitudes__estudiantes')
+
+    # A. Citas del Día
+    citas_hoy_list = entrevistas_coordinadora.filter(
+        fecha_entrevista__range=(start_of_today, end_of_today)
+    ).order_by('fecha_entrevista')
+
+    # B. Citas de la Semana (Próximas de esta semana)
+    citas_semana_list = entrevistas_coordinadora.filter(
+        fecha_entrevista__range=(now, end_of_week_dt),
+        estado='pendiente'
+    ).order_by('fecha_entrevista')
+
+    # C. Citas Pendientes de Confirmar (para la sección de "asistencia")
+    citas_pendientes_confirmar = entrevistas_coordinadora.filter(
+        estado='pendiente',
+        fecha_entrevista__lt=now # Citas que ya pasaron
+    ).order_by('fecha_entrevista')
+
+    # D. Historial de Citas Pasadas (de la semana actual)
+    citas_pasadas_semana = entrevistas_coordinadora.filter(
+        fecha_entrevista__lt=now, # Citas pasadas
+        fecha_entrevista__gte=start_of_week_dt, # Pero dentro de esta semana
+        estado__in=['realizada', 'no_asistio']
+    ).order_by('-fecha_entrevista')
+    
+    # 3. --- Obtener Datos para el Calendario (de TODAS las coordinadoras) ---
+    todas_las_coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
+    todas_las_entrevistas = Entrevistas.objects.filter(
+        coordinadora__in=todas_las_coordinadoras
+    ).select_related('solicitudes', 'solicitudes__estudiantes', 'coordinadora').order_by('fecha_entrevista')
+    
+    fechas_con_citas = set()
+    citas_data = []
+    
+    for entrevista in todas_las_entrevistas:
+        fecha_str = timezone.localtime(entrevista.fecha_entrevista).strftime('%Y-%m-%d')
+        hora_str = timezone.localtime(entrevista.fecha_entrevista).strftime('%H:%M')
+        fechas_con_citas.add(fecha_str)
+        
+        citas_data.append({
+            'fecha': fecha_str,
+            'hora': hora_str,
+            'estudiante': f"{entrevista.solicitudes.estudiantes.nombres} {entrevista.solicitudes.estudiantes.apellidos}",
+            'asunto': entrevista.solicitudes.asunto,
+            'estado': entrevista.get_estado_display(),
+            'estado_key': entrevista.estado,
+        })
+    
+    fechas_citas_json = json.dumps(list(fechas_con_citas))
+    citas_data_json = json.dumps(citas_data)
+    
+    # 4. --- Datos para Modales ---
+    categorias_ajustes = CategoriasAjustes.objects.all().order_by('nombre_categoria')
+    
+    context = {
+        'citas_hoy_list': citas_hoy_list,
+        'citas_semana_list': citas_semana_list,
+        'fechas_citas_json': fechas_citas_json,
+        'citas_data_json': citas_data_json,
+        'citas_pendientes_confirmar': citas_pendientes_confirmar,
+        'citas_pasadas_semana_list': citas_pasadas_semana,
+        'categorias_ajustes': categorias_ajustes,
+        
+        # Necesitaremos estos datos que antes estaban en esta vista pero
+        # que ahora no estamos consultando. Los dejamos vacíos por ahora
+        # para no romper los modales.
+        'casos_disponibles': Solicitudes.objects.none(),
+        'casos_con_ajustes': [],
+        'proximas_citas': [], # Reemplazado por citas_semana_list
+        'citas_realizadas': [], # Reemplazado por citas_pasadas_semana_list
+        'citas_no_asistio': [], # Reemplazado por citas_pasadas_semana_list
+    }
+    
+    return render(request, 'SIAPE/panel_control_coordinadora.html', context)
 
 @login_required
-def agendar_cita_asesor(request):
-    # ... (tu código original) ...
+def confirmar_cita_coordinadora(request, entrevista_id):
+    """
+    Permite a la Coordinadora confirmar la asistencia (realizada o no asistió) 
+    de una entrevista que ella gestiona.
+    """
+    # 1. Verificar Permiso
     try:
-        if request.user.perfil.rol.nombre_rol != ROL_ASESOR:
+        if request.user.perfil.rol.nombre_rol != ROL_COORDINADORA:
             messages.error(request, 'No tienes permisos para realizar esta acción.')
-            return redirect('panel_control_asesor')
+            return redirect('panel_control_coordinadora')
     except AttributeError:
         return redirect('home')
-    if request.method == 'POST':
-        solicitud_id = request.POST.get('solicitud_id')
-        fecha_entrevista_str = request.POST.get('fecha_entrevista')
-        modalidad = request.POST.get('modalidad')
-        notas = request.POST.get('notas', '')
-        try:
-            solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
-            perfil_asesor = request.user.perfil
-            fecha_entrevista = datetime.strptime(fecha_entrevista_str, '%Y-%m-%dT%H:%M')
-            fecha_entrevista = timezone.make_aware(fecha_entrevista)
-            Entrevistas.objects.create(
-                solicitudes=solicitud, coordinadora=perfil_asesor,
-                fecha_entrevista=fecha_entrevista, modalidad=modalidad, notas=notas
-            )
-            messages.success(request, 'Cita agendada correctamente.')
-        except Exception as e:
-            messages.error(request, f'Error al agendar la cita: {str(e)}')
-    return redirect('panel_control_asesor')
 
-
-@login_required
-def registrar_ajuste_razonable(request):
-    # ... (tu código original) ...
-    try:
-        if request.user.perfil.rol.nombre_rol != ROL_ASESOR:
-            messages.error(request, 'No tienes permisos para realizar esta acción.')
-            return redirect('panel_control_asesor')
-    except AttributeError:
-        return redirect('home')
-    if request.method == 'POST':
-        solicitud_id = request.POST.get('solicitud_id')
-        descripcion = request.POST.get('descripcion')
-        categoria_id = request.POST.get('categoria_id')
-        nueva_categoria = request.POST.get('nueva_categoria', '').strip()
-        reasignar = request.POST.get('reasignar', 'false') == 'true'
-        try:
-            solicitud = get_object_or_404(Solicitudes, id=solicitud_id, asesor_pedagogico_asignado=request.user.perfil)
-            if nueva_categoria:
-                categoria = CategoriasAjustes.objects.create(nombre_categoria=nueva_categoria)
-            elif categoria_id:
-                categoria = get_object_or_404(CategoriasAjustes, id=categoria_id)
-            else:
-                messages.error(request, 'Debe seleccionar una categoría o crear una nueva.')
-                return redirect('panel_control_asesor')
-            if reasignar: pass
-            ajuste_razonable = AjusteRazonable.objects.create(descripcion=descripcion, categorias_ajustes=categoria)
-            AjusteAsignado.objects.create(ajuste_razonable=ajuste_razonable, solicitudes=solicitud)
-            if reasignar:
-                messages.success(request, 'Ajuste razonable reasignado correctamente.')
-            else:
-                messages.success(request, 'Ajuste razonable registrado y asignado correctamente.')
-        except Exception as e:
-            messages.error(request, f'Error al registrar el ajuste: {str(e)}')
-    return redirect('panel_control_asesor')
-
-
-@login_required
-def rechazar_solicitud_asesor(request, solicitud_id):
-    # ... (tu código original) ...
-    try:
-        if request.user.perfil.rol.nombre_rol != ROL_ASESOR:
-            messages.error(request, 'No tienes permisos para realizar esta acción.')
-            return redirect('panel_control_asesor')
-    except AttributeError:
-        return redirect('home')
-    if request.method == 'POST':
-        motivo_rechazo = request.POST.get('motivo_rechazo', '').strip()
-        try:
-            solicitud = get_object_or_404(Solicitudes, id=solicitud_id, asesor_pedagogico_asignado=request.user.perfil)
-            if solicitud.estado != 'en_proceso':
-                messages.warning(request, 'Solo se pueden rechazar solicitudes en proceso.')
-                return redirect('panel_control_asesor')
-            solicitud.estado = 'rechazado'
-            solicitud.save()
-            if motivo_rechazo:
-                messages.success(request, f'Solicitud rechazada. Motivo: {motivo_rechazo}')
-            else:
-                messages.success(request, 'Solicitud rechazada correctamente.')
-        except Exception as e:
-            messages.error(request, f'Error al rechazar la solicitud: {str(e)}')
-    return redirect('panel_control_asesor')
-
-
-@login_required
-def aprobar_solicitud_asesor(request, solicitud_id):
-    # ... (tu código original) ...
-    try:
-        if request.user.perfil.rol.nombre_rol != ROL_ASESOR:
-            messages.error(request, 'No tienes permisos para realizar esta acción.')
-            return redirect('panel_control_asesor')
-    except AttributeError:
-        return redirect('home')
-    if request.method == 'POST':
-        try:
-            solicitud = get_object_or_404(Solicitudes, id=solicitud_id, asesor_pedagogico_asignado=request.user.perfil)
-            if solicitud.estado != 'en_proceso':
-                messages.warning(request, 'Solo se pueden aprobar solicitudes en proceso.')
-                return redirect('panel_control_asesor')
-            tiene_ajuste = AjusteAsignado.objects.filter(solicitudes=solicitud).exists()
-            if not tiene_ajuste:
-                messages.error(request, 'No se puede aprobar la solicitud. Debe asignar al menos un ajuste razonable antes de aprobar.')
-                return redirect('panel_control_asesor')
-            solicitud.estado = 'aprobado'
-            solicitud.save()
-            messages.success(request, 'Solicitud aprobada correctamente.')
-        except Exception as e:
-            messages.error(request, f'Error al aprobar la solicitud: {str(e)}')
-    return redirect('panel_control_asesor')
-
-
-@login_required
-def confirmar_cita_asesor(request, entrevista_id):
-    # ... (tu código original) ...
-    try:
-        if request.user.perfil.rol.nombre_rol != ROL_ASESOR:
-            messages.error(request, 'No tienes permisos para realizar esta acción.')
-            return redirect('panel_control_asesor')
-    except AttributeError:
-        return redirect('home')
+    # 2. Lógica de la Acción
     if request.method == 'POST':
         accion = request.POST.get('accion')
         notas_adicionales = request.POST.get('notas_adicionales', '')
         try:
-            entrevista = get_object_or_404(Entrevistas, id=entrevista_id, asesor_pedagogico=request.user.perfil)
+            # Cualquier coordinadora del rol puede confirmar cualquier entrevista del rol
+            todas_las_coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
+            entrevista = get_object_or_404(Entrevistas, id=entrevista_id, coordinadora__in=todas_las_coordinadoras)
+            
             if accion in ['realizada', 'no_asistio']:
                 entrevista.estado = accion
                 if notas_adicionales:
@@ -794,105 +1104,99 @@ def confirmar_cita_asesor(request, entrevista_id):
                     else:
                         entrevista.notas = f"[Confirmación - {timezone.now().strftime('%d/%m/%Y %H:%M')}]: {notas_adicionales}"
                 entrevista.save()
+                
                 if accion == 'realizada':
                     messages.success(request, 'Cita marcada como realizada.')
                 else:
-                    messages.info(request, 'Cita marcada como no asistió. Puedes reagendarla desde el panel.')
+                    messages.info(request, 'Cita marcada como no asistió. Puedes reagendarla.')
             else:
                 messages.error(request, 'Acción no válida.')
         except Exception as e:
             messages.error(request, f'Error al confirmar la cita: {str(e)}')
-    return redirect('panel_control_asesor')
+            
+    # 3. Redirigir siempre al panel de control
+    return redirect('panel_control_coordinadora')
 
 
 @login_required
-def editar_notas_cita(request, entrevista_id):
+def editar_notas_cita_coordinadora(request, entrevista_id):
+    """
+    Permite a la Coordinadora editar las notas de una cita que ella gestiona.
+    """
+    # 1. Verificar Permiso
     try:
-        if request.user.perfil.rol.nombre_rol != ROL_ASESOR:
+        if request.user.perfil.rol.nombre_rol != ROL_COORDINADORA:
             messages.error(request, 'No tienes permisos para realizar esta acción.')
-            return redirect('panel_control_asesor')
+            return redirect('panel_control_coordinadora')
     except AttributeError:
         return redirect('home')
+
+    # 2. Lógica de la Acción
     if request.method == 'POST':
         nuevas_notas = request.POST.get('notas', '')
         try:
-            entrevista = get_object_or_404(Entrevistas, id=entrevista_id, asesor_pedagogico=request.user.perfil)
+            # Cualquier coordinadora del rol puede editar notas de cualquier entrevista del rol
+            todas_las_coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
+            entrevista = get_object_or_404(Entrevistas, id=entrevista_id, coordinadora__in=todas_las_coordinadoras)
             entrevista.notas = nuevas_notas
             entrevista.save()
             messages.success(request, 'Notas actualizadas correctamente.')
         except Exception as e:
             messages.error(request, f'Error al actualizar las notas: {str(e)}')
-    return redirect('panel_control_asesor')
+            
+    # 3. Redirigir
+    return redirect('panel_control_coordinadora')
 
 
 @login_required
-def reagendar_cita_asesor(request, entrevista_id):
+def reagendar_cita_coordinadora(request, entrevista_id):
+    """
+    Permite a la Coordinadora reagendar una cita (usualmente una que 'no asistió').
+    Crea una nueva entrevista y actualiza la antigua.
+    """
+    # 1. Verificar Permiso
     try:
-        if request.user.perfil.rol.nombre_rol != ROL_ASESOR:
+        if request.user.perfil.rol.nombre_rol != ROL_COORDINADORA:
             messages.error(request, 'No tienes permisos para realizar esta acción.')
-            return redirect('panel_control_asesor')
+            return redirect('panel_control_coordinadora')
     except AttributeError:
         return redirect('home')
+
+    # 2. Lógica de la Acción
     if request.method == 'POST':
         nueva_fecha_str = request.POST.get('nueva_fecha_entrevista')
         nueva_modalidad = request.POST.get('nueva_modalidad', '')
         notas_reagendamiento = request.POST.get('notas_reagendamiento', '')
         try:
-            entrevista_original = get_object_or_404(Entrevistas, id=entrevista_id, asesor_pedagogico=request.user.perfil)
+            # Cualquier coordinadora del rol puede reagendar cualquier entrevista del rol
+            todas_las_coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
+            entrevista_original = get_object_or_404(Entrevistas, id=entrevista_id, coordinadora__in=todas_las_coordinadoras)
+            
             nueva_fecha = datetime.strptime(nueva_fecha_str, '%Y-%m-%dT%H:%M')
             nueva_fecha = timezone.make_aware(nueva_fecha)
+            
+            # Crear la nueva cita (mantenemos la misma coordinadora asignada originalmente)
             nueva_entrevista = Entrevistas.objects.create(
-                solicitudes=entrevista_original.solicitudes, asesor_pedagogico=entrevista_original.asesor_pedagogico,
-                fecha_entrevista=nueva_fecha, modalidad=nueva_modalidad or entrevista_original.modalidad,
+                solicitudes=entrevista_original.solicitudes, 
+                coordinadora=entrevista_original.coordinadora, # Mantiene la coordinadora original
+                fecha_entrevista=nueva_fecha, 
+                modalidad=nueva_modalidad or entrevista_original.modalidad,
                 notas=f"Reagendada desde cita del {entrevista_original.fecha_entrevista.strftime('%d/%m/%Y %H:%M')}. {notas_reagendamiento}" if notas_reagendamiento else f"Reagendada desde cita del {entrevista_original.fecha_entrevista.strftime('%d/%m/%Y %H:%M')}.",
-                estado='pendiente'
+                estado='pendiente' # La nueva cita está pendiente
             )
+            
+            # Actualizar la cita original a 'no asistió' si estaba 'pendiente'
             if entrevista_original.estado == 'pendiente':
-                entrevista_original.estado = 'no_asistio'
-                entrevista_original.save()
+                entrevista_original.estado = 'no_asistio' 
+            # Si ya era 'no_asistio', se mantiene así.
+            entrevista_original.save()
+            
             messages.success(request, 'Cita reagendada correctamente.')
         except Exception as e:
             messages.error(request, f'Error al reagendar la cita: {str(e)}')
-    return redirect('panel_control_asesor')
-
-
-@login_required
-def dashboard_coordinadora(request):
-    try:
-        if request.user.perfil.rol.nombre_rol != ROL_COORDINADORA:
-            return redirect('home')
-    except AttributeError:
-        return redirect('home')
-    total_solicitudes = Solicitudes.objects.count()
-    casos_resueltos = Solicitudes.objects.filter(estado='aprobado', ajusteasignado__isnull=False).distinct().count()
-    casos_en_proceso = Solicitudes.objects.filter(estado='en_proceso').count()
-    hoy = timezone.now().date()
-    inicio_semana = hoy - timedelta(days=hoy.weekday())
-    fin_semana = inicio_semana + timedelta(days=6)
-    inicio_semana_dt = timezone.make_aware(datetime.combine(inicio_semana, datetime.min.time()))
-    fin_semana_dt = timezone.make_aware(datetime.combine(fin_semana, datetime.max.time()))
-    perfil_coordinadora = request.user.perfil
-    citas_semana = Entrevistas.objects.filter(coordinadora=perfil_coordinadora, fecha_entrevista__gte=inicio_semana_dt, fecha_entrevista__lte=fin_semana_dt).count()
-    categorias_con_estadisticas = []
-    categorias = CategoriasAjustes.objects.filter(ajusterazonable__ajusteasignado__isnull=False).distinct().annotate(
-        total_aprobados=Count('ajusterazonable__ajusteasignado__solicitudes', filter=Q(ajusterazonable__ajusteasignado__solicitudes__estado='aprobado'), distinct=True),
-        total_pendientes=Count('ajusterazonable__ajusteasignado__solicitudes', filter=Q(ajusterazonable__ajusteasignado__solicitudes__estado='en_proceso'), distinct=True),
-        total_rechazados=Count('ajusterazonable__ajusteasignado__solicitudes', filter=Q(ajusterazonable__ajusteasignado__solicitudes__estado='rechazado'), distinct=True)
-    )
-    total_general = Solicitudes.objects.filter(ajusteasignado__isnull=False).distinct().count()
-    for categoria in categorias:
-        total_categoria = categoria.total_aprobados + categoria.total_pendientes + categoria.total_rechazados
-        porcentaje = (total_categoria / total_general * 100) if total_general > 0 else 0
-        categorias_con_estadisticas.append({
-            'categoria': categoria, 'aprobados': categoria.total_aprobados, 'pendientes': categoria.total_pendientes,
-            'rechazados': categoria.total_rechazados, 'total': total_categoria, 'porcentaje': round(porcentaje, 1)
-        })
-    categorias_con_estadisticas.sort(key=lambda x: x['total'], reverse=True)
-    context = {
-        'nombre_usuario': request.user.first_name, 'total_solicitudes': total_solicitudes, 'casos_resueltos': casos_resueltos,
-        'casos_en_proceso': casos_en_proceso, 'citas_semana': citas_semana, 'distribucion_apoyos': categorias_con_estadisticas,
-    }
-    return render(request, 'SIAPE/dashboard_coordinadora.html', context)
+            
+    # 3. Redirigir
+    return redirect('panel_control_coordinadora')
 
 # --- VISTA DIRECTOR DE CARRERA ---
 @login_required
@@ -986,19 +1290,3 @@ class PerfilUsuarioViewSet(viewsets.ModelViewSet):
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
-@login_required
-def casos_coordinadora(request):
-    # Mostrar solo solicitudes asignadas a la coordinadora logueada
-    if hasattr(request.user, 'perfil'):
-        perfil = request.user.perfil
-        solicitudes = Solicitudes.objects.filter(coordinadora_asignada=perfil).select_related('estudiantes').order_by('-created_at')
-    else:
-        solicitudes = Solicitudes.objects.none()
-    context = {'solicitudes': solicitudes, 'total_casos': solicitudes.count()}
-    return render(request, 'SIAPE/casos_coordinadora.html', context)
-
-@login_required
-def panel_control_coordinadora(request):
-    # Similar a panel_control_asesor pero para coordinadora
-    # Puedes personalizar la lógica según lo que deba ver la coordinadora
-    return render(request, 'SIAPE/panel_control_coordinadora.html')

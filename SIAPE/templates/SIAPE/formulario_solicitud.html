@@ -81,7 +81,7 @@
             <!-- === SECCIÓN DE AGENDAMIENTO (NUEVA CON CALENDARIO) === -->
             <div class="form-group">
                 <label>Agendamiento de Entrevista</label>
-                <p style="font-size: 0.9em; color: #555; margin-top: -10px;">
+                <p class="form-hint">
                     Por favor, selecciona un día y hora para tu entrevista con la Coordinadora de Inclusión.
                     (Horario de Lunes a Viernes, de 9:00 a 18:00).
                 </p>
@@ -93,8 +93,9 @@
                     <div class="cal-widget">
                         <div class="detalle-card" id="card-calendario-panel">
                             <div class="calendario-header" id="cal-header">
-                                Cargando mes...
+                                <!-- El mes se inserta aquí por JS -->
                             </div>
+                            <!-- Navegación movida encima de la grilla -->
                             <div class="cal-nav">
                                 <button type="button" id="cal-prev" class="btn-accion btn-accion-gray btn-accion-small"><i class="fas fa-chevron-left"></i> Ant</button>
                                 <button type="button" id="cal-today" class="btn-accion btn-accion-gray btn-accion-small">Hoy</button>
@@ -112,10 +113,14 @@
 
                     <!-- Columna 2: El Selector de Hora -->
                     <div class="cal-citas-list">
-                        <h4 id="cal-citas-titulo">2. Horarios disponibles</h4>
+                        <h4 id="cal-citas-titulo">Horarios Disponibles</h4>
                         <div id="cal-citas-dia">
-                            <div id="horario-loader" style="font-size: 0.9em; margin-top: 5px;"></div>
-                            <div class="horarios-botones" id="horarios-botones"></div>
+                            <!-- El contenido se inserta aquí por JS -->
+                            <div class="empty-state empty-state-10">
+                                <i class="fas fa-calendar-day empty-state-icon"></i>
+                                <p class="empty-state-text">Seleccione un día del calendario para ver los horarios disponibles.</p>
+                            </div>
+                            <div class="horarios-botones horarios-botones-hidden" id="horarios-botones"></div>
                             <input type="hidden" id="hora_cita" name="hora_cita" required>
                         </div>
                     </div>
@@ -123,7 +128,17 @@
                 
                 <!-- Input oculto para enviar la fecha seleccionada -->
                 <input type="hidden" id="fecha_cita" name="fecha_cita">
-            </div>
+                </div>
+                
+                <div class="form-group form-group-spacing">
+                    <label for="modalidad">Modalidad de la Cita <span>*</span></label>
+                    <select id="modalidad" name="modalidad" required>
+                        <option value="">-- Selecciona la modalidad --</option>
+                        <option value="Presencial">Presencial</option>
+                        <option value="Virtual">Virtual</option>
+                        <option value="Híbrida">Híbrida (Mixta)</option>
+                    </select>
+                </div>
             <!-- === FIN SECCIÓN DE AGENDAMIENTO === -->
 
 
@@ -167,49 +182,14 @@
 
     <!-- El script se queda aquí, al final del bloque de contenido -->
     <script>
-        // --- LÓGICA DEL FORMULARIO (Sección 1) ---
-        const form = document.getElementById('solicitud-form');
-        const mensajeDiv = document.getElementById('mensaje');
-        const submitButton = document.getElementById('submit-button');
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-        
-        // --- Lógica de Drag & Drop (se mantiene) ---
-        const dropZone = document.getElementById('drop-zone');
-        const fileInput = document.getElementById('documentos_adjuntos');
-        const fileList = document.getElementById('file-list');
-        let droppedFiles = [];
-        dropZone.addEventListener('click', () => fileInput.click());
-        fileInput.addEventListener('change', () => {
-            droppedFiles = Array.from(fileInput.files);
-            updateFileList();
-        });
-        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
-        dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('dragover');
-            droppedFiles = Array.from(e.dataTransfer.files);
-            updateFileList();
-        });
-        function updateFileList() {
-            fileList.innerHTML = '';
-            if (droppedFiles.length > 0) {
-                fileList.innerHTML = '<strong>Archivos seleccionados:</strong>';
-                droppedFiles.forEach(file => {
-                    const fileItem = document.createElement('div');
-                    fileItem.textContent = file.name;
-                    fileList.appendChild(fileItem);
-                });
-            }
-        }
-
-        // --- LÓGICA DEL CALENDARIO (Sección 2) ---
+        // --- LÓGICA DEL CALENDARIO (Sección 1) - Se ejecuta primero ---
         
         // Variables globales del calendario
         let navDate = new Date();
         const hoy = new Date();
-        const hoyStr = hoy.toISOString().split('T')[0]; // "YYYY-MM-DD"
-        let diaSeleccionadoEl = null; 
+        const hoyStr = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+        let diaSeleccionado = null; 
+        let diaSeleccionadoStr = null;
         let calendarioData = {}; // Guardará la data de la API
 
         // Elementos del DOM del calendario
@@ -218,12 +198,18 @@
         const btnPrev = document.getElementById('cal-prev');
         const btnNext = document.getElementById('cal-next');
         const btnToday = document.getElementById('cal-today');
-        
-        // Elementos del DOM del selector de hora
-        const horaSelect = document.getElementById('hora_cita');
-        const horaLabel = document.getElementById('hora_label');
-        const horarioLoader = document.getElementById('horario-loader');
+        const citasDiaContainer = document.getElementById('cal-citas-dia');
+        const citasDiaTitulo = document.getElementById('cal-citas-titulo');
+        const horariosBotones = document.getElementById('horarios-botones');
         const fechaHiddenInput = document.getElementById('fecha_cita');
+        
+        // Verificar que los elementos esenciales del calendario existan
+        const calendarioDisponible = calHeader && calGridBody && btnPrev && btnNext && btnToday && 
+            citasDiaContainer && citasDiaTitulo && horariosBotones && fechaHiddenInput;
+        
+        if (!calendarioDisponible) {
+            console.warn('Advertencia: No se encontraron todos los elementos del calendario. El calendario no se inicializará.');
+        }
 
         const meses = [
             "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -232,76 +218,277 @@
 
         // 1. Función para buscar datos del mes
         async function fetchCalendarioDelMes(year, month) {
+            if (!calendarioDisponible) return;
+            
             calHeader.innerText = `Cargando ${meses[month]} ${year}...`;
-            calGridBody.innerHTML = ''; // Limpiar
             
             try {
                 const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
-                // Usamos la URL que definimos en urls.py
                 const response = await fetch(`/api/calendario-disponible/?month=${monthStr}`);
                 
                 if (!response.ok) throw new Error('Error de red');
                 
                 calendarioData = await response.json();
-                renderCalendar(year, month); // Llama a renderizar con los nuevos datos
+                renderCalendar(year, month);
 
             } catch (error) {
                 console.error('Error fetching calendario:', error);
-                calHeader.innerText = "Error al cargar calendario";
+                if (calHeader) calHeader.innerText = "Error al cargar calendario";
+            }
+        }
+
+        // 2. Función para mostrar los horarios de un día
+        function mostrarHorariosDelDia(fechaStr, diaEl) {
+            console.log('=== mostrarHorariosDelDia llamada ===');
+            console.log('fechaStr:', fechaStr);
+            console.log('diaEl:', diaEl);
+            console.log('calendarioDisponible:', calendarioDisponible);
+            console.log('horariosBotones:', horariosBotones);
+            console.log('calendarioData:', calendarioData);
+            
+            if (!calendarioDisponible) {
+                console.warn('No se puede mostrar horarios: calendario no disponible');
+                return;
+            }
+            
+            // Verificar que horariosBotones exista
+            if (!horariosBotones) {
+                console.error('No se puede mostrar horarios: elemento horariosBotones no encontrado');
+                return;
+            }
+            
+            // calendarioData puede estar vacío inicialmente, pero aún así podemos mostrar los botones
+            // (todos aparecerán como no disponibles si no hay datos)
+            
+            // Actualizar título
+            const [year, month, day] = fechaStr.split('-');
+            citasDiaTitulo.innerText = `Horarios para ${day}/${month}/${year}`;
+
+            // Resaltar día seleccionado
+            if (diaSeleccionado) {
+                diaSeleccionado.classList.remove('cal-day-selected');
+            }
+            
+            if(diaEl) {
+                diaEl.classList.add('cal-day-selected');
+                diaSeleccionado = diaEl;
+                diaSeleccionadoStr = fechaStr;
+            } else {
+                diaSeleccionado = calGridBody.querySelector(`[data-fecha="${fechaStr}"]`);
+                if (diaSeleccionado) {
+                    diaSeleccionado.classList.add('cal-day-selected');
+                }
+            }
+
+            // Guardar fecha en el input oculto
+            if (fechaHiddenInput) {
+                fechaHiddenInput.value = fechaStr;
+            }
+            const horaCitaInput = document.getElementById('hora_cita');
+            if (horaCitaInput) {
+                horaCitaInput.value = '';
+            }
+
+            // Obtener los slots disponibles y no disponibles del calendario
+            // Si no hay datos para este día, usar arrays vacíos (todos los horarios aparecerán como no disponibles)
+            const slotsDisponibles = (calendarioData && calendarioData.slotsDetallados && calendarioData.slotsDetallados[fechaStr]) ? calendarioData.slotsDetallados[fechaStr] : [];
+            const slotsNoDisponibles = (calendarioData && calendarioData.slotsNoDisponibles && calendarioData.slotsNoDisponibles[fechaStr]) ? calendarioData.slotsNoDisponibles[fechaStr] : [];
+            
+            // Debug: Log para verificar los datos recibidos
+            console.log('Fecha:', fechaStr);
+            console.log('Slots disponibles:', slotsDisponibles);
+            console.log('Slots no disponibles:', slotsNoDisponibles);
+            console.log('CalendarioData completo:', calendarioData);
+            
+            // Limpiar contenido previo - remover todos los empty-state
+            const existingEmptyStates = citasDiaContainer.querySelectorAll('.empty-state');
+            console.log('Empty states encontrados:', existingEmptyStates.length);
+            existingEmptyStates.forEach(el => {
+                console.log('Removiendo empty-state:', el);
+                el.remove();
+            });
+            
+            // Verificar que horariosBotones esté en el DOM, si no, agregarlo
+            if (!horariosBotones.parentElement) {
+                console.warn('horariosBotones no está en el DOM, agregándolo...');
+                citasDiaContainer.appendChild(horariosBotones);
+            }
+            
+            // Limpiar botones previos
+            console.log('Limpiando botones previos. Botones actuales:', horariosBotones.children.length);
+            horariosBotones.innerHTML = '';
+            console.log('Botones limpiados');
+            console.log('horariosBotones parent después de verificar:', horariosBotones.parentElement);
+
+            // Generar todos los slots de 9:00 a 17:00
+            const allSlots = [];
+            for (let h = 9; h <= 17; h++) {
+                allSlots.push(`${h.toString().padStart(2, '0')}:00`);
+            }
+
+            // Mostrar botones siempre, incluso si no hay disponibles
+            console.log('Antes de remover clase hidden. Clases actuales:', horariosBotones.className);
+            horariosBotones.classList.remove('horarios-botones-hidden');
+            console.log('Después de remover clase hidden. Clases actuales:', horariosBotones.className);
+            horariosBotones.style.display = 'flex';
+            console.log('Display establecido a flex');
+            
+            console.log('Creando botones de horarios para fecha:', fechaStr);
+            console.log('horariosBotones encontrado:', horariosBotones);
+            console.log('horariosBotones parent:', horariosBotones.parentElement);
+
+            // Crear botones para cada horario
+            for (const slot of allSlots) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'btn-horario';
+                const horaInicio = parseInt(slot.split(':')[0]);
+                const horaFin = horaInicio + 1;
+                btn.textContent = `${slot} - ${horaFin.toString().padStart(2, '0')}:00`;
+                btn.dataset.hora = slot;
+
+                // Verificar si el slot está disponible o no
+                // Un slot está disponible SOLO si está en slotsDisponibles Y NO está en slotsNoDisponibles
+                const estaDisponible = slotsDisponibles.includes(slot);
+                const estaNoDisponible = slotsNoDisponibles.includes(slot);
+
+                // Lógica mejorada: un slot solo está disponible si:
+                // 1. Está explícitamente en la lista de disponibles
+                // 2. Y NO está en la lista de no disponibles
+                // Si está en ambas listas, priorizamos "no disponible" (más seguro)
+                if (estaNoDisponible) {
+                    // Si está en la lista de no disponibles, definitivamente no está disponible
+                    btn.disabled = true;
+                    btn.classList.add('no-disponible');
+                    btn.title = 'Hora no disponible (ya tomada o fuera de horario)';
+                    console.log(`Slot ${slot} marcado como NO disponible (está en slotsNoDisponibles)`);
+                } else if (estaDisponible) {
+                    // Si está en la lista de disponibles y no en no disponibles, está disponible
+                    btn.disabled = false;
+                    btn.classList.remove('no-disponible');
+                    btn.addEventListener('click', function() {
+                        horariosBotones.querySelectorAll('.btn-horario').forEach(b => b.classList.remove('selected'));
+                        btn.classList.add('selected');
+                        const horaCitaInput = document.getElementById('hora_cita');
+                        if (horaCitaInput) {
+                            horaCitaInput.value = slot;
+                        }
+                        const mensajeDiv = document.getElementById('mensaje');
+                        if (mensajeDiv) mensajeDiv.style.display = 'none';
+                    });
+                    console.log(`Slot ${slot} marcado como disponible`);
+                } else {
+                    // Si no está en ninguna lista, por defecto no está disponible (más seguro)
+                    btn.disabled = true;
+                    btn.classList.add('no-disponible');
+                    btn.title = 'Hora no disponible';
+                    console.log(`Slot ${slot} marcado como NO disponible (no está en ninguna lista)`);
+                }
+                horariosBotones.appendChild(btn);
+            }
+            
+            console.log('Total de botones creados:', horariosBotones.children.length);
+            console.log('horariosBotones display:', window.getComputedStyle(horariosBotones).display);
+            console.log('horariosBotones visibility:', window.getComputedStyle(horariosBotones).visibility);
+            console.log('horariosBotones offsetHeight:', horariosBotones.offsetHeight);
+            console.log('horariosBotones offsetWidth:', horariosBotones.offsetWidth);
+            
+            // Asegurar que los botones sean visibles
+            horariosBotones.style.display = 'flex';
+            horariosBotones.style.visibility = 'visible';
+            horariosBotones.style.opacity = '1';
+            
+            // Si no hay slots disponibles, mostrar mensaje adicional DESPUÉS de los botones
+            if (slotsDisponibles.length === 0) {
+                // Insertar el mensaje después del contenedor de botones, no antes
+                horariosBotones.insertAdjacentHTML('afterend', `
+                    <div class="empty-state empty-state-10 empty-state-error" style="margin-top: 15px;">
+                        <i class="fas fa-calendar-times empty-state-error-icon"></i>
+                        <p class="empty-state-error-text">No hay horarios disponibles para este día. Todos los horarios están ocupados.</p>
+                    </div>
+                `);
             }
         }
         
-        // 2. Función para renderizar el calendario (ADAPTADA)
+        // 3. Función principal para renderizar el calendario
         function renderCalendar(year, month) {
+            if (!calendarioDisponible) return;
+            
             calHeader.innerText = `${meses[month]} ${year}`;
+            
+            // Limpiamos la grilla e inyectamos los encabezados
             calGridBody.innerHTML = `
-                <div class="cal-day-header">L</div> <div class="cal-day-header">M</div>
-                <div class="cal-day-header">X</div> <div class="cal-day-header">J</div>
-                <div class="cal-day-header">V</div> <div class="cal-day-header">S</div>
+                <div class="cal-day-header">L</div>
+                <div class="cal-day-header">M</div>
+                <div class="cal-day-header">X</div>
+                <div class="cal-day-header">J</div>
+                <div class="cal-day-header">V</div>
+                <div class="cal-day-header">S</div>
                 <div class="cal-day-header">D</div>
             `;
+            
             const primerDiaDelMes = new Date(year, month, 1);
             const ultimoDiaDelMes = new Date(year, month + 1, 0);
             const ultimoDiaNum = ultimoDiaDelMes.getDate();
-            let diaInicioSemana = (primerDiaDelMes.getDay() + 6) % 7; // Lunes=0
+            let diaInicioSemana = (primerDiaDelMes.getDay() + 6) % 7;
             const ultimoDiaMesAnterior = new Date(year, month, 0).getDate();
-            // Días mes anterior
+
+            // Días del mes anterior
             for (let i = diaInicioSemana; i > 0; i--) {
+                const dia = ultimoDiaMesAnterior - i + 1;
                 const dayDiv = document.createElement('div');
                 dayDiv.classList.add('cal-day', 'other-month');
-                dayDiv.innerText = ultimoDiaMesAnterior - i + 1;
+                dayDiv.innerText = dia;
                 calGridBody.appendChild(dayDiv);
             }
-            // Días mes actual (todos seleccionables, como en panel asesor)
+
+            // Días del mes actual
             for (let dia = 1; dia <= ultimoDiaNum; dia++) {
                 const dayDiv = document.createElement('div');
                 dayDiv.classList.add('cal-day');
                 dayDiv.innerText = dia;
+
                 const fechaStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
                 dayDiv.dataset.fecha = fechaStr;
-                // Resaltar día actual (azul)
+
+                const fechaDate = new Date(year, month, dia);
+                const diaSemana = fechaDate.getDay(); // 0 = Domingo, 6 = Sábado
+                const esFinDeSemana = diaSemana === 0 || diaSemana === 6;
+                const hoyDate = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+                const esDiaPasado = fechaDate < hoyDate;
+                const esSeleccionable = !esFinDeSemana && !esDiaPasado;
+
                 if (fechaStr === hoyStr) {
                     dayDiv.classList.add('day-today');
                 }
-                // Resaltar día seleccionado (rojo)
-                if (diaSeleccionadoEl && diaSeleccionadoEl.dataset.fecha === fechaStr) {
-                    dayDiv.classList.add('cal-day-selected');
-                }
-                // Colorear según disponibilidad
-                if (calendarioData.fechasConDisponibilidad?.includes(fechaStr)) {
-                    dayDiv.classList.add('day-disponible');
-                } else if (calendarioData.diasCompletos?.includes(fechaStr)) {
-                    dayDiv.classList.add('day-lleno');
-                }
-                // Permitir seleccionar cualquier día del mes actual (no días pasados)
-                if (fechaStr >= hoyStr) {
-                    dayDiv.addEventListener('click', () => seleccionarDia(dayDiv, fechaStr));
-                } else {
+
+                // Colorear según disponibilidad (solo días hábiles)
+                if (esSeleccionable) {
+                    if (calendarioData.fechasConDisponibilidad?.includes(fechaStr)) {
+                        dayDiv.classList.add('day-disponible');
+                    } else if (calendarioData.diasCompletos?.includes(fechaStr)) {
+                        dayDiv.classList.add('day-lleno');
+                    }
+                } else if (esFinDeSemana) {
+                    // Fines de semana no disponibles
+                    dayDiv.classList.add('day-inabil');
+                } else if (esDiaPasado) {
+                    // Días pasados no disponibles
                     dayDiv.classList.add('day-inabil');
                 }
+
+                // Solo permitir seleccionar días hábiles futuros o hoy
+                if (esSeleccionable) {
+                    dayDiv.addEventListener('click', () => {
+                        console.log('Click en día:', fechaStr);
+                        mostrarHorariosDelDia(fechaStr, dayDiv);
+                    });
+                }
+                
                 calGridBody.appendChild(dayDiv);
             }
-            // Días mes siguiente
+
+            // Días del mes siguiente
             const totalDiasGrid = calGridBody.children.length;
             const diasSiguientes = (7 - (totalDiasGrid % 7)) % 7;
             for (let i = 1; i <= diasSiguientes; i++) {
@@ -310,171 +497,234 @@
                 dayDiv.innerText = i;
                 calGridBody.appendChild(dayDiv);
             }
-        }
-
-        // 3. Función para manejar el clic en un día
-        function seleccionarDia(dayEl, fechaStr) {
-            // Resaltar día seleccionado (rojo) y día actual (azul)
-            if (diaSeleccionadoEl) {
-                diaSeleccionadoEl.classList.remove('cal-day-selected');
-            }
-            dayEl.classList.add('cal-day-selected');
-            diaSeleccionadoEl = dayEl;
-            // Guardar fecha en el input oculto
-            fechaHiddenInput.value = fechaStr;
-            // Limpiar selección previa de hora
-            document.getElementById('hora_cita').value = '';
-            // Mostrar horarios como botones (igual que panel de control)
-            const horariosBotones = document.getElementById('horarios-botones');
-            horariosBotones.innerHTML = '';
-            const slotsDisponibles = calendarioData.slotsDetallados?.[fechaStr] || [];
-            const slotsNoDisponibles = calendarioData.slotsNoDisponibles?.[fechaStr] || [];
-            const allSlots = [];
-            for (let h = 9; h <= 17; h++) {
-                const hora = `${h.toString().padStart(2, '0')}:00`;
-                allSlots.push(hora);
-            }
-            let hayDisponibles = false;
-            let selectedHora = document.getElementById('hora_cita').value;
-            for (const slot of allSlots) {
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'btn-horario';
-                btn.textContent = `${slot} - ${parseInt(slot.split(':')[0]) + 1}:00`;
-                btn.dataset.hora = slot;
-                // Si está en slotsDisponibles: habilitado
-                if (slotsDisponibles.includes(slot)) {
-                    btn.disabled = false;
-                    hayDisponibles = true;
-                    btn.addEventListener('click', function() {
-                        horariosBotones.querySelectorAll('.btn-horario').forEach(b => b.classList.remove('selected'));
-                        btn.classList.add('selected');
-                        document.getElementById('hora_cita').value = slot;
-                        mensajeDiv.style.display = 'none';
-                    });
-                    if (selectedHora === slot) {
-                        btn.classList.add('selected');
-                    }
+            
+            // Al re-renderizar, si un día estaba seleccionado, lo volvemos a mostrar
+            if (diaSeleccionadoStr && calendarioData && calendarioData.slotsDetallados) {
+                const [selYear, selMonth] = diaSeleccionadoStr.split('-');
+                if (parseInt(selYear) === year && parseInt(selMonth) === (month + 1)) {
+                    // Intentar mostrar los horarios del día seleccionado
+                    // La función mostrarHorariosDelDia manejará el caso si no hay datos para ese día
+                    mostrarHorariosDelDia(diaSeleccionadoStr, null);
                 } else {
-                    // Si está en slotsNoDisponibles: mostrar como no disponible (por cita tomada)
-                    btn.disabled = true;
-                    btn.classList.add('no-disponible');
-                    if (slotsNoDisponibles.includes(slot)) {
-                        btn.title = 'Hora no disponible (ya tomada o fuera de horario)';
-                    } else {
-                        btn.title = 'Hora no disponible';
+                    // El día seleccionado no está en el mes actual, limpiar selección
+                    diaSeleccionado = null;
+                    diaSeleccionadoStr = null;
+                    if (citasDiaTitulo) citasDiaTitulo.innerText = `Horarios Disponibles`;
+                    if (citasDiaContainer) {
+                        citasDiaContainer.innerHTML = `
+                            <div class="empty-state empty-state-10">
+                                <i class="fas fa-calendar-day empty-state-icon"></i>
+                                <p class="empty-state-text">Seleccione un día del calendario para ver los horarios disponibles.</p>
+                            </div>
+                        `;
                     }
+                    if (horariosBotones) {
+                        horariosBotones.classList.add('horarios-botones-hidden');
+                        horariosBotones.style.display = 'none';
+                    }
+                    const horaCitaInput = document.getElementById('hora_cita');
+                    if (horaCitaInput) horaCitaInput.value = '';
+                    if (fechaHiddenInput) fechaHiddenInput.value = '';
                 }
-                horariosBotones.appendChild(btn);
-            }
-            if (!hayDisponibles) {
-                document.getElementById('horario-loader').innerHTML = '<strong style="color: #fd7e14;">No hay horas disponibles para este día.</strong>';
             } else {
-                document.getElementById('horario-loader').innerHTML = '';
+                // No hay día seleccionado o no hay datos del calendario
+                if (citasDiaTitulo) citasDiaTitulo.innerText = `Horarios Disponibles`;
+                if (citasDiaContainer) {
+                    citasDiaContainer.innerHTML = `
+                        <div class="empty-state empty-state-10">
+                            <i class="fas fa-calendar-day empty-state-icon"></i>
+                            <p class="empty-state-text">Seleccione un día del calendario para ver los horarios disponibles.</p>
+                        </div>
+                    `;
+                }
+                if (horariosBotones) {
+                    horariosBotones.classList.add('horarios-botones-hidden');
+                    horariosBotones.style.display = 'none';
+                }
             }
         }
 
-        // 4. Listeners de navegación del calendario
-        btnPrev.addEventListener('click', () => {
-            navDate.setMonth(navDate.getMonth() - 1);
-            fetchCalendarioDelMes(navDate.getFullYear(), navDate.getMonth());
-        });
-        btnNext.addEventListener('click', () => {
-            navDate.setMonth(navDate.getMonth() + 1);
-            fetchCalendarioDelMes(navDate.getFullYear(), navDate.getMonth());
-        });
-        btnToday.addEventListener('click', () => {
-            navDate = new Date();
-            fetchCalendarioDelMes(navDate.getFullYear(), navDate.getMonth());
-        });
-
-        // 5. Carga inicial del calendario
-        fetchCalendarioDelMes(navDate.getFullYear(), navDate.getMonth());
-
-
-        // --- LÓGICA DE ENVÍO (Sección 3) ---
-        form.addEventListener('submit', async function(e) {
-            // Validar que se haya seleccionado una hora
-            const horaCitaInput = document.getElementById('hora_cita');
-            if (!horaCitaInput.value) {
-                mensajeDiv.className = 'error';
-                mensajeDiv.innerHTML = '<strong>Error de Validación:</strong><ul><li><strong>HORA_CITA:</strong> Debe seleccionar un horario disponible.</li></ul>';
-                mensajeDiv.style.display = 'block';
-                e.preventDefault();
-                return;
-            }
-
-            e.preventDefault();
-
-            submitButton.disabled = true;
-            submitButton.innerText = "Enviando Solicitud, espere...";
-            mensajeDiv.style.display = 'none';
-
-            const formData = new FormData(form);
-
-            // --- Lógica para archivos ---
-            formData.delete('documentos_adjuntos'); 
-            for (const file of droppedFiles) {
-                formData.append('documentos_adjuntos', file);
-            }
-
-            try {
-                const response = await fetch('/SIAPE/solicitud-publica/', {
-                    method: 'POST',
-                    body: formData,
-                    headers: { 'X-CSRFToken': csrfToken }
+        // 4. Event Listeners para navegación (solo si el calendario está disponible)
+        if (calendarioDisponible) {
+            if (btnPrev) {
+                btnPrev.addEventListener('click', () => {
+                    navDate.setMonth(navDate.getMonth() - 1);
+                    fetchCalendarioDelMes(navDate.getFullYear(), navDate.getMonth());
                 });
+            }
 
-                const data = await response.json();
+            if (btnNext) {
+                btnNext.addEventListener('click', () => {
+                    navDate.setMonth(navDate.getMonth() + 1);
+                    fetchCalendarioDelMes(navDate.getFullYear(), navDate.getMonth());
+                });
+            }
 
-                if (response.ok) { 
-                    mensajeDiv.className = 'exito';
-                    mensajeDiv.innerHTML = `<strong>¡Solicitud enviada con éxito!</strong> El proceso ha iniciado. Tu <strong>ID de seguimiento de caso es: ${data.solicitud_id}</strong>.`;
-                    mensajeDiv.style.display = 'block';
-                    form.reset(); 
-                    droppedFiles = [];
+            if (btnToday) {
+                btnToday.addEventListener('click', () => {
+                    navDate = new Date();
+                    fetchCalendarioDelMes(navDate.getFullYear(), navDate.getMonth());
+                });
+            }
+
+            // 5. Carga inicial del calendario
+            fetchCalendarioDelMes(navDate.getFullYear(), navDate.getMonth());
+        }
+
+        // --- LÓGICA DEL FORMULARIO (Sección 2) ---
+        const form = document.getElementById('solicitud-form');
+        const mensajeDiv = document.getElementById('mensaje');
+        const submitButton = document.getElementById('submit-button');
+        const csrfTokenElement = document.querySelector('[name=csrfmiddlewaretoken]');
+        
+        if (!form || !mensajeDiv || !submitButton || !csrfTokenElement) {
+            console.error('Error: No se encontraron elementos esenciales del formulario');
+        } else {
+            const csrfToken = csrfTokenElement.value;
+            
+            // --- Lógica de Drag & Drop ---
+            const dropZone = document.getElementById('drop-zone');
+            const fileInput = document.getElementById('documentos_adjuntos');
+            const fileList = document.getElementById('file-list');
+            let droppedFiles = [];
+            
+            if (dropZone && fileInput) {
+                dropZone.addEventListener('click', () => fileInput.click());
+                fileInput.addEventListener('change', () => {
+                    droppedFiles = Array.from(fileInput.files);
                     updateFileList();
+                });
+                dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+                dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
+                dropZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('dragover');
+                    droppedFiles = Array.from(e.dataTransfer.files);
+                    updateFileList();
+                });
+            }
+            
+            function updateFileList() {
+                if (fileList) {
+                    fileList.innerHTML = '';
+                    if (droppedFiles.length > 0) {
+                        fileList.innerHTML = '<strong>Archivos seleccionados:</strong>';
+                        droppedFiles.forEach(file => {
+                            const fileItem = document.createElement('div');
+                            fileItem.textContent = file.name;
+                            fileList.appendChild(fileItem);
+                        });
+                    }
+                }
+            }
 
-                    // Resetear calendario
-                    fechaHiddenInput.value = '';
-                    horaCitaInput.value = '';
-                    if (diaSeleccionadoEl) diaSeleccionadoEl.classList.remove('cal-day-selected');
-                    document.getElementById('horarios-botones').innerHTML = '';
-                    // Recargar el mes actual
-                    fetchCalendarioDelMes(new Date().getFullYear(), new Date().getMonth());
-
-                } else {
-                    // Error de validación (HTTP 400)
+            // --- LÓGICA DE ENVÍO ---
+            form.addEventListener('submit', async function(e) {
+                // Validar que se haya seleccionado una hora
+                const horaCitaInput = document.getElementById('hora_cita');
+                if (!horaCitaInput || !horaCitaInput.value) {
                     mensajeDiv.className = 'error';
-                    let errores = "<strong>Error de Validación:</strong><ul>";
-
-                    // Manejo del error de "hora tomada" (race condition)
-                    if (data.non_field_errors) {
-                         errores += `<li><strong>HORA:</strong> ${data.non_field_errors[0]}</li>`;
-                         // Refrescar el mes, porque la data está desactualizada
-                         fetchCalendarioDelMes(navDate.getFullYear(), navDate.getMonth());
-                         horaCitaInput.value = '';
-                    }
-
-                    for (const [campo, mensajes] of Object.entries(data)) {
-                        if (campo !== 'non_field_errors') {
-                           errores += `<li><strong>${campo.toUpperCase()}:</strong> ${mensajes[0]}</li>`;
-                        }
-                    }
-                    errores += "</ul>";
-                    mensajeDiv.innerHTML = errores;
+                    mensajeDiv.innerHTML = '<strong>Error de Validación:</strong><ul><li><strong>HORA_CITA:</strong> Debe seleccionar un horario disponible.</li></ul>';
                     mensajeDiv.style.display = 'block';
+                    e.preventDefault();
+                    return;
                 }
 
-            } catch (error) {
-                mensajeDiv.className = 'error';
-                mensajeDiv.innerText = 'Error de conexión con el servidor. Inténtalo de nuevo.';
-                mensajeDiv.style.display = 'block';
-                console.error('Error:', error);
-            }
+                e.preventDefault();
 
-            submitButton.disabled = false;
-            submitButton.innerText = "Enviar Solicitud y Agendar";
-        });
+                submitButton.disabled = true;
+                submitButton.innerText = "Enviando Solicitud, espere...";
+                mensajeDiv.style.display = 'none';
+
+                const formData = new FormData(form);
+
+                // --- Lógica para archivos ---
+                formData.delete('documentos_adjuntos'); 
+                for (const file of droppedFiles) {
+                    formData.append('documentos_adjuntos', file);
+                }
+
+                try {
+                    const response = await fetch('/SIAPE/solicitud-publica/', {
+                        method: 'POST',
+                        body: formData,
+                        headers: { 'X-CSRFToken': csrfToken }
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) { 
+                        mensajeDiv.className = 'exito';
+                        mensajeDiv.innerHTML = `<strong>¡Solicitud enviada con éxito!</strong> El proceso ha iniciado. Tu <strong>ID de seguimiento de caso es: ${data.solicitud_id}</strong>.`;
+                        mensajeDiv.style.display = 'block';
+                        form.reset();
+                        // Resetear el checkbox de autorización manualmente si existe
+                        const autorizacionCheckbox = document.getElementById('autorizacion_datos');
+                        if (autorizacionCheckbox) {
+                            autorizacionCheckbox.checked = false;
+                        }
+                        droppedFiles = [];
+                        updateFileList();
+
+                        // Resetear calendario
+                        if (fechaHiddenInput) fechaHiddenInput.value = '';
+                        if (horaCitaInput) horaCitaInput.value = '';
+                        diaSeleccionado = null;
+                        diaSeleccionadoStr = null;
+                        if (citasDiaTitulo) citasDiaTitulo.innerText = `Horarios Disponibles`;
+                        if (citasDiaContainer) {
+                            citasDiaContainer.innerHTML = `
+                                <div class="empty-state empty-state-10">
+                                    <i class="fas fa-calendar-day empty-state-icon"></i>
+                                    <p class="empty-state-text">Seleccione un día del calendario para ver los horarios disponibles.</p>
+                                </div>
+                            `;
+                        }
+                        if (horariosBotones) {
+                            horariosBotones.classList.add('horarios-botones-hidden');
+                            horariosBotones.style.display = 'none';
+                        }
+                        // Recargar el mes actual
+                        if (calendarioDisponible) {
+                            navDate = new Date();
+                            fetchCalendarioDelMes(navDate.getFullYear(), navDate.getMonth());
+                        }
+
+                    } else {
+                        // Error de validación (HTTP 400)
+                        mensajeDiv.className = 'error';
+                        let errores = "<strong>Error de Validación:</strong><ul>";
+
+                        // Manejo del error de "hora tomada" (race condition)
+                        if (data.non_field_errors) {
+                             errores += `<li><strong>HORA:</strong> ${data.non_field_errors[0]}</li>`;
+                             // Refrescar el mes, porque la data está desactualizada
+                             if (calendarioDisponible) {
+                                 fetchCalendarioDelMes(navDate.getFullYear(), navDate.getMonth());
+                             }
+                             if (horaCitaInput) horaCitaInput.value = '';
+                        }
+
+                        for (const [campo, mensajes] of Object.entries(data)) {
+                            if (campo !== 'non_field_errors') {
+                               errores += `<li><strong>${campo.toUpperCase()}:</strong> ${mensajes[0]}</li>`;
+                            }
+                        }
+                        errores += "</ul>";
+                        mensajeDiv.innerHTML = errores;
+                        mensajeDiv.style.display = 'block';
+                    }
+
+                } catch (error) {
+                    mensajeDiv.className = 'error';
+                    mensajeDiv.innerText = 'Error de conexión con el servidor. Inténtalo de nuevo.';
+                    mensajeDiv.style.display = 'block';
+                    console.error('Error:', error);
+                }
+
+                submitButton.disabled = false;
+                submitButton.innerText = "Enviar Solicitud y Agendar";
+            });
+        }
     </script>
 {% endblock %}

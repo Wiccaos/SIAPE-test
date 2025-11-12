@@ -98,24 +98,28 @@
             
             // --- Lógica de Modo Oscuro ---
             const darkModeToggle = document.getElementById('dark-mode-toggle');
-            const currentTheme = localStorage.getItem('theme');
+            
+            // Solo ejecutar si el elemento existe (no todas las páginas tienen el toggle)
+            if (darkModeToggle) {
+                const currentTheme = localStorage.getItem('theme');
 
-            // Aplicar tema al cargar la página
-            if (currentTheme === 'dark') {
-                body.classList.add('dark-mode');
-                darkModeToggle.checked = true;
-            }
-
-            // Listener para el botón
-            darkModeToggle.addEventListener('change', () => {
-                if (darkModeToggle.checked) {
+                // Aplicar tema al cargar la página
+                if (currentTheme === 'dark') {
                     body.classList.add('dark-mode');
-                    localStorage.setItem('theme', 'dark');
-                } else {
-                    body.classList.remove('dark-mode');
-                    localStorage.setItem('theme', 'light');
+                    darkModeToggle.checked = true;
                 }
-            });
+
+                // Listener para el botón
+                darkModeToggle.addEventListener('change', () => {
+                    if (darkModeToggle.checked) {
+                        body.classList.add('dark-mode');
+                        localStorage.setItem('theme', 'dark');
+                    } else {
+                        body.classList.remove('dark-mode');
+                        localStorage.setItem('theme', 'light');
+                    }
+                });
+            }
 
             // --- Lógica de Accesibilidad ---
             const accessibilityToggle = document.getElementById('btn-accesibilidad');

@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block title %}
-    Panel Principal - Coordinadora | SIAPE
+    Panel Coordinadora | SIAPE
 {% endblock %}
 
 {% block extra_head %}
@@ -11,12 +11,13 @@
 
 {% block content %}
 <div class="main-content"> 
+    
     <nav class="dashboard-nav">
         <a href="{% url 'dashboard_coordinadora' %}" class="nav-item active">
             <i class="fas fa-home"></i>
             Panel Principal
         </a>
-        <a href="{% url 'casos_coordinadora' %}" class="nav-item">
+        <a href="{% url 'casos_generales' %}" class="nav-item">
             <i class="fas fa-folder-open"></i>
             Casos
         </a>
@@ -28,115 +29,96 @@
 
     <section class="kpi-container">
         <div class="kpi-card">
+            <div class="kpi-icon icon-citas">
+                <i class="fas fa-calendar-day"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ kpis.citas_hoy|default:0 }}</span>
+                <span class="kpi-label">Citas del Día</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
             <div class="kpi-icon icon-solicitudes">
                 <i class="fas fa-file-alt"></i>
             </div>
             <div class="kpi-info">
-                <span class="kpi-value">{{ total_solicitudes|default:0 }}</span>
-                <span class="kpi-label">Total Solicitudes</span>
-                </div>
-        </div>
-
-        <div class="kpi-card">
-            <div class="kpi-icon icon-resueltos">
-                <i class="fas fa-check-circle"></i>
+                <span class="kpi-value">{{ kpis.solicitudes_pendientes|default:0 }}</span>
+                <span class="kpi-label">Solicitudes Pendientes</span>
             </div>
-            <div class="kpi-info">
-                <span class="kpi-value">{{ casos_resueltos|default:0 }}</span>
-                <span class="kpi-label">Casos resueltos</span>
-                </div>
         </div>
 
         <div class="kpi-card">
             <div class="kpi-icon icon-proceso">
-                <i class="fas fa-clock"></i>
+                <i class="fas fa-calendar-week"></i>
             </div>
             <div class="kpi-info">
-                <span class="kpi-value">{{ casos_en_proceso|default:0 }}</span>
-                <span class="kpi-label">En Proceso</span>
-                </div>
+                <span class="kpi-value">{{ kpis.citas_semana|default:0 }}</span>
+                <span class="kpi-label">Citas de la Semana</span>
+            </div>
         </div>
+
         <div class="kpi-card">
-            <div class="kpi-icon icon-citas">
-                <i class="fas fa-calendar-check"></i>
+            <div class="kpi-icon kpi-icon-danger">
+                <i class="fas fa-calendar-times"></i>
             </div>
             <div class="kpi-info">
-                <span class="kpi-value">{{ citas_semana|default:0 }}</span>
-                <span class="kpi-label">Citas esta semana</span>
-                </div>
+                <span class="kpi-value">{{ kpis.citas_canceladas|default:0 }}</span>
+                <span class="kpi-label">Citas Canceladas (Hist.)</span>
+            </div>
         </div>
     </section>
 
     <section class="support-grid-container">
-        <h2>Citas del día</h2>
-        {% if citas_hoy %}
-            <table class="custom-table">
-                <head>
-                    <tr>
-                        <th>Hora</th>
-                        <th>Estudiante</th>
-                        <th>Asunto</th>
-                        <th>Modalidad</th>
-                    </tr>
-                </head>
-                <body>
-                    {% for cita in citas_hoy %}
-                    <tr>
-                        <td>{{ cita.fecha_entrevista|date:"H:i" }}</td>
-                        <td>{{ cita.solicitudes.estudiantes.nombres }} {{ cita.solicitudes.estudiantes.apellidos }}</td>
-                        <td>{{ cita.solicitudes.asunto }}</td>
-                        <td>{{ cita.modalidad|default:'No definida' }}</td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="4">No hay citas agendadas para hoy.</td>
-                    </tr>
+        <h2><i class="fas fa-calendar-day"></i> Citas Programadas para Hoy</h2>
+
+        {% if citas_del_dia_list %}
+            <div class="panel-control-container">
+                <div class="panel-section panel-section-no-shadow">
+                    {% for cita in citas_del_dia_list %}
+                        <div class="caso-item">
+                            <div class="caso-header">
+                                <div>
+                                    <span class="cita-fecha cita-fecha-large">
+                                        <i class="fas fa-clock"></i> {{ cita.fecha_entrevista|date:"H:i" }} hrs
+                                    </span>
+                                    <div class="caso-estudiante">{{ cita.solicitudes.estudiantes.nombres }} {{ cita.solicitudes.estudiantes.apellidos }}</div>
+                                    <div class="caso-asunto caso-asunto-small">
+                                        RUT: {{ cita.solicitudes.estudiantes.rut }} | Carrera: {{ cita.solicitudes.estudiantes.carreras.nombre }}
+                                    </div>
+                                </div>
+                                <div>
+                                    <span class="status status-en_proceso">{{ cita.get_estado_display }}</span>
+                                </div>
+                            </div>
+                            
+                            <hr class="border-top-light mt-15">
+                            
+                            <h4 class="section-title-small">Asunto de Solicitud (Estudiante):</h4>
+                            <p class="section-content">{{ cita.solicitudes.asunto }}</p>
+                            
+                            <h4 class="section-title-small">Tus Notas de Entrevista:</h4>
+                            {% if cita.notas %}
+                                <pre class="pre-formatted">{{ cita.notas }}</pre>
+                            {% else %}
+                                <p class="text-italic-muted">Aún no hay notas para esta entrevista.</p>
+                            {% endif %}
+
+                            <div class="acciones-casos acciones-casos-flex">
+                                <a href="{% url 'detalle_casos_coordinadora' cita.solicitudes.id %}" class="btn-accion btn-agendar">
+                                    <i class="fas fa-edit"></i> Ver/Editar Caso Completo
+                                </a>
+                            </div>
+                        </div>
                     {% endfor %}
-                </body>
-            </table>
-        {% else %}
-            <div class="empty-state">
-                <i class="fas fa-calendar-times"></i>
-                <p>No hay citas agendadas para hoy.</p>
-            </div>
-        {% endif %}
-    </section>
-
-    <section class="support-grid-container">
-        <h2>Distribución de apoyo personalizado</h2>
-
-        {% if distribucion_apoyos %}
-            {% for item in distribucion_apoyos %}
-                <div class="support-row">
-                    <div class="support-title">
-                        {{ item.categoria.nombre_categoria }}
-                    </div>
-                    <div class="support-stats">
-                        <div class="stat-box approved">
-                            <strong>{{ item.aprobados }}</strong>
-                            <span>aprobados</span>
-                        </div>
-                        <div class="stat-box pending">
-                            <strong>{{ item.pendientes }}</strong>
-                            <span>Pendientes</span>
-                        </div>
-                        <div class="stat-box rejected">
-                            <strong>{{ item.rechazados }}</strong>
-                            <span>Rechazados</span>
-                        </div>
-                    </div>
-                    <div class="support-total">
-                        {{ item.total }} casos ({{ item.porcentaje }}%)
-                    </div>
                 </div>
-            {% endfor %}
+            </div>
         {% else %}
             <div class="empty-state">
-                <i class="fas fa-inbox"></i>
-                <p>No hay datos de distribución de apoyos disponibles</p>
+                <i class="fas fa-calendar-check empty-state-large"></i>
+                <p class="empty-state-text-large">No hay citas agendadas para hoy.</p>
             </div>
         {% endif %}
-
     </section>
 
 </div>

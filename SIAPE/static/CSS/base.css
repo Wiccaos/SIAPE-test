@@ -14,9 +14,7 @@ body {
     margin: 0;
 }
 
-/* --- ¡ESTA ES LA REGLA CLAVE! ---
-  Forzamos a los elementos de formulario a HEREDAR la fuente del 'body'
-*/
+
 input,
 button,
 select,

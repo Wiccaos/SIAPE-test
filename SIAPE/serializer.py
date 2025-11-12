@@ -4,10 +4,10 @@ from .models import (
     Carreras, Estudiantes, Solicitudes, Evidencias, Asignaturas, 
     AsignaturasEnCurso, Entrevistas, AjusteRazonable, AjusteAsignado
 )
-from datetime import datetime, time
+from datetime import datetime, timedelta, time
 from django.utils import timezone
 
-ROL_COORDINADORA = 'Coordinadora de Apoyos'
+ROL_COORDINADORA = 'Coordinadora de Inclusión'
 
 class UsuarioSerializer(serializers.ModelSerializer):
     # --- Lectura y Escritura ---
@@ -307,7 +307,7 @@ class EntrevistasSerializer(serializers.ModelSerializer):
     # --- Campos de ESCRITURA (Write-only) ---
     solicitudes = serializers.PrimaryKeyRelatedField(queryset=Solicitudes.objects.all(), write_only=True, label="Solicitud")
     coordinadora = serializers.PrimaryKeyRelatedField(
-        queryset=PerfilUsuario.objects.filter(rol__nombre_rol='Coordinadora de Inclusión'),
+        queryset=PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA),
         write_only=True,
         label="Coordinadora de Inclusión"
     )
@@ -432,8 +432,9 @@ class PublicaSolicitudSerializer(serializers.Serializer):
     
     # --- Campos NUEVOS para la Cita (no van al modelo Solicitud) ---
     fecha_cita = serializers.DateField(write_only=True)
-    hora_cita = serializers.CharField(write_only=True) # Recibirá "HH:MM"
-    
+    hora_cita = serializers.CharField(write_only=True)
+    modalidad = serializers.CharField(write_only=True, max_length=100)
+
     # --- Campos para las relaciones (Evidencias) ---
     documentos_adjuntos = serializers.ListField(
         child=serializers.FileField(),
@@ -468,15 +469,24 @@ class PublicaSolicitudSerializer(serializers.Serializer):
             raise serializers.ValidationError("Formato de hora inválido.")
 
         # 1. Combinar fecha y hora en un datetime consciente de la zona horaria
-        fecha_hora_cita = timezone.make_aware(datetime.combine(fecha, hora_obj))
+        # Normalizar la hora a hora en punto (minutos y segundos en 0)
+        hora_normalizada = hora_obj.replace(minute=0, second=0, microsecond=0)
+        fecha_hora_cita = timezone.make_aware(datetime.combine(fecha, hora_normalizada))
 
         # 2. Re-validar que la hora no esté tomada
+        # Usar rango de fechas para evitar problemas con zonas horarias
+        # Buscar citas en el mismo día y hora (normalizada)
+        inicio_slot = fecha_hora_cita
+        fin_slot = fecha_hora_cita + timedelta(hours=1)
+        
         coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
         
+        # Buscar citas que se solapen con este slot (mismo día y hora)
         cita_tomada = Entrevistas.objects.filter(
             coordinadora__in=coordinadoras,
-            fecha_entrevista=fecha_hora_cita
-        ).exists()
+            fecha_entrevista__gte=inicio_slot,
+            fecha_entrevista__lt=fin_slot
+        ).exclude(coordinadora__isnull=True).exists()
 
         if cita_tomada:
             raise serializers.ValidationError(
@@ -488,7 +498,7 @@ class PublicaSolicitudSerializer(serializers.Serializer):
         return data
 
     def create(self, validated_data):
-        """ Crea Estudiante, Solicitud y la Entrevista inicial. """
+        """ Crea Estudiante, Solicitud y la Entrevista inicial, asignando coordinadora. """
 
         # 1. Datos del Estudiante
         datos_estudiante = {
@@ -497,51 +507,69 @@ class PublicaSolicitudSerializer(serializers.Serializer):
             'email': validated_data['email'],
             'numero': validated_data.get('numero'),
             'carreras': validated_data['carrera_id']
+            
         }
+
+        # 2. Buscar coordinadora disponible para el horario seleccionado
+        fecha_hora_cita = validated_data['fecha_entrevista_completa']
+        coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
         
-        # 2. Datos de la Solicitud (simplificada)
+        # Buscar una coordinadora que no tenga una cita en ese horario
+        coordinadora_asignada = None
+        for coord in coordinadoras:
+            tiene_cita = Entrevistas.objects.filter(
+                coordinadora=coord,
+                fecha_entrevista=fecha_hora_cita
+            ).exists()
+            if not tiene_cita:
+                coordinadora_asignada = coord
+                break
+        
+        # Si ninguna coordinadora está disponible, usar la primera (fallback)
+        if not coordinadora_asignada:
+            coordinadora_asignada = coordinadoras.first()
+        
+        if not coordinadora_asignada:
+            raise serializers.ValidationError("No hay coordinadoras disponibles en el sistema.")
+
+        # 3. Datos de la Solicitud (incluye coordinadora)
         datos_solicitud = {
             'asunto': validated_data['asunto'],
-            'descripcion': validated_data.get('descripcion', ''), # Ya no viene del form, pero el modelo lo puede requerir
+            'descripcion': validated_data.get('descripcion', ''),
             'autorizacion_datos': validated_data['autorizacion_datos'],
-            'estado': 'pendiente_entrevista' # <-- Estado inicial del flujo
+            'estado': 'pendiente_entrevista',
+            'coordinadora_asignada': coordinadora_asignada
         }
-        
+
         archivos = validated_data.get('documentos_adjuntos', [])
 
-        # 3. Crear/Actualizar Estudiante
+        # 4. Crear/Actualizar Estudiante
         estudiante, created = Estudiantes.objects.update_or_create(
             rut=validated_data['rut'],
             defaults=datos_estudiante
         )
 
-        # 4. Crear Solicitud
+        # 5. Crear Solicitud (con coordinadora asignada)
         solicitud = Solicitudes.objects.create(
-            estudiantes=estudiante, 
+            estudiantes=estudiante,
             **datos_solicitud
         )
 
-        # 5. Crear la Entrevista (¡NUEVO!)
-        
-        # Asignar una coordinadora (ej. la primera disponible)
-        coordinadora_asignada = PerfilUsuario.objects.filter(
-            rol__nombre_rol=ROL_COORDINADORA
-        ).first()
-
+        # 6. Crear la Entrevista con la coordinadora y la fecha/hora seleccionadas
         Entrevistas.objects.create(
             solicitudes=solicitud,
-            coordinadora=coordinadora_asignada, # Asigno la coordinadora
-            fecha_entrevista=validated_data['fecha_entrevista_completa'], # Uso la fecha validada
-            modalidad="No definida", # La coordinadora lo llenará después
-            estado='pendiente' # Estado de la *entrevista*
+            coordinadora=coordinadora_asignada,
+            fecha_entrevista=validated_data['fecha_entrevista_completa'],
+            modalidad=validated_data.get('modalidad', 'No definida'),
+            estado='pendiente'
         )
-            
-        # 6. Guardar Evidencias (si las hay)
+
+        # 7. Guardar Evidencias (si las hay)
         for archivo in archivos:
             Evidencias.objects.create(
                 solicitudes=solicitud,
                 estudiantes=estudiante,
                 archivo=archivo
             )
-            
+
         return solicitud

@@ -11,12 +11,13 @@
 
 {% block content %}
 <div class="main-content"> 
+    
     <nav class="dashboard-nav">
         <a href="{% url 'dashboard_coordinadora' %}" class="nav-item">
             <i class="fas fa-home"></i>
             Panel Principal
         </a>
-        <a href="{% url 'casos_coordinadora' %}" class="nav-item">
+        <a href="{% url 'casos_generales' %}" class="nav-item">
             <i class="fas fa-folder-open"></i>
             Casos
         </a>
@@ -25,7 +26,6 @@
             Panel de Control
         </a>
     </nav>
-</div>
 
     {% if messages %}
         {% for message in messages %}
@@ -36,155 +36,82 @@
     {% endif %}
 
     <div class="panel-control-container casos-dos-columnas">
-        <!-- Sección: Casos Disponibles para Asignar -->
-        <div class="panel-section casos-disponibles">
-            <h3><i class="fas fa-list"></i> Casos Disponibles</h3>
-            {% if casos_disponibles %}
-                {% for caso in casos_disponibles %}
-                    <div class="caso-item">
-                        <div class="caso-header">
-                            <div>
-                                <div class="caso-estudiante">{{ caso.estudiantes.nombres }} {{ caso.estudiantes.apellidos }}</div>
-                                <div class="caso-asunto">{{ caso.asunto }}</div>
-                                <div class="caso-asunto caso-asunto-date">{{ caso.created_at|date:"d/m/Y" }}</div>
-                            </div>
-                        </div>
-                        <form method="post" action="{% url 'asignar_caso_asesor' caso.id %}" class="form-margin-top">
-                            {% csrf_token %}
-                            <button type="submit" class="btn-accion btn-asignar">
-                                <i class="fas fa-user-check"></i> Asignarme
-                            </button>
-                        </form>
-                    </div>
-                {% endfor %}
-            {% else %}
-                <div class="empty-state">
-                    <i class="fas fa-inbox"></i>
-                    <p>No hay casos disponibles para asignar</p>
-                </div>
-            {% endif %}
-        </div>
-
-        <!-- Sección: Casos Asignados (para agendar citas y registrar ajustes) -->
-        <div class="panel-section casos-asignados">
-            <h3><i class="fas fa-briefcase"></i> Mis Casos Asignados</h3>
-            {% if casos_con_ajustes %}
-                {% for item in casos_con_ajustes %}
-                    {% with caso=item.caso %}
-                    <div class="caso-item">
-                        <div class="caso-header">
-                            <div>
-                                <div class="caso-estudiante">{{ caso.estudiantes.nombres }} {{ caso.estudiantes.apellidos }}</div>
-                                <div class="caso-asunto">{{ caso.asunto }}</div>
-                                {% if item.tiene_ajuste %}
-                                <div class="ajuste-asignado-info">
-                                    <i class="fas fa-check-circle"></i> 
-                                    <span><strong>Ajuste asignado:</strong> {{ item.ajuste_actual.ajuste_razonable.categorias_ajustes.nombre_categoria }}
-                                    {% if item.total_ajustes > 1 %}
-                                        <span class="ajustes-total">({{ item.total_ajustes }} ajustes)</span>
-                                    {% endif %}</span>
-                                </div>
-                                {% else %}
-                                <div class="sin-ajuste-info">
-                                    <i class="fas fa-exclamation-triangle"></i> 
-                                    <span><strong>Sin ajuste asignado</strong></span>
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="acciones-casos">
-                            <button type="button" class="btn-accion btn-agendar" onclick="abrirModalAgendar({{ caso.id }}, '{{ caso.asunto }}')">
-                                <i class="fas fa-calendar-plus"></i> Agendar Cita
-                            </button>
-                            {% if item.tiene_ajuste %}
-                            <button type="button" class="btn-accion btn-ajuste" onclick="abrirModalAjuste({{ caso.id }}, '{{ caso.asunto }}', true)">
-                                <i class="fas fa-edit"></i> Reasignar Ajuste
-                            </button>
-                            {% else %}
-                            <button type="button" class="btn-accion btn-ajuste" onclick="abrirModalAjuste({{ caso.id }}, '{{ caso.asunto }}', false)">
-                                <i class="fas fa-tools"></i> Registrar Ajuste
-                            </button>
-                            {% endif %}
-                            {% if caso.estado == 'en_proceso' %}
-                            <button type="button" class="btn-accion btn-accion-green {% if not item.tiene_ajuste %}btn-disabled{% endif %}" onclick="abrirModalAprobar({{ caso.id }}, '{{ caso.asunto }}', {{ item.tiene_ajuste|yesno:'true,false' }})" {% if not item.tiene_ajuste %}title="Debe asignar un ajuste antes de aprobar"{% endif %}>
-                                <i class="fas fa-check-circle"></i> Aprobar
-                            </button>
-                            <button type="button" class="btn-accion btn-accion-red" onclick="abrirModalRechazar({{ caso.id }}, '{{ caso.asunto }}')">
-                                <i class="fas fa-times-circle"></i> Rechazar
-                            </button>
-                            {% else %}
-                            <span class="status status-{{ caso.estado }} status-caso">
-                                {{ caso.get_estado_display }}
-                            </span>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endwith %}
-                {% endfor %}
-            {% else %}
-                <div class="empty-state">
-                    <i class="fas fa-folder-open"></i>
-                    <p>No tienes casos asignados</p>
-                </div>
-            {% endif %}
-        </div>
-    </div> <!-- FIN .panel-control-container -->
-
-    <!-- ========================================================
-         INICIO SECCIÓN CALENDARIO Y CITAS (MODIFICADA)
-    ========================================================= -->
-    <div class="panel-section">
-        <h3><i class="fas fa-calendar-alt"></i> Calendario de Citas</h3>
         
-        <!-- Contenedor de 2 columnas para Calendario + Lista de Citas -->
-        <div class="cal-layout-container">
+        <div class="panel-col-stack">
             
-            <!-- Columna 1: El Calendario -->
-            <div class="cal-widget">
-                <div class="detalle-card" id="card-calendario-panel">
-                    
-                    <div class="calendario-header" id="cal-header">
-                        <!-- El mes se inserta aquí por JS -->
+            <div class="panel-section">
+                <h3><i class="fas fa-calendar-day"></i> Citas del Día</h3>
+                {% if citas_hoy_list %}
+                    {% for cita in citas_hoy_list %}
+                        <div class="cal-cita-item estado-{{ cita.estado }}">
+                            <span class="cal-cita-hora"><i class="fas fa-clock"></i> {{ cita.fecha_entrevista|date:"H:i" }} hrs</span>
+                            <strong class="cal-cita-estudiante">{{ cita.solicitudes.estudiantes.nombres }} {{ cita.solicitudes.estudiantes.apellidos }}</strong>
+                            <span class="cal-cita-asunto">{{ cita.solicitudes.asunto }}</span>
+                            <span class="cal-cita-estado">Estado: {{ cita.get_estado_display }}</span>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state p-10">
+                        <i class="fas fa-check-circle text-muted"></i>
+                        <p class="text-small">No hay citas programadas para hoy.</p>
                     </div>
-                    
-                    <!-- Navegación movida encima de la grilla -->
-                    <div class="cal-nav">
-                        <button id="cal-prev" class="btn-accion btn-accion-gray btn-accion-small"><i class="fas fa-chevron-left"></i> Ant</button>
-                        <button id="cal-today" class="btn-accion btn-accion-gray btn-accion-small">Hoy</button>
-                        <button id="cal-next" class="btn-accion btn-accion-gray btn-accion-small">Sig <i class="fas fa-chevron-right"></i></button>
-                    </div>
+                {% endif %}
+            </div>
 
-                    <div class="calendario-grid" id="cal-grid-body">
-                        <!-- Los días se insertan aquí por JS -->
+            <div class="panel-section">
+                <h3><i class="fas fa-calendar-week"></i> Próximas Citas de la Semana</h3>
+                {% if citas_semana_list %}
+                    {% for cita in citas_semana_list %}
+                        <div class="cal-cita-item estado-{{ cita.estado }}">
+                            <span class="cal-cita-hora"><i class="fas fa-calendar-alt"></i> {{ cita.fecha_entrevista|date:"d/m/Y H:i" }} hrs</span>
+                            <strong class="cal-cita-estudiante">{{ cita.solicitudes.estudiantes.nombres }} {{ cita.solicitudes.estudiantes.apellidos }}</strong>
+                            <span class="cal-cita-asunto">{{ cita.solicitudes.asunto }}</span>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state p-10">
+                        <i class="fas fa-check-circle text-muted"></i>
+                        <p class="text-small">No hay más citas programadas para esta semana.</p>
                     </div>
-                    <div class="calendario-leyenda calendario-leyenda-mt">
-                        <div><span class="dot dot-entrevista"></span> Día con Cita(s)</div>
+                {% endif %}
+            </div>
+
+        </div> <div class="panel-section">
+            <h3><i class="fas fa-calendar-alt"></i> Calendario de Citas</h3>
+            
+            <div class="cal-layout-container grid-single-column">
+                
+                <div class="cal-widget">
+                    <div class="detalle-card" id="card-calendario-panel">
+                        <div class="calendario-header" id="cal-header"></div>
+                        <div class="cal-nav">
+                            <button id="cal-prev" class="btn-accion btn-accion-gray btn-accion-small"><i class="fas fa-chevron-left"></i> Ant</button>
+                            <button id="cal-today" class="btn-accion btn-accion-gray btn-accion-small">Hoy</button>
+                            <button id="cal-next" class="btn-accion btn-accion-gray btn-accion-small">Sig <i class="fas fa-chevron-right"></i></button>
+                        </div>
+                        <div class="calendario-grid" id="cal-grid-body"></div>
+                        <div class="calendario-leyenda calendario-leyenda-mt">
+                            <div><span class="dot dot-entrevista"></span> Día con Cita(s)</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cal-citas-list">
+                    <h4 id="cal-citas-titulo">Citas del Día</h4>
+                    <div id="cal-citas-dia">
+                        <div class="empty-state empty-state-10">
+                            <i class="fas fa-calendar-day empty-state-icon"></i>
+                            <p class="empty-state-text">Seleccione un día del calendario para ver las citas programadas.</p>
+                        </div>
                     </div>
                 </div>
             </div>
-
-            <!-- Columna 2: La Lista de Citas del Día -->
-            <div class="cal-citas-list">
-                <h4 id="cal-citas-titulo">Citas del Día</h4>
-                <div id="cal-citas-dia">
-                    <!-- El contenido se inserta aquí por JS -->
-                    <div class="empty-state empty-state-10">
-                        <i class="fas fa-calendar-day" style="font-size: 2rem; margin-bottom: 10px;"></i>
-                        <p style="font-size: 0.9rem;">Seleccione un día del calendario para ver las citas programadas.</p>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-    </div>
-
-    <!-- Sección: Citas Pendientes de Confirmar (Pasadas) -->
-    {% if citas_pendientes_confirmar %}
+        </div> </div> {% if citas_pendientes_confirmar %}
     <div class="panel-section citas-detalle">
-        <h3><i class="fas fa-exclamation-circle icon-warning"></i> Citas Pendientes de Confirmar</h3>
+        <h3><i class="fas fa-exclamation-circle icon-warning"></i> Citas Pendientes de Confirmar Asistencia</h3>
         <div class="cita-detalle-item cita-detalle-header">
             <div>Estudiante / Caso</div>
-            <div>Fecha y Hora</div>
+            <div>Fecha y Hora de Cita</div>
             <div>Modalidad</div>
             <div>Estado</div>
             <div>Acciones</div>
@@ -217,10 +144,9 @@
     </div>
     {% endif %}
 
-    <!-- Sección: Próximas Citas con Detalle -->
     <div class="panel-section citas-detalle">
-        <h3><i class="fas fa-calendar-check"></i> Próximas Citas</h3>
-        {% if proximas_citas %}
+        <h3><i class="fas fa-history"></i> Historial de Citas (Semana Actual)</h3>
+        {% if citas_pasadas_semana_list %}
             <div class="cita-detalle-item cita-detalle-header">
                 <div>Estudiante / Caso</div>
                 <div>Fecha y Hora</div>
@@ -228,24 +154,33 @@
                 <div>Estado</div>
                 <div>Acciones</div>
             </div>
-            {% for cita in proximas_citas %}
+            {% for cita in citas_pasadas_semana_list %}
                 <div class="cita-detalle-item cita-detalle-item-5cols">
                     <div>
                         <div class="cita-estudiante">{{ cita.solicitudes.estudiantes.nombres }} {{ cita.solicitudes.estudiantes.apellidos }}</div>
                         <div class="caso-asunto caso-asunto-small">{{ cita.solicitudes.asunto }}</div>
                     </div>
-                    <div class="cita-fecha-hora">
+                    <div class="cita-fecha-hora {% if cita.estado == 'no_asistio' %}cita-fecha-hora-no-asistio{% endif %}">
                         <i class="fas fa-clock"></i> {{ cita.fecha_entrevista|date:"d/m/Y H:i" }}
                     </div>
                     <div>
                         <span class="cita-modalidad">{{ cita.modalidad }}</span>
                     </div>
                     <div>
-                        <span class="status status-en_proceso">{{ cita.get_estado_display }}</span>
+                        {% if cita.estado == 'realizada' %}
+                        <span class="status status-aprobado">{{ cita.get_estado_display }}</span>
+                        {% else %}
+                        <span class="status status-rechazado">{{ cita.get_estado_display }}</span>
+                        {% endif %}
                     </div>
                     <div class="acciones-container">
+                        {% if cita.estado == 'no_asistio' %}
+                            <button type="button" class="btn-accion btn-agendar btn-accion-small" onclick="abrirModalReagendar({{ cita.id }}, '{{ cita.solicitudes.asunto }}', '{{ cita.modalidad }}')">
+                                <i class="fas fa-redo"></i> Reagendar
+                            </button>
+                        {% endif %}
                         <button type="button" class="btn-accion btn-accion-gray btn-accion-small" onclick="abrirModalEditarNotas({{ cita.id }}, '{{ cita.notas|escapejs }}', '{{ cita.solicitudes.asunto }}')">
-                            <i class="fas fa-edit"></i> Editar Notas
+                            <i class="fas fa-edit"></i> Ver/Editar Notas
                         </button>
                     </div>
                 </div>
@@ -253,163 +188,11 @@
         {% else %}
             <div class="empty-state">
                 <i class="fas fa-calendar-times"></i>
-                <p>No hay citas programadas</p>
+                <p>No hay historial de citas (realizadas o no asistidas) esta semana.</p>
             </div>
         {% endif %}
     </div>
 
-    <!-- Sección: Citas Realizadas / No Asistió -->
-    {% if citas_realizadas or citas_no_asistio %}
-    <div class="panel-section citas-detalle">
-        <h3><i class="fas fa-history"></i> Historial de Citas</h3>
-        <div class="cita-detalle-item cita-detalle-header">
-            <div>Estudiante / Caso</div>
-            <div>Fecha y Hora</div>
-            <div>Modalidad</div>
-            <div>Estado</div>
-            <div>Acciones</div>
-        </div>
-        {% for cita in citas_realizadas %}
-            <div class="cita-detalle-item cita-detalle-item-5cols">
-                <div>
-                    <div class="cita-estudiante">{{ cita.solicitudes.estudiantes.nombres }} {{ cita.solicitudes.estudiantes.apellidos }}</div>
-                    <div class="caso-asunto caso-asunto-small">{{ cita.solicitudes.asunto }}</div>
-                </div>
-                <div class="cita-fecha-hora">
-                    <i class="fas fa-clock"></i> {{ cita.fecha_entrevista|date:"d/m/Y H:i" }}
-                </div>
-                <div>
-                    <span class="cita-modalidad">{{ cita.modalidad }}</span>
-                </div>
-                <div>
-                    <span class="status status-aprobado">{{ cita.get_estado_display }}</span>
-                </div>
-                <div class="acciones-container">
-                    <button type="button" class="btn-accion btn-accion-gray btn-accion-small" onclick="abrirModalEditarNotas({{ cita.id }}, '{{ cita.notas|escapejs }}', '{{ cita.solicitudes.asunto }}')">
-                        <i class="fas fa-edit"></i> Editar Notas
-                    </button>
-                </div>
-            </div>
-        {% endfor %}
-        {% for cita in citas_no_asistio %}
-            <div class="cita-detalle-item cita-detalle-item-5cols">
-                <div>
-                    <div class="cita-estudiante">{{ cita.solicitudes.estudiantes.nombres }} {{ cita.solicitudes.estudiantes.apellidos }}</div>
-                    <div class="caso-asunto caso-asunto-small">{{ cita.solicitudes.asunto }}</div>
-                </div>
-                <div class="cita-fecha-hora cita-fecha-hora-no-asistio">
-                    <i class="fas fa-clock"></i> {{ cita.fecha_entrevista|date:"d/m/Y H:i" }}
-                </div>
-                <div>
-                    <span class="cita-modalidad">{{ cita.modalidad }}</span>
-                </div>
-                <div>
-                    <span class="status status-rechazado">{{ cita.get_estado_display }}</span>
-                </div>
-                <div class="acciones-container">
-                    <button type="button" class="btn-accion btn-agendar btn-accion-small" onclick="abrirModalReagendar({{ cita.id }}, '{{ cita.solicitudes.asunto }}', '{{ cita.modalidad }}')">
-                        <i class="fas fa-redo"></i> Reagendar
-                    </button>
-                </div>
-            </div>
-        {% endfor %}
-    </div>
-    {% endif %}
-
-    <!-- Modal para Agendar Cita -->
-    <div id="modalAgendar" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h4><i class="fas fa-calendar-plus"></i> Agendar Nueva Cita</h4>
-                <button class="close" onclick="cerrarModalAgendar()">&times;</button>
-            </div>
-            <form method="post" action="{% url 'agendar_cita_asesor' %}">
-                {% csrf_token %}
-                <input type="hidden" name="solicitud_id" id="agendar_solicitud_id">
-                
-                <div class="form-group">
-                    <label>Caso:</label>
-                    <input type="text" id="agendar_caso_asunto" class="input-readonly" readonly>
-                </div>
-                
-                <div class="form-group">
-                    <label for="fecha_entrevista">Fecha y Hora:</label>
-                    <input type="datetime-local" name="fecha_entrevista" id="fecha_entrevista" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="modalidad">Modalidad:</label>
-                    <select name="modalidad" id="modalidad" required>
-                        <option value="">Seleccione una modalidad</option>
-                        <option value="Presencial">Presencial</option>
-                        <option value="Virtual">Virtual</option>
-                        <option value="Híbrida">Híbrida</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="notas">Notas (opcional):</label>
-                    <textarea name="notas" id="notas" placeholder="Agregar notas adicionales sobre la cita..."></textarea>
-                </div>
-                
-                <div class="form-actions">
-                    <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalAgendar()">Cancelar</button>
-                    <button type="submit" class="btn-accion btn-agendar">
-                        <i class="fas fa-save"></i> Guardar Cita
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal para Registrar Ajuste Razonable -->
-    <div id="modalAjuste" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h4><i class="fas fa-tools"></i> Registrar Ajuste Razonable</h4>
-                <button class="close" onclick="cerrarModalAjuste()">&times;</button>
-            </div>
-            <form method="post" action="{% url 'registrar_ajuste_razonable' %}" id="formAjuste">
-                {% csrf_token %}
-                <input type="hidden" name="solicitud_id" id="ajuste_solicitud_id">
-                
-                <div class="form-group">
-                    <label>Caso:</label>
-                    <input type="text" id="ajuste_caso_asunto" class="input-readonly" readonly>
-                </div>
-                
-                <div class="form-group">
-                    <label for="descripcion">Descripción del Ajuste:</label>
-                    <textarea name="descripcion" id="descripcion" required placeholder="Describa el ajuste razonable a implementar..."></textarea>
-                </div>
-                
-                <div class="form-group">
-                    <label for="categoria_id">Categoría:</label>
-                    <select name="categoria_id" id="categoria_id" onchange="toggleNuevaCategoria()">
-                        <option value="">Seleccione una categoría</option>
-                        {% for categoria in categorias_ajustes %}
-                            <option value="{{ categoria.id }}">{{ categoria.nombre_categoria }}</option>
-                        {% endfor %}
-                        <option value="nueva">Crear nueva categoría</option>
-                    </select>
-                </div>
-                
-                <div class="form-group hidden" id="nuevaCategoriaGroup">
-                    <label for="nueva_categoria">Nombre de Nueva Categoría:</label>
-                    <input type="text" name="nueva_categoria" id="nueva_categoria" placeholder="Ingrese el nombre de la nueva categoría">
-                </div>
-                
-                <div class="form-actions">
-                    <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalAjuste()">Cancelar</button>
-                    <button type="submit" class="btn-accion btn-ajuste">
-                        <i class="fas fa-save"></i> Guardar Ajuste
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal para Confirmar Cita -->
     <div id="modalConfirmar" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -440,7 +223,6 @@
         </div>
     </div>
 
-    <!-- Modal para Editar Notas -->
     <div id="modalEditarNotas" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -470,7 +252,6 @@
         </div>
     </div>
 
-    <!-- Modal para Reagendar Cita -->
     <div id="modalReagendar" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -515,135 +296,16 @@
         </div>
     </div>
 
-    <!-- Modal para Aprobar Solicitud -->
-    <div id="modalAprobar" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h4><i class="fas fa-check-circle"></i> Aprobar Solicitud</h4>
-                <button class="close" onclick="cerrarModalAprobar()">&times;</button>
-            </div>
-            <form method="post" action="" id="formAprobar">
-                {% csrf_token %}
-                
-                <div class="form-group">
-                    <label>Caso:</label>
-                    <input type="text" id="aprobar_caso_asunto" class="input-readonly" readonly>
-                </div>
-                
-                <div class="form-group" id="mensajeAprobacion">
-                    <p>¿Está seguro de que desea aprobar esta solicitud?</p>
-                </div>
-                
-                <div class="form-actions">
-                    <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalAprobar()">Cancelar</button>
-                    <button type="submit" class="btn-accion btn-accion-green" id="btnAprobarSubmit">
-                        <i class="fas fa-check"></i> Aprobar Solicitud
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal para Rechazar Solicitud -->
-    <div id="modalRechazar" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h4><i class="fas fa-times-circle"></i> Rechazar Solicitud</h4>
-                <button class="close" onclick="cerrarModalRechazar()">&times;</button>
-            </div>
-            <form method="post" action="" id="formRechazar">
-                {% csrf_token %}
-                
-                <div class="form-group">
-                    <label>Caso:</label>
-                    <input type="text" id="rechazar_caso_asunto" class="input-readonly" readonly>
-                </div>
-                
-                <div class="form-group">
-                    <label for="motivo_rechazo">Motivo del Rechazo (opcional):</label>
-                    <textarea name="motivo_rechazo" id="motivo_rechazo" placeholder="Ingrese el motivo del rechazo de la solicitud..."></textarea>
-                </div>
-                
-                <div class="form-group">
-                    <p style="color: #dc3545; font-weight: 500;">¿Está seguro de que desea rechazar esta solicitud?</p>
-                </div>
-                
-                <div class="form-actions">
-                    <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalRechazar()">Cancelar</button>
-                    <button type="submit" class="btn-accion btn-accion-red">
-                        <i class="fas fa-times"></i> Rechazar Solicitud
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
 </div>
 
 <script>
-    function abrirModalAgendar(solicitudId, asunto) {
-        document.getElementById('agendar_solicitud_id').value = solicitudId;
-        document.getElementById('agendar_caso_asunto').value = asunto;
-        document.getElementById('modalAgendar').style.display = 'block';
-    }
-
-    function cerrarModalAgendar() {
-        document.getElementById('modalAgendar').style.display = 'none';
-        document.getElementById('fecha_entrevista').value = '';
-        document.getElementById('modalidad').value = '';
-        document.getElementById('notas').value = '';
-    }
-
-    function abrirModalAjuste(solicitudId, asunto, tieneAjuste) {
-        document.getElementById('ajuste_solicitud_id').value = solicitudId;
-        document.getElementById('ajuste_caso_asunto').value = asunto;
-        
-        // Agregar campo hidden para indicar si es reasignación
-        let reasignarInput = document.getElementById('reasignar_input');
-        if (!reasignarInput) {
-            reasignarInput = document.createElement('input');
-            reasignarInput.type = 'hidden';
-            reasignarInput.name = 'reasignar';
-            reasignarInput.id = 'reasignar_input';
-            document.getElementById('formAjuste').appendChild(reasignarInput);
-        }
-        reasignarInput.value = tieneAjuste ? 'true' : 'false';
-        
-        // Cambiar el título del modal según si ya tiene ajuste o no
-        const modalTitle = document.querySelector('#modalAjuste .modal-header h4');
-        if (tieneAjuste) {
-            modalTitle.innerHTML = '<i class="fas fa-edit"></i> Reasignar Ajuste Razonable';
-        } else {
-            modalTitle.innerHTML = '<i class="fas fa-tools"></i> Registrar Ajuste Razonable';
-        }
-        
-        document.getElementById('modalAjuste').style.display = 'block';
-    }
-
-    function cerrarModalAjuste() {
-        document.getElementById('modalAjuste').style.display = 'none';
-        document.getElementById('descripcion').value = '';
-        document.getElementById('categoria_id').value = '';
-        document.getElementById('nueva_categoria').value = '';
-        document.getElementById('nuevaCategoriaGroup').style.display = 'none';
-    }
-
-    function toggleNuevaCategoria() {
-        const categoriaSelect = document.getElementById('categoria_id');
-        const nuevaCategoriaGroup = document.getElementById('nuevaCategoriaGroup');
-        if (categoriaSelect.value === 'nueva') {
-            nuevaCategoriaGroup.classList.remove('hidden');
-            document.getElementById('nueva_categoria').required = true;
-        } else {
-            nuevaCategoriaGroup.classList.add('hidden');
-            document.getElementById('nueva_categoria').required = false;
-        }
-    }
-
+    // --- Funciones de Modales (Limpiadas) ---
+    
     function abrirModalConfirmar(entrevistaId, accion, asunto) {
         document.getElementById('confirmar_accion').value = accion;
         document.getElementById('confirmar_caso_asunto').value = asunto;
-        document.getElementById('formConfirmar').action = '{% url "confirmar_cita_asesor" 0 %}'.replace('0', entrevistaId);
+        // ***** URL ACTUALIZADA *****
+        document.getElementById('formConfirmar').action = '{% url "coordinadora_confirmar_cita" 0 %}'.replace('0', entrevistaId);
         
         const btnSubmit = document.getElementById('btnConfirmarSubmit');
         if (accion === 'realizada') {
@@ -665,7 +327,8 @@
     function abrirModalEditarNotas(entrevistaId, notas, asunto) {
         document.getElementById('editar_notas_caso_asunto').value = asunto;
         document.getElementById('editar_notas_textarea').value = notas.replace(/\\n/g, '\n');
-        document.getElementById('formEditarNotas').action = '{% url "editar_notas_cita" 0 %}'.replace('0', entrevistaId);
+        // ***** URL ACTUALIZADA *****
+        document.getElementById('formEditarNotas').action = '{% url "coordinadora_editar_notas_cita" 0 %}'.replace('0', entrevistaId);
         document.getElementById('modalEditarNotas').style.display = 'block';
     }
 
@@ -673,56 +336,11 @@
         document.getElementById('modalEditarNotas').style.display = 'none';
     }
 
-    function abrirModalAprobar(solicitudId, asunto, tieneAjuste) {
-        document.getElementById('aprobar_caso_asunto').value = asunto;
-        document.getElementById('formAprobar').action = '{% url "aprobar_solicitud_asesor" 0 %}'.replace('0', solicitudId);
-        
-        // Mostrar advertencia si no tiene ajuste
-        const mensajeAprobacion = document.getElementById('mensajeAprobacion');
-        const btnAprobar = document.getElementById('btnAprobarSubmit');
-        
-        if (!tieneAjuste) {
-            mensajeAprobacion.innerHTML = '<p style="color: #dc3545; font-weight: 500; padding: 10px; background-color: #f8d7da; border-radius: 6px; border-left: 4px solid #dc3545;">⚠️ <strong>No se puede aprobar.</strong> Debe asignar un ajuste razonable antes de aprobar esta solicitud.</p>';
-            btnAprobar.disabled = true;
-            btnAprobar.style.opacity = '0.5';
-            btnAprobar.style.cursor = 'not-allowed';
-            btnAprobar.classList.add('btn-disabled');
-        } else {
-            mensajeAprobacion.innerHTML = '<p>¿Está seguro de que desea aprobar esta solicitud?</p>';
-            btnAprobar.disabled = false;
-            btnAprobar.style.opacity = '1';
-            btnAprobar.style.cursor = 'pointer';
-            btnAprobar.classList.remove('btn-disabled');
-        }
-        
-        document.getElementById('modalAprobar').style.display = 'block';
-    }
-
-    function cerrarModalAprobar() {
-        document.getElementById('modalAprobar').style.display = 'none';
-        // Resetear el botón
-        const btnAprobar = document.getElementById('btnAprobarSubmit');
-        btnAprobar.disabled = false;
-        btnAprobar.style.opacity = '1';
-        btnAprobar.style.cursor = 'pointer';
-        btnAprobar.classList.remove('btn-disabled');
-    }
-
-    function abrirModalRechazar(solicitudId, asunto) {
-        document.getElementById('rechazar_caso_asunto').value = asunto;
-        document.getElementById('formRechazar').action = '{% url "rechazar_solicitud_asesor" 0 %}'.replace('0', solicitudId);
-        document.getElementById('modalRechazar').style.display = 'block';
-    }
-
-    function cerrarModalRechazar() {
-        document.getElementById('modalRechazar').style.display = 'none';
-        document.getElementById('motivo_rechazo').value = '';
-    }
-
     function abrirModalReagendar(entrevistaId, asunto, modalidad) {
         document.getElementById('reagendar_caso_asunto').value = asunto;
         document.getElementById('nueva_modalidad').value = modalidad;
-        document.getElementById('formReagendar').action = '{% url "reagendar_cita_asesor" 0 %}'.replace('0', entrevistaId);
+        // ***** URL ACTUALIZADA *****
+        document.getElementById('formReagendar').action = '{% url "coordinadora_reagendar_cita" 0 %}'.replace('0', entrevistaId);
         document.getElementById('modalReagendar').style.display = 'block';
     }
 
@@ -734,231 +352,184 @@
 
     // Cerrar modales al hacer clic fuera de ellos
     window.onclick = function(event) {
-        const modalAgendar = document.getElementById('modalAgendar');
-        const modalAjuste = document.getElementById('modalAjuste');
         const modalConfirmar = document.getElementById('modalConfirmar');
         const modalEditarNotas = document.getElementById('modalEditarNotas');
         const modalReagendar = document.getElementById('modalReagendar');
-        const modalAprobar = document.getElementById('modalAprobar');
-        const modalRechazar = document.getElementById('modalRechazar');
         
-        if (event.target == modalAgendar) {
-            cerrarModalAgendar();
-        }
-        if (event.target == modalAjuste) {
-            cerrarModalAjuste();
-        }
-        if (event.target == modalConfirmar) {
-            cerrarModalConfirmar();
-        }
-        if (event.target == modalEditarNotas) {
-            cerrarModalEditarNotas();
-        }
-        if (event.target == modalReagendar) {
-            cerrarModalReagendar();
-        }
-        if (event.target == modalAprobar) {
-            cerrarModalAprobar();
-        }
-        if (event.target == modalRechazar) {
-            cerrarModalRechazar();
-        }
+        if (event.target == modalConfirmar) { cerrarModalConfirmar(); }
+        if (event.target == modalEditarNotas) { cerrarModalEditarNotas(); }
+        if (event.target == modalReagendar) { cerrarModalReagendar(); }
     }
 
-    // --- INICIO DE CÓDIGO DEL CALENDARIO (MODIFICADO) ---
+    // --- CÓDIGO DEL CALENDARIO (Sin cambios) ---
+    document.addEventListener('DOMContentLoaded', function() {
+        const fechasConCitas = JSON.parse('{{ fechas_citas_json|escapejs }}' || "[]");
+        const todasLasCitas = JSON.parse('{{ citas_data_json|escapejs }}' || "[]");
 
-    // Fechas que tienen *alguna* cita (para la clase 'day-entrevista')
-    const fechasConCitas = JSON.parse('{{ fechas_citas_json|escapejs }}' || "[]");
-    // Lista completa de todas las citas con sus detalles
-    const todasLasCitas = JSON.parse('{{ citas_data_json|escapejs }}' || "[]");
+        let navDate = new Date();
+        const hoy = new Date();
+        const hoyStr = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+        let diaSeleccionado = null; 
+        let diaSeleccionadoStr = null;
 
-    // Variables globales del calendario
-    let navDate = new Date();
-    const hoy = new Date();
-    const hoyStr = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
-    let diaSeleccionado = null; 
-    let diaSeleccionadoStr = null;
+        const calHeader = document.getElementById('cal-header');
+        const calGridBody = document.getElementById('cal-grid-body');
+        const btnPrev = document.getElementById('cal-prev');
+        const btnNext = document.getElementById('cal-next');
+        const btnToday = document.getElementById('cal-today');
+        const citasDiaContainer = document.getElementById('cal-citas-dia');
+        const citasDiaTitulo = document.getElementById('cal-citas-titulo');
 
-    // Elementos del DOM
-    const calHeader = document.getElementById('cal-header');
-    const calGridBody = document.getElementById('cal-grid-body');
-    const btnPrev = document.getElementById('cal-prev');
-    const btnNext = document.getElementById('cal-next');
-    const btnToday = document.getElementById('cal-today');
-    const citasDiaContainer = document.getElementById('cal-citas-dia');
-    const citasDiaTitulo = document.getElementById('cal-citas-titulo');
-
-    const meses = [
-        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
-    ];
-    
-    // 4. (NUEVO) Mapear citas por fecha para acceso rápido
-    // Creamos un objeto: { "2025-11-08": [cita1, cita2], "2025-11-10": [cita3] }
-    const citasPorFecha = {};
-    for (const cita of todasLasCitas) {
-        if (!citasPorFecha[cita.fecha]) {
-            citasPorFecha[cita.fecha] = [];
-        }
-        citasPorFecha[cita.fecha].push(cita);
-    }
-
-    // 5. Función para mostrar las citas de un día
-    function mostrarCitasDelDia(fechaStr, diaEl) {
-        // Actualizar título
-        const [year, month, day] = fechaStr.split('-');
-        citasDiaTitulo.innerText = `Citas para ${day}/${month}/${year}`;
-
-        // Resaltar día seleccionado
-        if (diaSeleccionado) {
-            diaSeleccionado.classList.remove('cal-day-selected');
-        }
+        const meses = [
+            "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+        ];
         
-        // Si el elemento existe (no es null)
-        if(diaEl) {
-            diaEl.classList.add('cal-day-selected');
-            diaSeleccionado = diaEl;
-            diaSeleccionadoStr = fechaStr; // Guardamos la fecha
-        } else {
-            // Si diaEl es null (porque venimos de un re-render), buscamos el día
-            diaSeleccionado = calGridBody.querySelector(`[data-fecha="${fechaStr}"]`);
+        const citasPorFecha = {};
+        for (const cita of todasLasCitas) {
+            if (!citasPorFecha[cita.fecha]) {
+                citasPorFecha[cita.fecha] = [];
+            }
+            citasPorFecha[cita.fecha].push(cita);
+        }
+
+        function mostrarCitasDelDia(fechaStr, diaEl) {
+            const [year, month, day] = fechaStr.split('-');
+            citasDiaTitulo.innerText = `Citas para ${day}/${month}/${year}`;
+
             if (diaSeleccionado) {
-                diaSeleccionado.classList.add('cal-day-selected');
-            }
-        }
-
-
-        const citas = citasPorFecha[fechaStr] || [];
-        
-        if (citas.length === 0) {
-            citasDiaContainer.innerHTML = `
-                <div class="empty-state" style="padding: 10px 0;">
-                    <i class="fas fa-calendar-check" style="font-size: 2rem; margin-bottom: 10px;"></i>
-                    <p style="font-size: 0.9rem;">No hay citas programadas para este día.</p>
-                </div>
-            `;
-            return;
-        }
-
-        // Construir HTML para la lista de citas
-        let html = '';
-        for (const cita of citas) {
-            html += `
-                <div class="cal-cita-item estado-${cita.estado_key}">
-                    <span class="cal-cita-hora"><i class="fas fa-clock"></i> ${cita.hora}</span>
-                    <strong class="cal-cita-estudiante">${cita.estudiante}</strong>
-                    <span class="cal-cita-asunto">${cita.asunto}</span>
-                    <span class="cal-cita-estado">Estado: ${cita.estado}</span>
-                </div>
-            `;
-        }
-        citasDiaContainer.innerHTML = html;
-    }
-
-    // 6. Función principal para renderizar el calendario (Modificada)
-    function renderCalendar() {
-        const year = navDate.getFullYear();
-        const month = navDate.getMonth(); // 0-11
-        calHeader.innerText = `${meses[month]} ${year}`;
-        
-        // ======================= INICIO MODIFICACIÓN JS =======================
-        // Limpiamos la grilla e inyectamos los encabezados
-        calGridBody.innerHTML = `
-            <div class="cal-day-header">L</div>
-            <div class="cal-day-header">M</div>
-            <div class="cal-day-header">X</div>
-            <div class="cal-day-header">J</div>
-            <div class="cal-day-header">V</div>
-            <div class="cal-day-header">S</div>
-            <div class="cal-day-header">D</div>
-        `;
-        // ======================= FIN MODIFICACIÓN JS =======================
-        
-        const primerDiaDelMes = new Date(year, month, 1);
-        const ultimoDiaDelMes = new Date(year, month + 1, 0);
-        const ultimoDiaNum = ultimoDiaDelMes.getDate();
-        let diaInicioSemana = (primerDiaDelMes.getDay() + 6) % 7;
-        const ultimoDiaMesAnterior = new Date(year, month, 0).getDate();
-
-        // Días del mes anterior
-        for (let i = diaInicioSemana; i > 0; i--) {
-            const dia = ultimoDiaMesAnterior - i + 1;
-            const dayDiv = document.createElement('div');
-            dayDiv.classList.add('cal-day', 'other-month');
-            dayDiv.innerText = dia;
-            calGridBody.appendChild(dayDiv);
-        }
-
-        // Días del mes actual
-        for (let dia = 1; dia <= ultimoDiaNum; dia++) {
-            const dayDiv = document.createElement('div');
-            dayDiv.classList.add('cal-day');
-            dayDiv.innerText = dia;
-
-            const fechaStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-            dayDiv.dataset.fecha = fechaStr; // Añadimos data-fecha para encontrarlo
-
-            if (fechaStr === hoyStr) {
-                dayDiv.classList.add('day-today');
-            }
-
-            if (fechasConCitas.includes(fechaStr)) {
-                dayDiv.classList.add('day-entrevista');
+                diaSeleccionado.classList.remove('cal-day-selected');
             }
             
-            dayDiv.addEventListener('click', () => mostrarCitasDelDia(fechaStr, dayDiv));
-            
-            calGridBody.appendChild(dayDiv);
-        }
-
-        // Días del mes siguiente
-        const totalDiasGrid = calGridBody.children.length;
-        const diasSiguientes = (7 - (totalDiasGrid % 7)) % 7;
-        for (let i = 1; i <= diasSiguientes; i++) {
-            const dayDiv = document.createElement('div');
-            dayDiv.classList.add('cal-day', 'other-month');
-            dayDiv.innerText = i;
-            calGridBody.appendChild(dayDiv);
-        }
-        
-        // (NUEVO) Al re-renderizar, si un día estaba seleccionado, lo volvemos a mostrar
-        if (diaSeleccionadoStr) {
-            // Verificamos si el día sigue en el mes actual
-            const [selYear, selMonth] = diaSeleccionadoStr.split('-');
-            if (parseInt(selYear) === year && parseInt(selMonth) === (month + 1)) {
-                mostrarCitasDelDia(diaSeleccionadoStr, null); // Pasamos null para que la función lo busque
+            if(diaEl) {
+                diaEl.classList.add('cal-day-selected');
+                diaSeleccionado = diaEl;
+                diaSeleccionadoStr = fechaStr;
             } else {
-                // Si el día ya no está visible, limpiamos
-                diaSeleccionado = null;
-                diaSeleccionadoStr = null;
-                citasDiaTitulo.innerText = `Citas del Día`;
+                diaSeleccionado = calGridBody.querySelector(`[data-fecha="${fechaStr}"]`);
+                if (diaSeleccionado) {
+                    diaSeleccionado.classList.add('cal-day-selected');
+                }
+            }
+
+            const citas = citasPorFecha[fechaStr] || [];
+            
+            if (citas.length === 0) {
                 citasDiaContainer.innerHTML = `
-                    <div class="empty-state" style="padding: 10px 0;">
-                        <i class="fas fa-calendar-day" style="font-size: 2rem; margin-bottom: 10px;"></i>
-                        <p style="font-size: 0.9rem;">Seleccione un día del calendario para ver las citas programadas.</p>
+                    <div class="empty-state p-10">
+                        <i class="fas fa-calendar-check empty-state-icon"></i>
+                        <p class="empty-state-text">No hay citas programadas para este día.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            for (const cita of citas) {
+                html += `
+                    <div class="cal-cita-item estado-${cita.estado_key}">
+                        <span class="cal-cita-hora"><i class="fas fa-clock"></i> ${cita.hora}</span>
+                        <strong class="cal-cita-estudiante">${cita.estudiante}</strong>
+                        <span class="cal-cita-asunto">${cita.asunto}</span>
+                        <span class="cal-cita-estado">Estado: ${cita.estado}</span>
                     </div>
                 `;
             }
+            citasDiaContainer.innerHTML = html;
         }
-    }
 
-    // 5. Event Listeners para navegación
-    btnPrev.addEventListener('click', () => {
-        navDate.setMonth(navDate.getMonth() - 1);
+        function renderCalendar() {
+            const year = navDate.getFullYear();
+            const month = navDate.getMonth();
+            calHeader.innerText = `${meses[month]} ${year}`;
+            
+            calGridBody.innerHTML = `
+                <div class="cal-day-header">L</div>
+                <div class="cal-day-header">M</div>
+                <div class="cal-day-header">X</div>
+                <div class="cal-day-header">J</div>
+                <div class="cal-day-header">V</div>
+                <div class="cal-day-header">S</div>
+                <div class="cal-day-header">D</div>
+            `;
+            
+            const primerDiaDelMes = new Date(year, month, 1);
+            const ultimoDiaDelMes = new Date(year, month + 1, 0);
+            const ultimoDiaNum = ultimoDiaDelMes.getDate();
+            let diaInicioSemana = (primerDiaDelMes.getDay() + 6) % 7;
+            const ultimoDiaMesAnterior = new Date(year, month, 0).getDate();
+
+            for (let i = diaInicioSemana; i > 0; i--) {
+                const dia = ultimoDiaMesAnterior - i + 1;
+                const dayDiv = document.createElement('div');
+                dayDiv.classList.add('cal-day', 'other-month');
+                dayDiv.innerText = dia;
+                calGridBody.appendChild(dayDiv);
+            }
+
+            for (let dia = 1; dia <= ultimoDiaNum; dia++) {
+                const dayDiv = document.createElement('div');
+                dayDiv.classList.add('cal-day');
+                dayDiv.innerText = dia;
+
+                const fechaStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+                dayDiv.dataset.fecha = fechaStr;
+
+                if (fechaStr === hoyStr) {
+                    dayDiv.classList.add('day-today');
+                }
+
+                if (fechasConCitas.includes(fechaStr)) {
+                    dayDiv.classList.add('day-entrevista');
+                }
+                
+                dayDiv.addEventListener('click', () => mostrarCitasDelDia(fechaStr, dayDiv));
+                calGridBody.appendChild(dayDiv);
+            }
+
+            const totalDiasGrid = calGridBody.children.length;
+            const diasSiguientes = (7 - (totalDiasGrid % 7)) % 7;
+            for (let i = 1; i <= diasSiguientes; i++) {
+                const dayDiv = document.createElement('div');
+                dayDiv.classList.add('cal-day', 'other-month');
+                dayDiv.innerText = i;
+                calGridBody.appendChild(dayDiv);
+            }
+            
+            if (diaSeleccionadoStr) {
+                const [selYear, selMonth] = diaSeleccionadoStr.split('-');
+                if (parseInt(selYear) === year && parseInt(selMonth) === (month + 1)) {
+                    mostrarCitasDelDia(diaSeleccionadoStr, null);
+                } else {
+                    diaSeleccionado = null;
+                    diaSeleccionadoStr = null;
+                    citasDiaTitulo.innerText = `Citas del Día`;
+                    citasDiaContainer.innerHTML = `
+                        <div class="empty-state p-10">
+                            <i class="fas fa-calendar-day empty-state-icon"></i>
+                            <p class="empty-state-text">Seleccione un día del calendario para ver las citas programadas.</p>
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        btnPrev.addEventListener('click', () => {
+            navDate.setMonth(navDate.getMonth() - 1);
+            renderCalendar();
+        });
+
+        btnNext.addEventListener('click', () => {
+            navDate.setMonth(navDate.getMonth() + 1);
+            renderCalendar();
+        });
+
+        btnToday.addEventListener('click', () => {
+            navDate = new Date();
+            renderCalendar();
+        });
+
         renderCalendar();
     });
-
-    btnNext.addEventListener('click', () => {
-        navDate.setMonth(navDate.getMonth() + 1);
-        renderCalendar();
-    });
-
-    btnToday.addEventListener('click', () => {
-        navDate = new Date();
-        renderCalendar();
-    });
-
-    // 6. Renderizar el calendario al cargar la página
-    renderCalendar();
 </script>
 {% endblock %}
