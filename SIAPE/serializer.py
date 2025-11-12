@@ -432,8 +432,9 @@ class PublicaSolicitudSerializer(serializers.Serializer):
     
     # --- Campos NUEVOS para la Cita (no van al modelo Solicitud) ---
     fecha_cita = serializers.DateField(write_only=True)
-    hora_cita = serializers.CharField(write_only=True) # Recibirá "HH:MM"
-    
+    hora_cita = serializers.CharField(write_only=True)
+    modalidad = serializers.CharField(write_only=True, max_length=100)
+
     # --- Campos para las relaciones (Evidencias) ---
     documentos_adjuntos = serializers.ListField(
         child=serializers.FileField(),
@@ -497,6 +498,7 @@ class PublicaSolicitudSerializer(serializers.Serializer):
             'email': validated_data['email'],
             'numero': validated_data.get('numero'),
             'carreras': validated_data['carrera_id']
+            
         }
 
         # 2. Buscar coordinadora disponible
@@ -530,7 +532,7 @@ class PublicaSolicitudSerializer(serializers.Serializer):
             solicitudes=solicitud,
             coordinadora=coordinadora_asignada,
             fecha_entrevista=validated_data['fecha_entrevista_completa'],
-            modalidad="No definida",
+            modalidad=validated_data.get('modalidad', 'No definida'),
             estado='pendiente'
         )
 

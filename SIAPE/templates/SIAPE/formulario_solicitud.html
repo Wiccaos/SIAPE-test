@@ -128,7 +128,17 @@
                 
                 <!-- Input oculto para enviar la fecha seleccionada -->
                 <input type="hidden" id="fecha_cita" name="fecha_cita">
-            </div>
+                </div>
+                
+                <div class="form-group" style="margin-top: 1.5rem;">
+                    <label for="modalidad">Modalidad de la Cita <span>*</span></label>
+                    <select id="modalidad" name="modalidad" required>
+                        <option value="">-- Selecciona la modalidad --</option>
+                        <option value="Presencial">Presencial</option>
+                        <option value="Virtual">Virtual</option>
+                        <option value="Híbrida">Híbrida (Mixta)</option>
+                    </select>
+                </div>
             <!-- === FIN SECCIÓN DE AGENDAMIENTO === -->
 
 
