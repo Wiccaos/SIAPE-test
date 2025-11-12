@@ -1,0 +1,66 @@
+{% extends "plantilla.html" %}
+{% load static %}
+{% block title %}Mis Asignaturas | SIAPE{% endblock %}
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="main-content"> 
+    
+    <nav class="dashboard-nav">
+        <a href="{% url 'dashboard_docente' %}" class="nav-item">
+            <i class="fas fa-home"></i>
+            Panel Principal
+        </a>
+        <a href="{% url 'mis_alumnos_docente' %}" class="nav-item">
+            <i class="fas fa-users"></i>
+            Mis Alumnos
+        </a>
+        <a href="{% url 'mis_asignaturas_docente' %}" class="nav-item active">
+            <i class="fas fa-book-reader"></i>
+            Mis Asignaturas
+        </a>
+    </nav>
+
+    <section class="table-container table-mt-30">
+        <div class="table-header">
+            <h2>Mis Asignaturas</h2>
+        </div>
+        
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Nombre Asignatura</th>
+                    <th>Sección</th>
+                    <th>N° Estudiantes</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for asignatura in asignaturas %}
+                <tr>
+                    <td>{{ asignatura.nombre }}</td>
+                    <td>{{ asignatura.seccion }}</td>
+                    <td>{{ asignatura.total_estudiantes }}</td>
+                    <td>
+                        <a href="{% url 'detalle_asignatura_docente' asignatura.id %}" class="btn-accion btn-agendar btn-accion-small">
+                            <i class="fas fa-users"></i> Ver Listado
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4">
+                        <div class="empty-state">
+                            <i class="fas fa-inbox"></i>
+                            <p>No tienes asignaturas registradas a tu nombre.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</div>
+{% endblock %}

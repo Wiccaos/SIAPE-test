@@ -124,6 +124,23 @@ body.dark-mode .cal-day-header {
     color: #e0e0e0 !important;
     border-color: #444 !important;
 }
+
+
+/* 1. Esto oscurece el fondo de las tarjetas */
+body.dark-mode .detalle-card {
+    background-color: #232323 !important;
+    color: #e0e0e0 !important;
+    border-color: #444 !important;
+}
+
+/* 2. Esto aclara el texto dentro de las tarjetas */
+body.dark-mode .detalle-titulo {
+    color: #999;
+}
+body.dark-mode .detalle-card p,
+body.dark-mode .detalle-card li {
+    color: #e0e0e0;
+}
 /* Panel Control Asesor clases para reemplazar estilos en línea */
 .ajustes-total {
     color: #666;

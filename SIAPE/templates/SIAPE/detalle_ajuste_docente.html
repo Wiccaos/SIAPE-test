@@ -1,0 +1,58 @@
+{% extends "plantilla.html" %}
+{% load static %}
+{% block title %}Detalle Alumno | SIAPE{% endblock %}
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="main-content"> 
+    
+    <nav class="dashboard-nav">
+        <a href="{% url 'dashboard_docente' %}" class="nav-item">
+            <i class="fas fa-home"></i>
+            Panel Principal
+        </a>
+        <a href="{% url 'mis_alumnos_docente' %}" class="nav-item active">
+            <i class="fas fa-users"></i>
+            Mis Alumnos
+        </a>
+        <a href="{% url 'mis_asignaturas_docente' %}" class="nav-item">
+            <i class="fas fa-book-reader"></i>
+            Mis Asignaturas
+        </a>
+    </nav>
+
+    <div class="detalle-grid-container" style="grid-template-columns: 2fr 1fr; grid-template-areas: 'soluciones info-estudiante' 'volver volver';">
+        
+        <div class="detalle-card" id="card-info-estudiante">
+            <h3 class="detalle-titulo">ESTUDIANTE</h3>
+            <p>{{ estudiante.nombres }} {{ estudiante.apellidos }}</p>
+            <h3 class="detalle-titulo">RUT:</h3>
+            <p>{{ estudiante.rut }}</p>
+            <h3 class="detalle-titulo">CARRERA:</h3>
+            <p>{{ estudiante.carreras.nombre }}</p>
+        </div>
+
+        <div class="detalle-card" id="card-soluciones">
+            <h3 class="detalle-titulo">Ajustes Razonables Aprobados (Relevantes para tus clases)</h3>
+            <ul>
+                {% for ajuste_asignado in ajustes %}
+                    <li>{{ ajuste_asignado.ajuste_razonable.descripcion }}</li>
+                {% empty %}
+                    <li>No se encontraron ajustes aprobados para este estudiante en tus asignaturas.</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div id="card-volver">
+            <a href="{% url 'dashboard_docente' %}" class="btn-volver">
+                <i class="fas fa-chevron-left"></i> Volver al Panel
+            </a>
+            <a href="{% url 'mis_alumnos_docente' %}" class="btn-volver" style="margin-left: 10px;">
+                <i class="fas fa-chevron-left"></i> Volver a Mis Alumnos
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "plantilla.html" %}
+{% load static %}
+{% block title %}Mis Alumnos | SIAPE{% endblock %}
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="main-content"> 
+    
+    <nav class="dashboard-nav">
+        <a href="{% url 'dashboard_docente' %}" class="nav-item">
+            <i class="fas fa-home"></i>
+            Panel Principal
+        </a>
+        <a href="{% url 'mis_alumnos_docente' %}" class="nav-item active">
+            <i class="fas fa-users"></i>
+            Mis Alumnos
+        </a>
+        <a href="{% url 'mis_asignaturas_docente' %}" class="nav-item">
+            <i class="fas fa-book-reader"></i>
+            Mis Asignaturas
+        </a>
+    </nav>
+
+    <section class="table-container table-mt-30">
+        <div class="table-header">
+            <h2>Mis Alumnos (Todas las Asignaturas)</h2>
+        </div>
+        
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Estudiante</th>
+                    <th>RUT</th>
+                    <th>Carrera</th>
+                    <th>Estado de Ajuste</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for alumno in lista_alumnos %}
+                <tr>
+                    <td>{{ alumno.estudiante.nombres }} {{ alumno.estudiante.apellidos }}</td>
+                    <td>{{ alumno.estudiante.rut }}</td>
+                    <td>{{ alumno.estudiante.carreras.nombre }}</td>
+                    <td>
+                        {% if alumno.tiene_ajuste %}
+                            <span class="status status-aprobado">Con Ajustes Aprobados</span>
+                        {% else %}
+                            <span class="status" style="background-color: #f0f0f0; color: #777;">Sin Ajustes</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if alumno.tiene_ajuste %}
+                        <a href="{% url 'detalle_ajuste_docente' alumno.estudiante.id %}" class="btn-accion btn-accion-gray btn-accion-small">
+                            <i class="fas fa-eye"></i> Ver Ajustes
+                        </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5">
+                        <div class="empty-state">
+                            <i class="fas fa-users"></i>
+                            <p>No se encontraron alumnos inscritos en tus asignaturas.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <div class="table-footer">
+            <span>Mostrando {{ total_alumnos|default:0 }} estudiantes</span>
+        </div>
+    </section>
+</div>
+{% endblock %}
