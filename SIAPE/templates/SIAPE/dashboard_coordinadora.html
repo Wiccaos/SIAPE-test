@@ -59,7 +59,7 @@
         </div>
 
         <div class="kpi-card">
-            <div class="kpi-icon" style="background-color: #fdecec; color: #cc0000;">
+            <div class="kpi-icon kpi-icon-danger">
                 <i class="fas fa-calendar-times"></i>
             </div>
             <div class="kpi-info">
@@ -74,16 +74,16 @@
 
         {% if citas_del_dia_list %}
             <div class="panel-control-container">
-                <div class="panel-section" style="margin-bottom: 0; padding: 15px; box-shadow: none;">
+                <div class="panel-section panel-section-no-shadow">
                     {% for cita in citas_del_dia_list %}
                         <div class="caso-item">
                             <div class="caso-header">
                                 <div>
-                                    <span class="cita-fecha" style="font-size: 1.1rem; color: #cc0000; font-weight: 600;">
+                                    <span class="cita-fecha cita-fecha-large">
                                         <i class="fas fa-clock"></i> {{ cita.fecha_entrevista|date:"H:i" }} hrs
                                     </span>
                                     <div class="caso-estudiante">{{ cita.solicitudes.estudiantes.nombres }} {{ cita.solicitudes.estudiantes.apellidos }}</div>
-                                    <div class="caso-asunto" style="font-size: 0.9rem; color: #555;">
+                                    <div class="caso-asunto caso-asunto-small">
                                         RUT: {{ cita.solicitudes.estudiantes.rut }} | Carrera: {{ cita.solicitudes.estudiantes.carreras.nombre }}
                                     </div>
                                 </div>
@@ -92,19 +92,19 @@
                                 </div>
                             </div>
                             
-                            <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+                            <hr class="border-top-light mt-15">
                             
-                            <h4 style="margin: 10px 0 5px 0; font-size: 0.9rem; color: #333;">Asunto de Solicitud (Estudiante):</h4>
-                            <p style="margin: 0 0 15px 0; font-size: 0.95rem;">{{ cita.solicitudes.asunto }}</p>
+                            <h4 class="section-title-small">Asunto de Solicitud (Estudiante):</h4>
+                            <p class="section-content">{{ cita.solicitudes.asunto }}</p>
                             
-                            <h4 style="margin: 10px 0 5px 0; font-size: 0.9rem; color: #333;">Tus Notas de Entrevista:</h4>
+                            <h4 class="section-title-small">Tus Notas de Entrevista:</h4>
                             {% if cita.notas %}
-                                <pre style="background: #f4f4f4; padding: 10px; border-radius: 4px; font-family: inherit; white-space: pre-wrap; font-size: 0.95rem;">{{ cita.notas }}</pre>
+                                <pre class="pre-formatted">{{ cita.notas }}</pre>
                             {% else %}
-                                <p style="margin: 0; color: #777; font-style: italic;">Aún no hay notas para esta entrevista.</p>
+                                <p class="text-italic-muted">Aún no hay notas para esta entrevista.</p>
                             {% endif %}
 
-                            <div class="acciones-casos" style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+                            <div class="acciones-casos acciones-casos-flex">
                                 <a href="{% url 'detalle_casos_coordinadora' cita.solicitudes.id %}" class="btn-accion btn-agendar">
                                     <i class="fas fa-edit"></i> Ver/Editar Caso Completo
                                 </a>
@@ -115,8 +115,8 @@
             </div>
         {% else %}
             <div class="empty-state">
-                <i class="fas fa-calendar-check" style="font-size: 2.5rem; color: #ccc;"></i>
-                <p style="font-size: 1.1rem; color: #777;">No hay citas agendadas para hoy.</p>
+                <i class="fas fa-calendar-check empty-state-large"></i>
+                <p class="empty-state-text-large">No hay citas agendadas para hoy.</p>
             </div>
         {% endif %}
     </section>

@@ -34,9 +34,9 @@
 .cal-citas-list {
     background-color: #f8f9fa; 
     border-radius: 8px;
-    padding: 20px;
+    padding: 15px;
     border: 1px solid #eee;
-    min-height: 400px; 
+    min-height: 350px; 
 }
 
 .cal-citas-list h4 {
@@ -231,15 +231,16 @@
 .horarios-botones {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 10px;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 8px 0;
 }
 
 .btn-horario {
-    padding: 0.75rem 1.25rem;
+    padding: 0.6rem 1rem;
     border-radius: 6px;
     border: 1px solid #ddd;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 500;
     background: #ffffff;
     color: #28a745;
@@ -335,9 +336,9 @@
 .form-group label {
     display: block;
     margin-bottom: 0.5rem;
-    font-weight: 500;
-    font-size: 0.9rem;
-    color: #444;
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: #333;
 }
 .form-group label span {
     color: #d9534f; /* Color rojo para el asterisco */
@@ -489,6 +490,49 @@
 .btn:disabled {
     background-color: #ccc;
     cursor: not-allowed;
+}
+
+/* --- Clases para reemplazar estilos inline --- */
+.form-hint {
+    font-size: 0.9em;
+    color: #555;
+    margin-top: -10px;
+}
+
+.form-group-spacing {
+    margin-top: 1.5rem;
+}
+
+.empty-state-icon {
+    font-size: 2rem;
+    margin-bottom: 10px;
+}
+
+.empty-state-text {
+    font-size: 0.9rem;
+}
+
+.empty-state-text-small {
+    font-size: 0.9rem;
+}
+
+.empty-state-error {
+    margin-bottom: 15px;
+}
+
+.empty-state-error-icon {
+    font-size: 2rem;
+    margin-bottom: 10px;
+    color: #dc3545;
+}
+
+.empty-state-error-text {
+    font-size: 0.9rem;
+    color: #dc3545;
+}
+
+.horarios-botones-hidden {
+    display: none;
 }
 
 /* --- Mensajes de Exito/Error --- */

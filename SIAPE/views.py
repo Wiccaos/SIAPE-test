@@ -130,20 +130,32 @@ def get_horarios_disponibles(request):
         if not coordinadoras.exists():
             return Response({"error": "No hay coordinadoras configuradas."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # 4. Encontrar citas ya tomadas para esa fecha por CUALQUIER coordinadora
+        # 4. Calcular horarios disponibles: un horario está disponible si AL MENOS UNA coordinadora lo tiene libre
         start_of_day = timezone.make_aware(datetime.combine(selected_date, time.min))
         end_of_day = timezone.make_aware(datetime.combine(selected_date, time.max))
 
-        citas_existentes = Entrevistas.objects.filter(
-            coordinadora__in=coordinadoras,
-            fecha_entrevista__range=(start_of_day, end_of_day)
-        ).values_list('fecha_entrevista', flat=True)
-
-        # 5. Filtrar la lista
-        taken_slots = set()
-        for dt in citas_existentes:
-            taken_slots.add(dt.astimezone(timezone.get_current_timezone()).strftime('%H:%M')) # Formato HH:MM
-        available_slots = [slot for slot in all_slots if slot not in taken_slots]
+        # Para cada slot, verificar si al menos una coordinadora lo tiene disponible
+        available_slots = []
+        for slot in all_slots:
+            # Convertir el slot (ej: "10:00") a datetime
+            hora_obj = datetime.strptime(slot, '%H:%M').time()
+            slot_datetime = timezone.make_aware(datetime.combine(selected_date, hora_obj))
+            
+            # Verificar si al menos una coordinadora tiene este horario libre
+            # Un horario está disponible si AL MENOS UNA coordinadora NO tiene cita en ese horario
+            slot_disponible = False
+            for coord in coordinadoras:
+                tiene_cita = Entrevistas.objects.filter(
+                    coordinadora=coord,
+                    fecha_entrevista=slot_datetime
+                ).exclude(coordinadora__isnull=True).exists()
+                if not tiene_cita:
+                    slot_disponible = True
+                    break
+            
+            if slot_disponible:
+                available_slots.append(slot)
+        
         return Response(available_slots, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": f"Error interno del servidor: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -160,9 +172,9 @@ def get_calendario_disponible(request):
     # 1. Obtener el mes y año de la consulta
     month_str = request.GET.get('month')
     try:
-        # Si no se provee mes, usa el mes actual
+        # Si no se provee mes, usa el mes actual (en zona horaria de Chile)
         if not month_str:
-            target_date = date.today()
+            target_date = timezone.localtime(timezone.now()).date()
         else:
             target_date = datetime.strptime(month_str, '%Y-%m').date()
     except ValueError:
@@ -176,25 +188,67 @@ def get_calendario_disponible(request):
     if not coordinadoras.exists():
         return Response({"error": "No hay coordinadoras configuradas."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # 3. Obtener todas las citas ya tomadas en ese mes
-    citas_del_mes = Entrevistas.objects.filter(
+    # 3. Obtener todas las citas ya tomadas en ese mes, agrupadas por coordinadora y día
+    # Estructura: {coordinadora_id: {dia_str: set([hora1, hora2, ...])}}
+    citas_por_coordinadora_dia = {}
+    
+    # Obtener TODAS las citas del mes de TODAS las coordinadoras de una vez
+    # Usar rango de fechas en lugar de __year y __month para evitar problemas de zona horaria
+    # Calcular el primer y último día del mes en la zona horaria local
+    primer_dia_mes = timezone.make_aware(datetime(year, month, 1, 0, 0, 0))
+    if month == 12:
+        ultimo_dia_mes = timezone.make_aware(datetime(year + 1, 1, 1, 0, 0, 0))
+    else:
+        ultimo_dia_mes = timezone.make_aware(datetime(year, month + 1, 1, 0, 0, 0))
+    
+    print(f"[DEBUG] Buscando citas entre {primer_dia_mes} y {ultimo_dia_mes}")
+    
+    # Filtrar por rango de fechas (esto funciona correctamente con zonas horarias)
+    todas_las_citas = Entrevistas.objects.filter(
         coordinadora__in=coordinadoras,
-        fecha_entrevista__year=year,
-        fecha_entrevista__month=month
-    ).values_list('fecha_entrevista', flat=True)
-
-    # Agrupar citas por día
-    citas_por_dia = {}
-    for dt in citas_del_mes:
-        dia_str = dt.astimezone(timezone.get_current_timezone()).strftime('%Y-%m-%d')
-        hora_str = dt.astimezone(timezone.get_current_timezone()).strftime('%H:%M')
-        if dia_str not in citas_por_dia:
-            citas_por_dia[dia_str] = set()
-        citas_por_dia[dia_str].add(hora_str)
+        fecha_entrevista__gte=primer_dia_mes,
+        fecha_entrevista__lt=ultimo_dia_mes
+    ).exclude(coordinadora__isnull=True).select_related('coordinadora').values_list('coordinadora_id', 'fecha_entrevista')
+    
+    # Debug: mostrar todas las citas encontradas
+    total_citas = todas_las_citas.count()
+    print(f"[DEBUG] Total de citas encontradas en {year}-{month:02d}: {total_citas}")
+    for coord_id, dt in todas_las_citas:
+        dt_local = timezone.localtime(dt)
+        print(f"[DEBUG] Cita encontrada: Coord={coord_id}, Fecha UTC={dt}, Fecha Local={dt_local.strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.debug(f"Total de citas encontradas en {year}-{month:02d}: {total_citas}")
+    
+    # Inicializar el diccionario para todas las coordinadoras
+    for coord in coordinadoras:
+        citas_por_coordinadora_dia[coord.id] = {}
+    
+    # Procesar cada cita
+    for coord_id, dt in todas_las_citas:
+        # Convertir a la zona horaria local de forma consistente
+        dt_local = timezone.localtime(dt)
+        dia_str = dt_local.strftime('%Y-%m-%d')
+        # Normalizar la hora a solo la hora en punto (ej: "10:30" -> "10:00")
+        # Esto es necesario porque los slots son de hora en punto
+        hora_str = f"{dt_local.hour:02d}:00"
+        
+        if coord_id not in citas_por_coordinadora_dia:
+            citas_por_coordinadora_dia[coord_id] = {}
+        if dia_str not in citas_por_coordinadora_dia[coord_id]:
+            citas_por_coordinadora_dia[coord_id][dia_str] = set()
+        citas_por_coordinadora_dia[coord_id][dia_str].add(hora_str)
+        
+        print(f"[DEBUG] Cita encontrada: Coordinadora {coord_id}, Día {dia_str}, Hora {hora_str} (original: {dt_local.strftime('%Y-%m-%d %H:%M:%S')})")
+        logger.debug(f"Cita encontrada: Coordinadora {coord_id}, Día {dia_str}, Hora {hora_str} (original: {dt_local.strftime('%Y-%m-%d %H:%M:%S')})")
+    
+    # Debug: Log de citas encontradas por coordinadora
+    for coord in coordinadoras:
+        if coord.id in citas_por_coordinadora_dia:
+            logger.debug(f"Coordinadora {coord.id}: {sum(len(horas) for horas in citas_por_coordinadora_dia[coord.id].values())} horas ocupadas")
+            for dia, horas in citas_por_coordinadora_dia[coord.id].items():
+                logger.debug(f"  Día {dia}: horas ocupadas {sorted(horas)}")
 
     # 4. Definir los slots base y preparar la respuesta
     slots_base_por_hora = range(9, 18) # 9:00 a 17:00
-    slots_base_set = set([f"{h:02d}:00" for h in slots_base_por_hora])
     
     respuesta_api = {
         "fechasConDisponibilidad": [], # Días con al menos 1 hora libre
@@ -214,34 +268,81 @@ def get_calendario_disponible(request):
         dia_actual_date = date(year, month, dia)
         dia_actual_str = dia_actual_date.strftime('%Y-%m-%d')
 
-        # Omitir fines de semana y días pasados
-        if dia_actual_date.weekday() >= 5 or dia_actual_date < date.today():
+        # Omitir fines de semana y días pasados (usar fecha actual en zona horaria de Chile)
+        hoy_chile = timezone.localtime(timezone.now()).date()
+        if dia_actual_date.weekday() >= 5 or dia_actual_date < hoy_chile:
             continue
 
-        citas_tomadas_ese_dia = citas_por_dia.get(dia_actual_str, set())
         slots_libres = []
         slots_no_disponibles = []
+        
         for h in slots_base_por_hora:
             hora_str = f"{h:02d}:00"
-            # Si la hora ya está tomada, no disponible
-            if hora_str in citas_tomadas_ese_dia:
-                slots_no_disponibles.append(hora_str)
-                continue
+            
             # Si es hoy, solo permitir con 2 horas de anticipación
             if dia_actual_str == hoy_str:
                 if h <= now.hour + 1:  # Debe ser al menos 2 horas después de la actual
                     slots_no_disponibles.append(hora_str)
                     continue
-            slots_libres.append(hora_str)
+            
+            # Verificar si alguna coordinadora tiene una cita en este horario
+            # IMPORTANTE: Si CUALQUIERA de las coordinadoras tiene una cita en este horario,
+            # el horario NO está disponible (solo hay 1 horario disponible por día)
+            # Un horario está disponible SOLO si NINGUNA coordinadora tiene una cita en ese horario
+            slot_ocupado = False
+            coordinadora_ocupada = None
+            if coordinadoras.exists():
+                for coord in coordinadoras:
+                    citas_coord_dia = citas_por_coordinadora_dia.get(coord.id, {}).get(dia_actual_str, set())
+                    # Debug: verificar qué hay en el set
+                    if citas_coord_dia:
+                        print(f"[DEBUG] Coordinadora {coord.id}, Día {dia_actual_str}: horas en set = {sorted(citas_coord_dia)}, buscando {hora_str}")
+                        logger.debug(f"Coordinadora {coord.id}, Día {dia_actual_str}: horas en set = {sorted(citas_coord_dia)}, buscando {hora_str}")
+                    # Si esta coordinadora tiene una cita en este horario, el slot está ocupado
+                    if hora_str in citas_coord_dia:
+                        slot_ocupado = True
+                        coordinadora_ocupada = coord.id
+                        print(f"[DEBUG] ✓ Slot {hora_str} del día {dia_actual_str} está ocupado por coordinadora {coord.id}")
+                        logger.debug(f"✓ Slot {hora_str} del día {dia_actual_str} está ocupado por coordinadora {coord.id}")
+                        break
+            
+            # Si ninguna coordinadora tiene el horario ocupado, está disponible
+            if not slot_ocupado and coordinadoras.exists():
+                slots_libres.append(hora_str)
+                logger.debug(f"  Slot {hora_str} del día {dia_actual_str} está DISPONIBLE")
+            else:
+                # Al menos una coordinadora tiene este horario ocupado (o no hay coordinadoras)
+                slots_no_disponibles.append(hora_str)
+                if slot_ocupado:
+                    print(f"[DEBUG] Slot {hora_str} del día {dia_actual_str} agregado a slots_no_disponibles (ocupado por coord {coordinadora_ocupada})")
+                    logger.debug(f"  Slot {hora_str} del día {dia_actual_str} agregado a slots_no_disponibles (ocupado por coord {coordinadora_ocupada})")
+                else:
+                    print(f"[DEBUG] Slot {hora_str} del día {dia_actual_str} agregado a slots_no_disponibles (no hay coordinadoras)")
+                    logger.debug(f"  Slot {hora_str} del día {dia_actual_str} agregado a slots_no_disponibles (no hay coordinadoras)")
 
+        # Siempre agregar los slots detallados, incluso si no hay disponibles
+        # Esto permite que el frontend muestre correctamente qué horarios están ocupados
+        respuesta_api["slotsDetallados"][dia_actual_str] = slots_libres
+        respuesta_api["slotsNoDisponibles"][dia_actual_str] = slots_no_disponibles
+        
+        # Debug: Log de slots para este día
+        if slots_no_disponibles:
+            print(f"[DEBUG] Día {dia_actual_str}: {len(slots_no_disponibles)} slots no disponibles: {sorted(slots_no_disponibles)}")
+            logger.debug(f"Día {dia_actual_str}: {len(slots_no_disponibles)} slots no disponibles: {sorted(slots_no_disponibles)}")
+        
         if len(slots_libres) > 0:
             respuesta_api["fechasConDisponibilidad"].append(dia_actual_str)
-            respuesta_api["slotsDetallados"][dia_actual_str] = slots_libres
-            respuesta_api["slotsNoDisponibles"][dia_actual_str] = slots_no_disponibles
         else:
             respuesta_api["diasCompletos"].append(dia_actual_str)
-            respuesta_api["slotsNoDisponibles"][dia_actual_str] = slots_no_disponibles
 
+    # Debug: Imprimir resumen final
+    print(f"[DEBUG] Resumen final - Días con disponibilidad: {len(respuesta_api['fechasConDisponibilidad'])}")
+    print(f"[DEBUG] Resumen final - Días completos: {len(respuesta_api['diasCompletos'])}")
+    print(f"[DEBUG] Resumen final - Total días procesados: {len(respuesta_api['slotsDetallados'])}")
+    for dia, slots in list(respuesta_api['slotsNoDisponibles'].items())[:5]:  # Mostrar primeros 5 días
+        if slots:
+            print(f"[DEBUG] Día {dia}: {len(slots)} slots no disponibles: {sorted(slots)}")
+    
     return Response(respuesta_api, status=status.HTTP_200_OK)
 
 
@@ -715,8 +816,12 @@ def dashboard_coordinadora(request):
 
     # 3. --- Obtener Datos para KPIs ---
     
-    # Base de entrevistas para esta coordinadora
-    entrevistas_coordinadora = Entrevistas.objects.filter(coordinadora=perfil)
+    # Base de entrevistas para todas las coordinadoras (filtramos por rol)
+    # Como todas las coordinadoras deben ver todas las entrevistas del rol
+    todas_las_coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
+    entrevistas_coordinadora = Entrevistas.objects.filter(
+        coordinadora__in=todas_las_coordinadoras
+    ).exclude(coordinadora__isnull=True)
     
     # KPI 1: Citas del día (Query que usaremos también para la lista)
     citas_hoy_qs = entrevistas_coordinadora.filter(
@@ -880,12 +985,19 @@ def panel_control_coordinadora(request):
     start_of_week_dt = timezone.make_aware(datetime.combine(start_of_week, datetime.min.time()))
     end_of_week_dt = timezone.make_aware(datetime.combine(end_of_week, datetime.max.time()))
 
-    # 2. --- Obtener Citas para la Coordinadora Logueada ---
+    # 2. --- Obtener Citas para Todas las Coordinadoras (Rol Completo) ---
     
-    # Base de entrevistas para esta coordinadora
+    # Verificar que el perfil de la coordinadora existe
+    if not perfil_coordinadora:
+        messages.error(request, 'Error: No se pudo obtener el perfil de la coordinadora.')
+        return redirect('home')
+    
+    # Base de entrevistas para todas las coordinadoras del rol
+    # Todas las coordinadoras deben ver todas las entrevistas agendadas del rol
+    todas_las_coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
     entrevistas_coordinadora = Entrevistas.objects.filter(
-        coordinadora=perfil_coordinadora
-    ).select_related('solicitudes', 'solicitudes__estudiantes')
+        coordinadora__in=todas_las_coordinadoras
+    ).exclude(coordinadora__isnull=True).select_related('solicitudes', 'solicitudes__estudiantes')
 
     # A. Citas del Día
     citas_hoy_list = entrevistas_coordinadora.filter(
@@ -980,8 +1092,9 @@ def confirmar_cita_coordinadora(request, entrevista_id):
         accion = request.POST.get('accion')
         notas_adicionales = request.POST.get('notas_adicionales', '')
         try:
-            # Importante: Filtra por la coordinadora logueada
-            entrevista = get_object_or_404(Entrevistas, id=entrevista_id, coordinadora=request.user.perfil)
+            # Cualquier coordinadora del rol puede confirmar cualquier entrevista del rol
+            todas_las_coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
+            entrevista = get_object_or_404(Entrevistas, id=entrevista_id, coordinadora__in=todas_las_coordinadoras)
             
             if accion in ['realizada', 'no_asistio']:
                 entrevista.estado = accion
@@ -1022,7 +1135,9 @@ def editar_notas_cita_coordinadora(request, entrevista_id):
     if request.method == 'POST':
         nuevas_notas = request.POST.get('notas', '')
         try:
-            entrevista = get_object_or_404(Entrevistas, id=entrevista_id, coordinadora=request.user.perfil)
+            # Cualquier coordinadora del rol puede editar notas de cualquier entrevista del rol
+            todas_las_coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
+            entrevista = get_object_or_404(Entrevistas, id=entrevista_id, coordinadora__in=todas_las_coordinadoras)
             entrevista.notas = nuevas_notas
             entrevista.save()
             messages.success(request, 'Notas actualizadas correctamente.')
@@ -1053,15 +1168,17 @@ def reagendar_cita_coordinadora(request, entrevista_id):
         nueva_modalidad = request.POST.get('nueva_modalidad', '')
         notas_reagendamiento = request.POST.get('notas_reagendamiento', '')
         try:
-            entrevista_original = get_object_or_404(Entrevistas, id=entrevista_id, coordinadora=request.user.perfil)
+            # Cualquier coordinadora del rol puede reagendar cualquier entrevista del rol
+            todas_las_coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
+            entrevista_original = get_object_or_404(Entrevistas, id=entrevista_id, coordinadora__in=todas_las_coordinadoras)
             
             nueva_fecha = datetime.strptime(nueva_fecha_str, '%Y-%m-%dT%H:%M')
             nueva_fecha = timezone.make_aware(nueva_fecha)
             
-            # Crear la nueva cita
+            # Crear la nueva cita (mantenemos la misma coordinadora asignada originalmente)
             nueva_entrevista = Entrevistas.objects.create(
                 solicitudes=entrevista_original.solicitudes, 
-                coordinadora=entrevista_original.coordinadora, # Asignada a la misma coordinadora
+                coordinadora=entrevista_original.coordinadora, # Mantiene la coordinadora original
                 fecha_entrevista=nueva_fecha, 
                 modalidad=nueva_modalidad or entrevista_original.modalidad,
                 notas=f"Reagendada desde cita del {entrevista_original.fecha_entrevista.strftime('%d/%m/%Y %H:%M')}. {notas_reagendamiento}" if notas_reagendamiento else f"Reagendada desde cita del {entrevista_original.fecha_entrevista.strftime('%d/%m/%Y %H:%M')}.",

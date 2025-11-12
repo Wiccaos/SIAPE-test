@@ -4,10 +4,10 @@ from .models import (
     Carreras, Estudiantes, Solicitudes, Evidencias, Asignaturas, 
     AsignaturasEnCurso, Entrevistas, AjusteRazonable, AjusteAsignado
 )
-from datetime import datetime, time
+from datetime import datetime, timedelta, time
 from django.utils import timezone
 
-ROL_COORDINADORA = 'Coordinadora de Apoyos'
+ROL_COORDINADORA = 'Coordinadora de Inclusión'
 
 class UsuarioSerializer(serializers.ModelSerializer):
     # --- Lectura y Escritura ---
@@ -307,7 +307,7 @@ class EntrevistasSerializer(serializers.ModelSerializer):
     # --- Campos de ESCRITURA (Write-only) ---
     solicitudes = serializers.PrimaryKeyRelatedField(queryset=Solicitudes.objects.all(), write_only=True, label="Solicitud")
     coordinadora = serializers.PrimaryKeyRelatedField(
-        queryset=PerfilUsuario.objects.filter(rol__nombre_rol='Coordinadora de Inclusión'),
+        queryset=PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA),
         write_only=True,
         label="Coordinadora de Inclusión"
     )
@@ -469,15 +469,24 @@ class PublicaSolicitudSerializer(serializers.Serializer):
             raise serializers.ValidationError("Formato de hora inválido.")
 
         # 1. Combinar fecha y hora en un datetime consciente de la zona horaria
-        fecha_hora_cita = timezone.make_aware(datetime.combine(fecha, hora_obj))
+        # Normalizar la hora a hora en punto (minutos y segundos en 0)
+        hora_normalizada = hora_obj.replace(minute=0, second=0, microsecond=0)
+        fecha_hora_cita = timezone.make_aware(datetime.combine(fecha, hora_normalizada))
 
         # 2. Re-validar que la hora no esté tomada
+        # Usar rango de fechas para evitar problemas con zonas horarias
+        # Buscar citas en el mismo día y hora (normalizada)
+        inicio_slot = fecha_hora_cita
+        fin_slot = fecha_hora_cita + timedelta(hours=1)
+        
         coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
         
+        # Buscar citas que se solapen con este slot (mismo día y hora)
         cita_tomada = Entrevistas.objects.filter(
             coordinadora__in=coordinadoras,
-            fecha_entrevista=fecha_hora_cita
-        ).exists()
+            fecha_entrevista__gte=inicio_slot,
+            fecha_entrevista__lt=fin_slot
+        ).exclude(coordinadora__isnull=True).exists()
 
         if cita_tomada:
             raise serializers.ValidationError(
@@ -501,8 +510,27 @@ class PublicaSolicitudSerializer(serializers.Serializer):
             
         }
 
-        # 2. Buscar coordinadora disponible
-        coordinadora_asignada = PerfilUsuario.objects.filter(rol__nombre_rol='Coordinadora de Inclusión').first()
+        # 2. Buscar coordinadora disponible para el horario seleccionado
+        fecha_hora_cita = validated_data['fecha_entrevista_completa']
+        coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
+        
+        # Buscar una coordinadora que no tenga una cita en ese horario
+        coordinadora_asignada = None
+        for coord in coordinadoras:
+            tiene_cita = Entrevistas.objects.filter(
+                coordinadora=coord,
+                fecha_entrevista=fecha_hora_cita
+            ).exists()
+            if not tiene_cita:
+                coordinadora_asignada = coord
+                break
+        
+        # Si ninguna coordinadora está disponible, usar la primera (fallback)
+        if not coordinadora_asignada:
+            coordinadora_asignada = coordinadoras.first()
+        
+        if not coordinadora_asignada:
+            raise serializers.ValidationError("No hay coordinadoras disponibles en el sistema.")
 
         # 3. Datos de la Solicitud (incluye coordinadora)
         datos_solicitud = {

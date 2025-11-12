@@ -43,7 +43,7 @@
         {% endif %}
     </nav>
 
-    <section class="table-container" style="padding: 20px 25px 15px 25px;">
+    <section class="table-container p-20">
         <form method="GET" action="{% url 'casos_generales' %}">
             
             <div class="filter-bar">
@@ -62,7 +62,7 @@
             </div>
 
             <div class="collapsible-filters" id="collapsible-filters-content">
-                <div class="form-grid" style="margin-bottom: 0; padding-bottom: 0;">
+                <div class="form-grid mb-0 padding-bottom-0">
                     <div class="form-group">
                         <label for="q_fecha">Fecha de Solicitud:</label>
                         <input type="date" id="q_fecha" name="q_fecha" value="{{ filtros_aplicados.q_fecha }}">
@@ -80,13 +80,13 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-actions" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee; justify-content: flex-start;">
+                <div class="form-actions mt-15 border-top-light flex-start padding-top-15">
                     <a href="{% url 'casos_generales' %}" class="btn-accion btn-accion-gray">Limpiar Filtros</a>
                 </div>
             </div>
         </form>
     </section>
-    <section class="table-container" style="margin-top: 20px;">
+    <section class="table-container mt-20">
         <div class="table-header">
             <h2>Casos Encontrados</h2>
         </div>
@@ -123,9 +123,9 @@
                 {% empty %}
                 <tr>
                     <td colspan="5">
-                        <div class="empty-state" style="padding: 20px;">
-                            <i class="fas fa-search" style="color: #ccc; font-size: 1.5rem;"></i>
-                            <p style="font-size: 1rem; color: #777;">No se encontraron solicitudes con esos filtros.</p>
+                        <div class="empty-state p-20">
+                            <i class="fas fa-search text-muted icon-medium"></i>
+                            <p class="text-muted">No se encontraron solicitudes con esos filtros.</p>
                         </div>
                     </td>
                 </tr>

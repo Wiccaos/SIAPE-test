@@ -51,9 +51,9 @@
                         </div>
                     {% endfor %}
                 {% else %}
-                    <div class="empty-state" style="padding: 10px 0;">
-                        <i class="fas fa-check-circle" style="color: #ccc;"></i>
-                        <p style="font-size: 0.9rem;">No hay citas programadas para hoy.</p>
+                    <div class="empty-state p-10">
+                        <i class="fas fa-check-circle text-muted"></i>
+                        <p class="text-small">No hay citas programadas para hoy.</p>
                     </div>
                 {% endif %}
             </div>
@@ -69,9 +69,9 @@
                         </div>
                     {% endfor %}
                 {% else %}
-                    <div class="empty-state" style="padding: 10px 0;">
-                        <i class="fas fa-check-circle" style="color: #ccc;"></i>
-                        <p style="font-size: 0.9rem;">No hay más citas programadas para esta semana.</p>
+                    <div class="empty-state p-10">
+                        <i class="fas fa-check-circle text-muted"></i>
+                        <p class="text-small">No hay más citas programadas para esta semana.</p>
                     </div>
                 {% endif %}
             </div>
@@ -79,7 +79,7 @@
         </div> <div class="panel-section">
             <h3><i class="fas fa-calendar-alt"></i> Calendario de Citas</h3>
             
-            <div class="cal-layout-container" style="grid-template-columns: 1fr; gap: 15px;">
+            <div class="cal-layout-container grid-single-column">
                 
                 <div class="cal-widget">
                     <div class="detalle-card" id="card-calendario-panel">
@@ -100,8 +100,8 @@
                     <h4 id="cal-citas-titulo">Citas del Día</h4>
                     <div id="cal-citas-dia">
                         <div class="empty-state empty-state-10">
-                            <i class="fas fa-calendar-day" style="font-size: 2rem; margin-bottom: 10px;"></i>
-                            <p style="font-size: 0.9rem;">Seleccione un día del calendario para ver las citas programadas.</p>
+                            <i class="fas fa-calendar-day empty-state-icon"></i>
+                            <p class="empty-state-text">Seleccione un día del calendario para ver las citas programadas.</p>
                         </div>
                     </div>
                 </div>
@@ -416,9 +416,9 @@
             
             if (citas.length === 0) {
                 citasDiaContainer.innerHTML = `
-                    <div class="empty-state" style="padding: 10px 0;">
-                        <i class="fas fa-calendar-check" style="font-size: 2rem; margin-bottom: 10px;"></i>
-                        <p style="font-size: 0.9rem;">No hay citas programadas para este día.</p>
+                    <div class="empty-state p-10">
+                        <i class="fas fa-calendar-check empty-state-icon"></i>
+                        <p class="empty-state-text">No hay citas programadas para este día.</p>
                     </div>
                 `;
                 return;
@@ -505,9 +505,9 @@
                     diaSeleccionadoStr = null;
                     citasDiaTitulo.innerText = `Citas del Día`;
                     citasDiaContainer.innerHTML = `
-                        <div class="empty-state" style="padding: 10px 0;">
-                            <i class="fas fa-calendar-day" style="font-size: 2rem; margin-bottom: 10px;"></i>
-                            <p style="font-size: 0.9rem;">Seleccione un día del calendario para ver las citas programadas.</p>
+                        <div class="empty-state p-10">
+                            <i class="fas fa-calendar-day empty-state-icon"></i>
+                            <p class="empty-state-text">Seleccione un día del calendario para ver las citas programadas.</p>
                         </div>
                     `;
                 }

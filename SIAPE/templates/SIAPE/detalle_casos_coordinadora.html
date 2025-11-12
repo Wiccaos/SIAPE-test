@@ -94,8 +94,8 @@
                         {% endfor %}
                         </ul>
                     {% else %}
-                        <div class="empty-state" style="padding: 10px 0;">
-                            <p style="font-size: 0.9rem;">No hay evidencias adjuntas.</p>
+                        <div class="empty-state p-10">
+                            <p class="text-small">No hay evidencias adjuntas.</p>
                         </div>
                     {% endif %}
                 </div>
@@ -118,8 +118,8 @@
                         </div>
                         {% endfor %}
                     {% else %}
-                        <div class="empty-state" style="padding: 10px 0;">
-                            <p style="font-size: 0.9rem;">No hay entrevistas registradas.</p>
+                        <div class="empty-state p-10">
+                            <p class="text-small">No hay entrevistas registradas.</p>
                         </div>
                     {% endif %}
                 </div>
@@ -137,8 +137,8 @@
                         </div>
                         {% endfor %}
                     {% else %}
-                        <div class="empty-state" style="padding: 10px 0;">
-                            <p style="font-size: 0.9rem;">Aún no se han asignado ajustes.</p>
+                        <div class="empty-state p-10">
+                            <p class="text-small">Aún no se han asignado ajustes.</p>
                         </div>
                     {% endif %}
                 </div>
@@ -158,16 +158,16 @@
                         </label>
                         <textarea name="descripcion_caso" id="descripcion_caso" rows="10">{{ solicitud.descripcion }}</textarea>
                     </div>
-                    <div class="form-actions" style="justify-content: flex-end;">
+                    <div class="form-actions flex-end">
                         <button type="submit" class="btn-accion btn-agendar">
                             <i class="fas fa-save"></i> Guardar Descripción
                         </button>
                     </div>
                 </form>
                 
-                <hr style="border: 0; border-top: 1px solid #eee; margin: 25px 0;">
+                <hr class="border-top-light margin-25-0">
                 
-                <h3 style="border: none; margin-bottom: 15px;">Acciones del Caso</h3>
+                <h3 class="mb-15">Acciones del Caso</h3>
                 <div class="acciones-casos">
                     <button type="button" class="btn-accion btn-agendar" onclick="abrirModalAgendar({{ solicitud.id }}, '{{ solicitud.asunto }}')">
                         <i class="fas fa-calendar-plus"></i> Agendar (Nueva) Cita
@@ -180,7 +180,7 @@
             </div>
         </div>
         
-        <div style="grid-column: 1 / -1; margin-top: 15px;">
+        <div class="grid-column-full mt-15">
             <a href="{% url 'casos_generales' %}" class="btn-volver">
                 <i class="fas fa-chevron-left"></i> Volver a la lista de Casos
             </a>
