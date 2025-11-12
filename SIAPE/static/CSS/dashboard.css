@@ -1290,6 +1290,15 @@ body.dark-mode .cal-day {
     background-color: #c82333;
 }
 
+.btn-accion-orange {
+    background-color: #ff9800;
+    color: white;
+}
+
+.btn-accion-orange:hover {
+    background-color: #e68900;
+}
+
 .btn-accion-green {
     background-color: #28a745;
     color: white;

@@ -1,0 +1,139 @@
+{% extends "plantilla.html" %}
+{% load static %}
+
+{% block title %}
+    Panel Principal - Asesora Técnica Pedagógica | SIAPE
+{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="main-content"> 
+    
+    <nav class="dashboard-nav">
+        <a href="{% url 'dashboard_asesor_técnico' %}" class="nav-item active">
+            <i class="fas fa-home"></i>
+            Panel Principal
+        </a>
+        <a href="{% url 'casos_generales' %}" class="nav-item">
+            <i class="fas fa-folder-open"></i>
+            Casos
+        </a>
+    </nav>
+
+    <section class="kpi-container">
+        <div class="kpi-card">
+            <div class="kpi-icon icon-solicitudes">
+                <i class="fas fa-file-medical"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ kpis.casos_nuevos_semana|default:0 }}</span>
+                <span class="kpi-label">Casos Nuevos (Esta Semana)</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-proceso">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ kpis.casos_pendientes_total|default:0 }}</span>
+                <span class="kpi-label">Pendientes de Formulación</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-solicitudes">
+                <i class="fas fa-user-check"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ kpis.casos_asignados|default:0 }}</span>
+                <span class="kpi-label">Casos Asignados a Mí</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-proceso">
+                <i class="fas fa-spinner"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ kpis.casos_en_proceso|default:0 }}</span>
+                <span class="kpi-label">Casos en Proceso</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-resueltos">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ kpis.casos_completados|default:0 }}</span>
+                <span class="kpi-label">Casos Completados</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-resueltos">
+                <i class="fas fa-check-double"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ kpis.casos_aprobados|default:0 }}</span>
+                <span class="kpi-label">Casos Aprobados</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="support-grid-container">
+        <h2><i class="fas fa-file-alt"></i> Casos Pendientes de Formulación</h2>
+
+        {% if casos_pendientes_list %}
+            <div class="panel-control-container">
+                <div class="panel-section panel-section-no-shadow">
+                    {% for caso in casos_pendientes_list %}
+                        <div class="caso-item">
+                            <div class="caso-header">
+                                <div>
+                                    <div class="caso-estudiante">{{ caso.estudiantes.nombres }} {{ caso.estudiantes.apellidos }}</div>
+                                    <div class="caso-asunto caso-asunto-small">
+                                        RUT: {{ caso.estudiantes.rut }} | Carrera: {{ caso.estudiantes.carreras.nombre }}
+                                    </div>
+                                    <div class="caso-asunto caso-asunto-small">
+                                        <i class="fas fa-calendar"></i> Actualizado: {{ caso.updated_at|date:"d/m/Y H:i" }}
+                                    </div>
+                                </div>
+                                <div>
+                                    <span class="status status-en_proceso">{{ caso.get_estado_display }}</span>
+                                </div>
+                            </div>
+                            
+                            <hr class="border-top-light mt-15">
+                            
+                            <h4 class="section-title-small">Asunto de Solicitud:</h4>
+                            <p class="section-content">{{ caso.asunto }}</p>
+                            
+                            {% if caso.descripcion %}
+                                <h4 class="section-title-small">Descripción del Caso:</h4>
+                                <p class="section-content">{{ caso.descripcion|truncatewords:50 }}</p>
+                            {% endif %}
+
+                            <div class="acciones-casos acciones-casos-flex">
+                                <a href="{% url 'detalle_casos_asesor_tecnico' caso.id %}" class="btn-accion btn-agendar">
+                                    <i class="fas fa-edit"></i> Ver/Formular Ajuste
+                                </a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-check-circle empty-state-large"></i>
+                <p class="empty-state-text-large">No hay casos pendientes de formulación en este momento.</p>
+            </div>
+        {% endif %}
+    </section>
+
+</div>
+{% endblock %}

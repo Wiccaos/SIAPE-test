@@ -23,6 +23,16 @@
             <a href="{% url 'panel_control_coordinadora' %}" class="nav-item">
                 <i class="fas fa-tachometer-alt"></i> Panel de Control
             </a>
+        {% elif user.perfil.rol.nombre_rol == "Asesora Técnica Pedagógica" %}
+            <a href="{% url 'dashboard_asesor_técnico' %}" class="nav-item">
+                <i class="fas fa-home"></i> Panel Principal
+            </a>
+            <a href="{% url 'casos_generales' %}" class="nav-item active"> 
+                <i class="fas fa-folder-open"></i> Casos
+            </a>
+            <a href="#" class="nav-item">
+                <i class="fas fa-tachometer-alt"></i> Panel de Control
+            </a>
         {% elif user.perfil.rol.nombre_rol == "Asesora Pedagógica" %}
             <a href="{% url 'dashboard_asesor' %}" class="nav-item">
                 <i class="fas fa-home"></i> Panel Principal
@@ -45,6 +55,9 @@
 
     <section class="table-container p-20">
         <form method="GET" action="{% url 'casos_generales' %}">
+            {% if mostrando_todos %}
+                <input type="hidden" name="todos" value="1">
+            {% endif %}
             
             <div class="filter-bar">
                 <div class="form-group main-search-group">
@@ -60,9 +73,48 @@
                     <i class="fas fa-search"></i> Buscar
                 </button>
             </div>
+            
+            {% if not mostrando_todos and rol_usuario != "Administrador" %}
+                <div class="alert alert-info" style="background-color: #e7f3ff; border-left: 4px solid #2196F3; padding: 12px 15px; margin-top: 15px; border-radius: 4px;">
+                    <i class="fas fa-info-circle"></i> 
+                    <strong>Filtro activo por rol:</strong> 
+                    {% if rol_usuario == "Coordinadora de Inclusión" %}
+                        Mostrando casos en estado "Pendiente de Entrevista".
+                    {% elif rol_usuario == "Asesora Técnica Pedagógica" %}
+                        Mostrando casos en estado "Pendiente de Formulación".
+                    {% elif rol_usuario == "Asesora Pedagógica" %}
+                        Mostrando casos en estado "Pendiente de Preaprobación".
+                    {% elif rol_usuario == "Director de Carrera" %}
+                        Mostrando casos en estado "Pendiente de Aprobación".
+                    {% endif %}
+                    <a href="{% url 'casos_generales' %}?todos=1" style="color: #cc0000; font-weight: bold; margin-left: 10px;">
+                        <i class="fas fa-eye"></i> Ver Todos los Casos
+                    </a>
+                </div>
+            {% elif mostrando_todos %}
+                <div class="alert alert-warning" style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 12px 15px; margin-top: 15px; border-radius: 4px;">
+                    <i class="fas fa-eye"></i> 
+                    <strong>Vista general:</strong> Mostrando todos los casos sin filtro por rol.
+                    <a href="{% url 'casos_generales' %}" style="color: #cc0000; font-weight: bold; margin-left: 10px;">
+                        <i class="fas fa-filter"></i> Ver Mis Casos
+                    </a>
+                </div>
+            {% endif %}
 
             <div class="collapsible-filters" id="collapsible-filters-content">
                 <div class="form-grid mb-0 padding-bottom-0">
+                    <div class="form-group">
+                        <label for="q_estado">Estado del Caso:</label>
+                        <select id="q_estado" name="q_estado">
+                            <option value="">-- Todos los estados --</option>
+                            {% for estado_valor, estado_nombre in estados_disponibles %}
+                            <option value="{{ estado_valor }}" {% if filtros_aplicados.q_estado == estado_valor %}selected{% endif %}>
+                                {{ estado_nombre }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
                     <div class="form-group">
                         <label for="q_fecha">Fecha de Solicitud:</label>
                         <input type="date" id="q_fecha" name="q_fecha" value="{{ filtros_aplicados.q_fecha }}">
@@ -81,6 +133,15 @@
                     </div>
                 </div>
                 <div class="form-actions mt-15 border-top-light flex-start padding-top-15">
+                    {% if not mostrando_todos and rol_usuario != "Administrador" %}
+                        <a href="{% url 'casos_generales' %}?todos=1" class="btn-accion btn-accion-gray" style="background-color: #f0f0f0; border: 2px solid #2196F3; color: #2196F3; font-weight: bold;">
+                            <i class="fas fa-list"></i> Ver Todos los Casos (Sin Filtro por Rol)
+                        </a>
+                    {% elif mostrando_todos %}
+                        <a href="{% url 'casos_generales' %}" class="btn-accion btn-accion-gray" style="background-color: #f0f0f0; border: 2px solid #cc0000; color: #cc0000; font-weight: bold;">
+                            <i class="fas fa-filter"></i> Aplicar Filtro por Rol
+                        </a>
+                    {% endif %}
                     <a href="{% url 'casos_generales' %}" class="btn-accion btn-accion-gray">Limpiar Filtros</a>
                 </div>
             </div>
@@ -88,7 +149,24 @@
     </section>
     <section class="table-container mt-20">
         <div class="table-header">
-            <h2>Casos Encontrados</h2>
+            <h2>
+                Casos Encontrados
+                {% if not mostrando_todos and rol_usuario != "Administrador" %}
+                    <span style="font-size: 0.7em; color: #666; font-weight: normal;">
+                        (Filtrado por rol: {{ rol_usuario }})
+                    </span>
+                {% elif mostrando_todos %}
+                    <span style="font-size: 0.7em; color: #666; font-weight: normal;">
+                        (Todos los casos - Sin filtro por rol)
+                    </span>
+                {% endif %}
+            </h2>
+            <p style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                Total: <strong>{{ total_casos }}</strong> caso{{ total_casos|pluralize }}
+                {% if not mostrando_todos and rol_usuario != "Administrador" %}
+                    <span style="color: #2196F3;">| Filtro activo por rol</span>
+                {% endif %}
+            </p>
         </div>
         
         <table class="custom-table">
@@ -117,7 +195,13 @@
 {% endif %}
                     </td>
                     <td>
-                        <a href="{% url 'detalle_casos_coordinadora' solicitud.id %}" class="link-rojo">Ver más »</a>
+                        {% if user.perfil.rol.nombre_rol == "Asesora Técnica Pedagógica" %}
+                            <a href="{% url 'detalle_casos_asesor_tecnico' solicitud.id %}" class="link-rojo">Ver más »</a>
+                        {% elif user.perfil.rol.nombre_rol == "Coordinadora de Inclusión" %}
+                            <a href="{% url 'detalle_casos_coordinadora' solicitud.id %}" class="link-rojo">Ver más »</a>
+                        {% else %}
+                            <a href="{% url 'detalle_casos_coordinadora' solicitud.id %}" class="link-rojo">Ver más »</a>
+                        {% endif %}
                     </td>
                 </tr>
                 {% empty %}
@@ -125,7 +209,19 @@
                     <td colspan="5">
                         <div class="empty-state p-20">
                             <i class="fas fa-search text-muted icon-medium"></i>
-                            <p class="text-muted">No se encontraron solicitudes con esos filtros.</p>
+                            {% if rol_usuario == "Asesora Técnica Pedagógica" and not mostrando_todos %}
+                                <p class="text-muted">No hay casos pendientes de formulación en este momento.</p>
+                                <p class="text-muted" style="margin-top: 10px;">
+                                    <a href="{% url 'casos_generales' %}?todos=1" style="color: #cc0000;">Ver todos los casos</a>
+                                </p>
+                            {% elif rol_usuario == "Coordinadora de Inclusión" and not mostrando_todos %}
+                                <p class="text-muted">No hay casos pendientes de entrevista o asignados a ti.</p>
+                                <p class="text-muted" style="margin-top: 10px;">
+                                    <a href="{% url 'casos_generales' %}?todos=1" style="color: #cc0000;">Ver todos los casos</a>
+                                </p>
+                            {% else %}
+                                <p class="text-muted">No se encontraron solicitudes con esos filtros.</p>
+                            {% endif %}
                         </div>
                     </td>
                 </tr>

@@ -285,10 +285,6 @@ def get_calendario_disponible(request):
                     slots_no_disponibles.append(hora_str)
                     continue
             
-            # Verificar si alguna coordinadora tiene una cita en este horario
-            # IMPORTANTE: Si CUALQUIERA de las coordinadoras tiene una cita en este horario,
-            # el horario NO está disponible (solo hay 1 horario disponible por día)
-            # Un horario está disponible SOLO si NINGUNA coordinadora tiene una cita en ese horario
             slot_ocupado = False
             coordinadora_ocupada = None
             if coordinadoras.exists():
@@ -364,7 +360,7 @@ def redireccionamiento_por_rol(request):
     if rol == ROL_COORDINADORA:
         return redirect('dashboard_coordinadora')
     elif rol == ROL_ASESORA_TECNICA:
-        return redirect('panel_control_asesora_tecnica')
+        return redirect('dashboard_asesor_técnico')
     elif rol == ROL_ASESOR:
         return redirect('dashboard_asesor')
     elif rol == ROL_DIRECTOR:
@@ -392,11 +388,17 @@ def logout_view(request):
 def casos_generales(request):
     """
     Vista unificada para buscar y filtrar todos los casos del sistema.
-    Accesible por todos los roles de asesoría.
+    Filtra casos según el rol del usuario:
+    - Coordinadora: Casos pendientes de entrevista o asignados a ella
+    - Asesora Técnica: Casos pendientes de formulación (que debe formular)
+    - Asesor Pedagógico: Casos pendientes de preaprobación
+    - Director: Casos pendientes de aprobación
+    - Admin: Todos los casos
     """
 
     try:
         perfil = request.user.perfil
+        rol_nombre = perfil.rol.nombre_rol
         ROLES_PERMITIDOS = [
             ROL_COORDINADORA,
             ROL_ASESORA_TECNICA,
@@ -404,28 +406,79 @@ def casos_generales(request):
             ROL_DIRECTOR,
             ROL_ADMIN
         ]
-        if perfil.rol.nombre_rol not in ROLES_PERMITIDOS:
+        if rol_nombre not in ROLES_PERMITIDOS:
             messages.error(request, 'No tienes permisos para acceder a esta vista.')
             return redirect('home')
     except AttributeError:
         if not request.user.is_superuser:
             return redirect('home')
+        rol_nombre = None
+        perfil = None
 
+    # Base query con relaciones optimizadas
     solicitudes_list = Solicitudes.objects.all().select_related(
         'estudiantes', 
-        'estudiantes__carreras'
+        'estudiantes__carreras',
+        'coordinadora_asignada',
+        'asesor_tecnico_asignado',
+        'asesor_pedagogico_asignado'
     ).prefetch_related(
         'ajusteasignado_set__ajuste_razonable__categorias_ajustes'
     ).distinct().order_by('-created_at')
 
-    q_nombre = request.GET.get('q_nombre', None)
-    q_fecha = request.GET.get('q_fecha', None)
-    q_ajuste = request.GET.get('q_ajuste', None)
+    # Obtener parámetros de filtro
+    q_nombre = request.GET.get('q_nombre', '').strip()
+    q_fecha = request.GET.get('q_fecha', '').strip()
+    q_ajuste = request.GET.get('q_ajuste', '').strip()
+    q_estado = request.GET.get('q_estado', '').strip()  # Filtro por estado
+    q_todos = request.GET.get('todos', '').strip()  # Permite ver todos los casos
     
+    # Inicializar filtros
     filtros = Q()
+    filtros_busqueda = Q()
+    
+    # 1. Determinar si el usuario quiere ver todos los casos (sin filtro por rol)
+    tiene_todos = 'todos' in request.GET
+    # Verificar si se seleccionó un estado específico (no vacío)
+    tiene_estado_explicito = bool(q_estado and q_estado.strip())
+    
+    # 2. Aplicar filtro por defecto según el rol
+    # Por defecto, SIEMPRE aplicar el filtro por rol (a menos que tenga_todos=True o sea Admin)
+    # El filtro por rol se aplica a menos que el usuario explícitamente quiera ver todos los casos
+    aplicar_filtro_por_rol = (not tiene_todos and rol_nombre and rol_nombre != ROL_ADMIN and perfil is not None)
+    
+    if aplicar_filtro_por_rol:
+        if rol_nombre == ROL_COORDINADORA:
+            # Coordinadora: Solo casos pendientes de entrevista (sin importar asignación)
+            filtros = Q(estado='pendiente_entrevista')
+        elif rol_nombre == ROL_ASESORA_TECNICA:
+            # Asesora Técnica: Casos pendientes de formulación (que debe formular)
+            filtros = Q(estado='pendiente_formulacion')
+        elif rol_nombre == ROL_ASESOR:
+            # Asesor Pedagógico: Casos pendientes de preaprobación
+            filtros = Q(estado='pendiente_preaprobacion')
+        elif rol_nombre == ROL_DIRECTOR:
+            # Director: Casos pendientes de aprobación
+            filtros = Q(estado='pendiente_aprobacion')
 
+    # 3. Filtro por estado explícito (si se proporciona)
+    # Si tiene_todos=True: El estado seleccionado es el único filtro (reemplaza el filtro por rol)
+    # Si tiene_todos=False: El estado se combina con el filtro por rol (si existe)
+    if tiene_estado_explicito:
+        if tiene_todos:
+            # Si quiere ver todos los casos, el estado seleccionado es el único filtro
+            filtros = Q(estado=q_estado)
+        elif aplicar_filtro_por_rol and filtros:
+            # Si tiene filtro por rol activo, combinar con el estado seleccionado
+            # Nota: Esto puede resultar en 0 resultados si el estado no coincide con el rol
+            filtros &= Q(estado=q_estado)
+        else:
+            # Si no hay filtro por rol (admin o sin rol), usar solo el estado
+            filtros = Q(estado=q_estado)
+
+    # 4. Filtros de búsqueda (se aplican además del filtro por defecto o estado seleccionado)
     if q_nombre:
-        filtros &= (
+        filtros_busqueda &= (
             Q(estudiantes__nombres__icontains=q_nombre) | 
             Q(estudiantes__apellidos__icontains=q_nombre) |
             Q(estudiantes__rut__icontains=q_nombre)
@@ -434,22 +487,44 @@ def casos_generales(request):
     if q_fecha:
         try:
             fecha_obj = datetime.strptime(q_fecha, '%Y-%m-%d').date()
-            filtros &= Q(created_at__date=fecha_obj)
+            filtros_busqueda &= Q(created_at__date=fecha_obj)
         except ValueError:
             messages.error(request, "Formato de fecha inválido.")
 
     if q_ajuste:
-        filtros &= Q(ajusteasignado__ajuste_razonable__categorias_ajustes__id=q_ajuste)
-
-    solicitudes_list = solicitudes_list.filter(filtros)
+        filtros_busqueda &= Q(ajusteasignado__ajuste_razonable__categorias_ajustes__id=q_ajuste)
+    
+    # 5. Combinar filtros base con filtros de búsqueda
+    if filtros_busqueda:
+        if filtros:  # Si hay filtro base (por defecto o estado), combinarlo con búsqueda
+            filtros &= filtros_busqueda
+        else:  # Si no hay filtro base, usar solo los de búsqueda
+            filtros = filtros_busqueda
+    
+    # 6. Aplicar filtros
+    # Aplicar filtros si existen
+    if filtros:
+        solicitudes_list = solicitudes_list.filter(filtros)
+    # Si no hay filtros (solo para Admin con tiene_todos=True), mostrar todos los casos sin filtrar
 
     categorias_ajustes = CategoriasAjustes.objects.all().order_by('nombre_categoria')
+
+    # Obtener opciones de estado para el filtro
+    estados_disponibles = Solicitudes.ESTADO_CHOICES
 
     context = {
         'solicitudes': solicitudes_list,
         'total_casos': solicitudes_list.count(),
         'categorias_ajustes': categorias_ajustes,
-        'filtros_aplicados': request.GET
+        'estados_disponibles': estados_disponibles,
+        'filtros_aplicados': {
+            'q_nombre': q_nombre,
+            'q_fecha': q_fecha,
+            'q_ajuste': q_ajuste,
+            'q_estado': q_estado,
+        },
+        'rol_usuario': rol_nombre,
+        'mostrando_todos': tiene_todos
     }
     
     return render(request, 'SIAPE/casos_generales.html', context)
@@ -911,6 +986,28 @@ def detalle_casos_coordinadora(request, solicitud_id):
     # Obtenemos las categorías para el modal (si queremos añadir ajustes)
     categorias_ajustes = CategoriasAjustes.objects.all().order_by('nombre_categoria')
 
+    # 3. --- Determinar acciones permitidas según el rol ---
+    rol_nombre = perfil.rol.nombre_rol if perfil else None
+    # Permisos de edición: Coordinadora, Asesora Técnica, Asesor Pedagógico y Admin pueden editar
+    puede_editar_descripcion = rol_nombre in [ROL_COORDINADORA, ROL_ASESORA_TECNICA, ROL_ASESOR, ROL_ADMIN]
+    puede_agendar_cita = rol_nombre == ROL_COORDINADORA
+    
+    # Acciones de Coordinadora
+    puede_enviar_asesor_tecnico = rol_nombre == ROL_COORDINADORA and solicitud.estado == 'pendiente_entrevista'
+    
+    # Acciones de Asesora Técnica Pedagógica
+    puede_formular_ajustes = rol_nombre == ROL_ASESORA_TECNICA and solicitud.estado == 'pendiente_formulacion'
+    puede_enviar_asesor_pedagogico = rol_nombre == ROL_ASESORA_TECNICA and solicitud.estado == 'pendiente_formulacion'
+    puede_devolver_a_coordinadora = rol_nombre == ROL_ASESORA_TECNICA and solicitud.estado == 'pendiente_formulacion'
+    
+    # Acciones de Asesor Pedagógico
+    puede_enviar_a_director = rol_nombre == ROL_ASESOR and solicitud.estado == 'pendiente_preaprobacion'
+    puede_devolver_a_asesor_tecnico = rol_nombre == ROL_ASESOR and solicitud.estado == 'pendiente_preaprobacion'
+    
+    # Acciones de Director
+    puede_aprobar = rol_nombre == ROL_DIRECTOR and solicitud.estado == 'pendiente_aprobacion'
+    puede_rechazar = rol_nombre == ROL_DIRECTOR and solicitud.estado == 'pendiente_aprobacion'
+
     context = {
         'solicitud': solicitud,
         'estudiante': estudiante,
@@ -918,9 +1015,419 @@ def detalle_casos_coordinadora(request, solicitud_id):
         'evidencias': evidencias,
         'entrevistas_list': entrevistas,
         'categorias_ajustes': categorias_ajustes, # Para el modal
+        'rol_usuario': rol_nombre,
+        'puede_editar_descripcion': puede_editar_descripcion,
+        'puede_agendar_cita': puede_agendar_cita,
+        'puede_enviar_asesor_tecnico': puede_enviar_asesor_tecnico,
+        'puede_formular_ajustes': puede_formular_ajustes,
+        'puede_enviar_asesor_pedagogico': puede_enviar_asesor_pedagogico,
+        'puede_devolver_a_coordinadora': puede_devolver_a_coordinadora,
+        'puede_enviar_a_director': puede_enviar_a_director,
+        'puede_devolver_a_asesor_tecnico': puede_devolver_a_asesor_tecnico,
+        'puede_aprobar': puede_aprobar,
+        'puede_rechazar': puede_rechazar,
     }
     
     return render(request, 'SIAPE/detalle_casos_coordinadora.html', context)
+
+@login_required
+def detalle_casos_asesor_tecnico(request, solicitud_id):
+    """
+    Vista para mostrar el detalle de un caso para la Asesora Técnica Pedagógica.
+    Es un wrapper que redirige a la misma vista pero con un contexto diferente.
+    """
+    # Verificar que el usuario es Asesora Técnica
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_ASESORA_TECNICA:
+            messages.error(request, 'No tienes permisos para acceder a esta página.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+        perfil = None
+    
+    # Llamar a la misma función pero con el contexto específico
+    return detalle_casos_coordinadora(request, solicitud_id)
+
+@require_POST
+@login_required
+def formular_ajuste_asesor_tecnico(request, solicitud_id):
+    """
+    Vista para que la Asesora Técnica Pedagógica pueda crear y asignar ajustes a un caso.
+    """
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_ASESORA_TECNICA:
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+        perfil = None
+
+    # 2. --- Obtener la Solicitud ---
+    solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
+    
+    # Verificar que el caso está en el estado correcto
+    if solicitud.estado != 'pendiente_formulacion':
+        messages.error(request, 'Este caso no está en estado de formulación.')
+        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+
+    # 3. --- Obtener Datos del Formulario ---
+    descripcion = request.POST.get('descripcion', '').strip()
+    categoria_id = request.POST.get('categoria_id', '')
+    nueva_categoria = request.POST.get('nueva_categoria', '').strip()
+
+    # 4. --- Validaciones ---
+    if not descripcion:
+        messages.error(request, 'La descripción del ajuste es requerida.')
+        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+
+    # Verificar si se seleccionó "nueva" o si hay una categoría seleccionada
+    crear_nueva_categoria = categoria_id == 'nueva' or (not categoria_id and nueva_categoria)
+    
+    if not categoria_id and not nueva_categoria:
+        messages.error(request, 'Debe seleccionar una categoría o crear una nueva.')
+        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+
+    if categoria_id and categoria_id != 'nueva' and nueva_categoria:
+        messages.error(request, 'No puede seleccionar una categoría existente y crear una nueva a la vez.')
+        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+
+    if crear_nueva_categoria and not nueva_categoria:
+        messages.error(request, 'Debe proporcionar el nombre de la nueva categoría.')
+        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+
+    try:
+        # 5. --- Obtener o Crear Categoría ---
+        if crear_nueva_categoria:
+            if not nueva_categoria:
+                messages.error(request, 'Debe proporcionar el nombre de la nueva categoría.')
+                return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+            categoria, created = CategoriasAjustes.objects.get_or_create(
+                nombre_categoria=nueva_categoria.strip().capitalize()
+            )
+            if created:
+                messages.info(request, f'Categoría "{categoria.nombre_categoria}" creada exitosamente.')
+        else:
+            if not categoria_id or categoria_id == 'nueva':
+                messages.error(request, 'Debe seleccionar una categoría válida.')
+                return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+            categoria = get_object_or_404(CategoriasAjustes, id=categoria_id)
+
+        # 6. --- Crear Ajuste Razonable ---
+        ajuste_razonable = AjusteRazonable.objects.create(
+            descripcion=descripcion,
+            categorias_ajustes=categoria
+        )
+
+        # 7. --- Asignar Ajuste a la Solicitud ---
+        AjusteAsignado.objects.create(
+            ajuste_razonable=ajuste_razonable,
+            solicitudes=solicitud
+        )
+
+        # 8. --- Asignar Asesora Técnica al caso si no está asignada ---
+        if not solicitud.asesor_tecnico_asignado:
+            solicitud.asesor_tecnico_asignado = perfil
+            solicitud.save()
+
+        messages.success(request, 'Ajuste formulado y asignado exitosamente.')
+
+    except Exception as e:
+        logger.error(f"Error al formular ajuste: {str(e)}")
+        messages.error(request, f'Error al formular el ajuste: {str(e)}')
+
+    # 9. --- Redirigir de vuelta al detalle ---
+    return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+
+@require_POST
+@login_required
+def enviar_a_asesor_tecnico(request, solicitud_id):
+    """
+    Vista para que la Coordinadora envíe el caso a la Asesora Técnica Pedagógica.
+    Cambia el estado del caso de 'pendiente_entrevista' a 'pendiente_formulacion'.
+    """
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_COORDINADORA:
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+        perfil = None
+
+    # 2. --- Obtener la Solicitud ---
+    solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
+    
+    # 3. --- Verificar que el caso está en el estado correcto ---
+    if solicitud.estado != 'pendiente_entrevista':
+        messages.error(request, 'Este caso no está en estado de entrevista. Solo se pueden enviar casos pendientes de entrevista.')
+        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+    
+    try:
+        # 4. --- Cambiar el estado del caso ---
+        solicitud.estado = 'pendiente_formulacion'
+        solicitud.save()
+        
+        messages.success(request, 'Caso enviado a la Asesora Técnica Pedagógica exitosamente. El caso ahora está pendiente de formulación.')
+        
+    except Exception as e:
+        logger.error(f"Error al enviar caso a asesora técnica: {str(e)}")
+        messages.error(request, f'Error al enviar el caso: {str(e)}')
+    
+    # 5. --- Redirigir de vuelta al detalle ---
+    return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+
+@require_POST
+@login_required
+def enviar_a_asesor_pedagogico(request, solicitud_id):
+    """
+    Vista para que la Asesora Técnica Pedagógica envíe el caso al siguiente estado
+    (pendiente_preaprobacion) después de formular los ajustes.
+    """
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_ASESORA_TECNICA:
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+
+    # 2. --- Obtener la Solicitud ---
+    solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
+    
+    # Verificar que el caso está en el estado correcto
+    if solicitud.estado != 'pendiente_formulacion':
+        messages.error(request, 'Este caso no está en estado de formulación.')
+        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+
+    # 3. --- Verificar que hay ajustes asignados ---
+    ajustes_count = AjusteAsignado.objects.filter(solicitudes=solicitud).count()
+    if ajustes_count == 0:
+        messages.error(request, 'Debe formular al menos un ajuste antes de enviar el caso al Asesor Pedagógico.')
+        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+
+    try:
+        # 4. --- Cambiar el estado del caso ---
+        solicitud.estado = 'pendiente_preaprobacion'
+        solicitud.save()
+        
+        messages.success(request, 'Caso enviado al Asesor Pedagógico exitosamente. El caso ahora está pendiente de preaprobación.')
+        
+    except Exception as e:
+        logger.error(f"Error al enviar caso a asesor pedagógico: {str(e)}")
+        messages.error(request, f'Error al enviar el caso: {str(e)}')
+
+    # 5. --- Redirigir de vuelta al detalle ---
+    return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+
+@require_POST
+@login_required
+def devolver_a_coordinadora(request, solicitud_id):
+    """
+    Vista para que la Asesora Técnica Pedagógica devuelva el caso a la Coordinadora.
+    Cambia el estado del caso de 'pendiente_formulacion' a 'pendiente_entrevista'.
+    """
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_ASESORA_TECNICA:
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+        perfil = None
+
+    # 2. --- Obtener la Solicitud ---
+    solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
+    
+    # 3. --- Verificar que el caso está en el estado correcto ---
+    if solicitud.estado != 'pendiente_formulacion':
+        messages.error(request, 'Este caso no está en estado de formulación. Solo se pueden devolver casos pendientes de formulación.')
+        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+    
+    try:
+        # 4. --- Cambiar el estado del caso ---
+        solicitud.estado = 'pendiente_entrevista'
+        solicitud.save()
+        
+        messages.success(request, 'Caso devuelto a la Coordinadora exitosamente. El caso ahora está pendiente de entrevista.')
+        
+    except Exception as e:
+        logger.error(f"Error al devolver caso a coordinadora: {str(e)}")
+        messages.error(request, f'Error al devolver el caso: {str(e)}')
+    
+    # 5. --- Redirigir de vuelta al detalle ---
+    return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+
+@require_POST
+@login_required
+def enviar_a_director(request, solicitud_id):
+    """
+    Vista para que el Asesor Pedagógico envíe el caso al Director.
+    Cambia el estado del caso de 'pendiente_preaprobacion' a 'pendiente_aprobacion'.
+    """
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_ASESOR:
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+        perfil = None
+
+    # 2. --- Obtener la Solicitud ---
+    solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
+    
+    # 3. --- Verificar que el caso está en el estado correcto ---
+    if solicitud.estado != 'pendiente_preaprobacion':
+        messages.error(request, 'Este caso no está en estado de preaprobación. Solo se pueden enviar casos pendientes de preaprobación.')
+        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+    
+    try:
+        # 4. --- Cambiar el estado del caso ---
+        solicitud.estado = 'pendiente_aprobacion'
+        solicitud.save()
+        
+        messages.success(request, 'Caso enviado al Director exitosamente. El caso ahora está pendiente de aprobación.')
+        
+    except Exception as e:
+        logger.error(f"Error al enviar caso a director: {str(e)}")
+        messages.error(request, f'Error al enviar el caso: {str(e)}')
+    
+    # 5. --- Redirigir de vuelta al detalle ---
+    return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+
+@require_POST
+@login_required
+def devolver_a_asesor_tecnico(request, solicitud_id):
+    """
+    Vista para que el Asesor Pedagógico devuelva el caso al Asesor Técnico Pedagógico.
+    Cambia el estado del caso de 'pendiente_preaprobacion' a 'pendiente_formulacion'.
+    """
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_ASESOR:
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+        perfil = None
+
+    # 2. --- Obtener la Solicitud ---
+    solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
+    
+    # 3. --- Verificar que el caso está en el estado correcto ---
+    if solicitud.estado != 'pendiente_preaprobacion':
+        messages.error(request, 'Este caso no está en estado de preaprobación. Solo se pueden devolver casos pendientes de preaprobación.')
+        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+    
+    try:
+        # 4. --- Cambiar el estado del caso ---
+        solicitud.estado = 'pendiente_formulacion'
+        solicitud.save()
+        
+        messages.success(request, 'Caso devuelto al Asesor Técnico Pedagógico exitosamente. El caso ahora está pendiente de formulación.')
+        
+    except Exception as e:
+        logger.error(f"Error al devolver caso a asesor técnico: {str(e)}")
+        messages.error(request, f'Error al devolver el caso: {str(e)}')
+    
+    # 5. --- Redirigir de vuelta al detalle ---
+    return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+
+@require_POST
+@login_required
+def aprobar_caso(request, solicitud_id):
+    """
+    Vista para que el Director apruebe el caso.
+    Cambia el estado del caso de 'pendiente_aprobacion' a 'aprobado'.
+    """
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+        perfil = None
+
+    # 2. --- Obtener la Solicitud ---
+    solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
+    
+    # 3. --- Verificar que el caso está en el estado correcto ---
+    if solicitud.estado != 'pendiente_aprobacion':
+        messages.error(request, 'Este caso no está en estado de aprobación. Solo se pueden aprobar casos pendientes de aprobación.')
+        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+    
+    try:
+        # 4. --- Cambiar el estado del caso ---
+        solicitud.estado = 'aprobado'
+        solicitud.save()
+        
+        messages.success(request, 'Caso aprobado exitosamente. El caso ha sido aprobado e informado.')
+        
+    except Exception as e:
+        logger.error(f"Error al aprobar caso: {str(e)}")
+        messages.error(request, f'Error al aprobar el caso: {str(e)}')
+    
+    # 5. --- Redirigir de vuelta al detalle ---
+    return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+
+@require_POST
+@login_required
+def rechazar_caso(request, solicitud_id):
+    """
+    Vista para que el Director rechace el caso.
+    Cambia el estado del caso de 'pendiente_aprobacion' a 'pendiente_preaprobacion' 
+    (vuelve a Asesoría Pedagógica para evaluación de corrección).
+    """
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+        perfil = None
+
+    # 2. --- Obtener la Solicitud ---
+    solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
+    
+    # 3. --- Verificar que el caso está en el estado correcto ---
+    if solicitud.estado != 'pendiente_aprobacion':
+        messages.error(request, 'Este caso no está en estado de aprobación. Solo se pueden rechazar casos pendientes de aprobación.')
+        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+    
+    try:
+        # 4. --- Cambiar el estado del caso (vuelve a Asesoría Pedagógica) ---
+        solicitud.estado = 'pendiente_preaprobacion'
+        solicitud.save()
+        
+        messages.warning(request, 'Caso rechazado. El caso ha sido devuelto a Asesoría Pedagógica para evaluación de corrección o archivo.')
+        
+    except Exception as e:
+        logger.error(f"Error al rechazar caso: {str(e)}")
+        messages.error(request, f'Error al rechazar el caso: {str(e)}')
+    
+    # 5. --- Redirigir de vuelta al detalle ---
+    return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
 
 @require_POST # Solo permite esta vista vía POST
 @login_required
@@ -956,8 +1463,18 @@ def actualizar_descripcion_caso(request, solicitud_id):
     else:
         messages.error(request, 'No se recibió la descripción.')
         
-    # 3. --- Redirigir de vuelta a la página de detalle ---
-    return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+    # 3. --- Determinar la URL de redirección según el rol ---
+    try:
+        perfil = request.user.perfil
+        rol_nombre = perfil.rol.nombre_rol if perfil else None
+        if rol_nombre == ROL_ASESORA_TECNICA:
+            return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+        elif rol_nombre == ROL_COORDINADORA:
+            return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+        else:
+            return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+    except AttributeError:
+        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
 
 @login_required
 def panel_control_coordinadora(request):
@@ -1198,10 +1715,30 @@ def reagendar_cita_coordinadora(request, entrevista_id):
     # 3. Redirigir
     return redirect('panel_control_coordinadora')
 
-# --- VISTA DIRECTOR DE CARRERA ---
+
+# --- VISTA ASESOR PEDAGÓGICO ---
+@login_required
+def dashboard_asesor(request):
+    try:
+        if request.user.perfil.rol.nombre_rol != ROL_ASESOR:
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+    total_solicitudes = Solicitudes.objects.count()
+    casos_resueltos = Solicitudes.objects.filter(estado='aprobado', ajusteasignado__isnull=False).distinct().count()
+    casos_en_proceso = Solicitudes.objects.filter(estado='en_proceso').count()
+    context = {
+        'nombre_usuario': request.user.first_name, 'total_solicitudes': total_solicitudes, 'casos_resueltos': casos_resueltos,
+        'casos_en_proceso': casos_en_proceso,
+    }
+    return render(request, 'SIAPE/dashboard_asesor.html', context)
+
+# ----------------------------------------------------
+#                VISTA DIRECTOR DE CARRERA
+# ----------------------------------------------------
+
 @login_required
 def dashboard_director(request):
-    # ... (tu código original) ...
     try:
         if request.user.perfil.rol.nombre_rol != ROL_DIRECTOR:
             return redirect('home')
@@ -1216,6 +1753,98 @@ def dashboard_director(request):
         'casos_en_proceso': casos_en_proceso, 'carreras': carreras, 
     }
     return render(request, 'SIAPE/dashboard_director.html', context)
+
+
+# ----------------------------------------------------
+#                VISTA ASESORA TÉCNICA PEDAGÓGICA
+# ----------------------------------------------------
+
+@login_required
+def dashboard_asesor_técnico(request):
+    """
+    Dashboard principal para la Asesora Técnica Pedagógica.
+    Muestra KPIs de casos pendientes de formulación y estadísticas.
+    """
+    
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_ASESORA_TECNICA:
+            messages.error(request, 'No tienes permisos para acceder a este panel.')
+            return redirect('home')
+    except AttributeError:
+        logger.warning(f"Usuario {request.user.email} sin perfil/rol intentó acceder al dashboard de asesora técnica.")
+        return redirect('home')
+
+    # 2. --- Configuración de Fechas ---
+    now = timezone.localtime(timezone.now())
+    today = now.date()
+    
+    # Cálculo de la semana (Lunes a Domingo)
+    start_of_week = today - timedelta(days=today.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
+    start_of_week_dt = timezone.make_aware(datetime.combine(start_of_week, datetime.min.time()))
+    end_of_week_dt = timezone.make_aware(datetime.combine(end_of_week, datetime.max.time()))
+    
+    # 3. --- Obtener Datos para KPIs ---
+    
+    # Base de solicitudes para todas las asesoras técnicas (filtramos por rol)
+    todas_las_asesoras_tecnicas = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_ASESORA_TECNICA)
+    
+    # KPI 1: Casos nuevos (pendiente_formulacion esta semana)
+    # Casos que cambiaron a pendiente_formulacion esta semana
+    casos_nuevos_semana = Solicitudes.objects.filter(
+        estado='pendiente_formulacion',
+        updated_at__range=(start_of_week_dt, end_of_week_dt)
+    ).select_related('estudiantes', 'estudiantes__carreras').count()
+    
+    # KPI 2: Casos pendientes de formulación en total
+    casos_pendientes_formulacion = Solicitudes.objects.filter(
+        estado='pendiente_formulacion'
+    ).select_related('estudiantes', 'estudiantes__carreras')
+    kpi_casos_pendientes_total = casos_pendientes_formulacion.count()
+    
+    # KPI 3: Casos completados (que pasaron de pendiente_formulacion a estados más avanzados)
+    # Esto incluye casos que ya están en preaprobación, aprobación o aprobados
+    casos_completados = Solicitudes.objects.filter(
+        estado__in=['pendiente_preaprobacion', 'pendiente_aprobacion', 'aprobado']
+    ).count()
+    
+    # KPI 4: Casos asignados a esta asesora técnica específica
+    casos_asignados = Solicitudes.objects.filter(
+        asesor_tecnico_asignado=perfil,
+        estado='pendiente_formulacion'
+    ).select_related('estudiantes', 'estudiantes__carreras').count()
+    
+    # KPI 5: Casos en proceso (pendiente_preaprobacion, pendiente_aprobacion)
+    # Estos son casos que la asesora técnica ya formuló y están en siguientes etapas
+    casos_en_proceso = Solicitudes.objects.filter(
+        estado__in=['pendiente_preaprobacion', 'pendiente_aprobacion']
+    ).count()
+    
+    # KPI 6: Casos aprobados totales (que pasaron por formulación)
+    casos_aprobados = Solicitudes.objects.filter(estado='aprobado').count()
+    
+    # 4. --- Obtener Lista de Casos Pendientes de Formulación ---
+    # Los casos más recientes primero
+    casos_pendientes_list = casos_pendientes_formulacion.order_by('-updated_at')[:10]
+    
+    # 5. --- Preparar Contexto ---
+    context = {
+        'nombre_usuario': request.user.first_name,
+        'kpis': {
+            'casos_nuevos_semana': casos_nuevos_semana,
+            'casos_pendientes_total': kpi_casos_pendientes_total,
+            'casos_completados': casos_completados,
+            'casos_asignados': casos_asignados,
+            'casos_en_proceso': casos_en_proceso,
+            'casos_aprobados': casos_aprobados,
+        },
+        'casos_pendientes_list': casos_pendientes_list,
+    }
+    
+    # 6. --- Renderizar Template ---
+    return render(request, 'SIAPE/dashboard_asesor_técnico.html', context)
 
 
 # ----------- Vistas de los modelos (API) ------------

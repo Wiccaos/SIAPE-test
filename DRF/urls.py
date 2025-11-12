@@ -64,7 +64,7 @@ urlpatterns = [
     path('dashboard/admin/roles/editar/<int:rol_id>/', views.editar_rol_admin, name='editar_rol_admin'),
 
     # # URLs de Asesor Pedagógico
-    # path('dashboard/asesor/', views.dashboard_asesor, name='dashboard_asesor'),
+    path('dashboard/asesor/', views.dashboard_asesor, name='dashboard_asesor'),
     # path('dashboard/asesor/casos/', views.casos_asesor, name='casos_asesor'),
     # path('dashboard/asesor/casos/<int:solicitud_id>/', views.detalle_caso_asesor, name='detalle_caso_asesor'),
     # path('dashboard/asesor/panel-control/', views.panel_control_asesor, name='panel_control_asesor'),
@@ -83,6 +83,7 @@ urlpatterns = [
     path('dashboard/coordinador/casos/<int:solicitud_id>/', views.detalle_casos_coordinadora, name='detalle_casos_coordinadora'),
     path('dashboard/coordinador/panel-control/', views.panel_control_coordinadora, name='panel_control_coordinadora'),
     path('dashboard/coordinador/casos/<int:solicitud_id>/actualizar-descripcion/', views.actualizar_descripcion_caso, name='actualizar_descripcion_caso'),
+    path('dashboard/coordinador/casos/<int:solicitud_id>/enviar-asesor-tecnico/', views.enviar_a_asesor_tecnico, name='enviar_a_asesor_tecnico'),
     path('dashboard/coordinador/confirmar-cita/<int:entrevista_id>/', 
          views.confirmar_cita_coordinadora, 
          name='coordinadora_confirmar_cita'),
@@ -95,6 +96,21 @@ urlpatterns = [
 
     # URLs de Director de Carrera
     path('dashboard/director/', views.dashboard_director, name='dashboard_director'),
+
+    # URLs de Asesora Técnica Pedagógica
+    path('dashboard/asesor-tecnico/', views.dashboard_asesor_técnico, name='dashboard_asesor_técnico'),
+    path('dashboard/asesor-tecnico/casos/<int:solicitud_id>/', views.detalle_casos_asesor_tecnico, name='detalle_casos_asesor_tecnico'),
+    path('dashboard/asesor-tecnico/casos/<int:solicitud_id>/formular-ajuste/', views.formular_ajuste_asesor_tecnico, name='formular_ajuste_asesor_tecnico'),
+    path('dashboard/asesor-tecnico/casos/<int:solicitud_id>/enviar-asesor-pedagogico/', views.enviar_a_asesor_pedagogico, name='enviar_a_asesor_pedagogico'),
+    path('dashboard/asesor-tecnico/casos/<int:solicitud_id>/devolver-coordinadora/', views.devolver_a_coordinadora, name='devolver_a_coordinadora'),
+    
+    # URLs de Asesor Pedagógico
+    path('dashboard/asesor/casos/<int:solicitud_id>/enviar-director/', views.enviar_a_director, name='enviar_a_director'),
+    path('dashboard/asesor/casos/<int:solicitud_id>/devolver-asesor-tecnico/', views.devolver_a_asesor_tecnico, name='devolver_a_asesor_tecnico'),
+    
+    # URLs de Director de Carrera
+    path('dashboard/director/casos/<int:solicitud_id>/aprobar/', views.aprobar_caso, name='aprobar_caso'),
+    path('dashboard/director/casos/<int:solicitud_id>/rechazar/', views.rechazar_caso, name='rechazar_caso'),
 
     # URLs documentación
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
