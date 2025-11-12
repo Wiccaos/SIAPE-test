@@ -1,49 +1,68 @@
-{% extends 'plantilla.html' %} {% load static %}
+{% extends "plantilla.html" %}
+{% load static %}
 
-{% block extra_head %}
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+{% block title %}
+    Dashboard Director de Carrera | SIAPE
 {% endblock %}
 
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="main-content"> 
     
-    <h2>Dashboard del Director de Carrera</h2>
-    <p class="lead">Bienvenido, {{ nombre_usuario }}.</p>
+    <nav class="dashboard-nav">
+        <a href="{% url 'dashboard_director' %}" class="nav-item active">
+            <i class="fas fa-user-tie"></i>
+            Panel Principal
+        </a>
+        </nav>
 
-    <div class="row">
-        <div class="col-md-4">
-            <div class="card text-white bg-warning mb-3">
-                <div class="card-header">Pendientes de Aprobación</div>
-                <div class="card-body">
-                    <h5 class="card-title">{{ kpis.total_pendientes }}</h5>
-                    <p class="card-text">Solicitudes esperando tu acción.</p>
-                </div>
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} custom-alert-{{ message.tags }}">
+                {{ message }}
             </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card text-white bg-success mb-3">
-                <div class="card-header">Casos Aprobados</div>
-                <div class="card-body">
-                    <h5 class="card-title">{{ kpis.total_aprobados }}</h5>
-                    <p class="card-text">Total en tu historial.</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card text-white bg-danger mb-3">
-                <div class="card-header">Casos Devueltos/Rechazados</div>
-                <div class="card-body">
-                    <h5 class="card-title">{{ kpis.total_rechazados }}</h5>
-                    <p class="card-text">Total en tu historial.</p>
-                </div>
-            </div>
-        </div>
-    </div>
+        {% endfor %}
+    {% endif %}
 
-    <h3 class="mt-4">Solicitudes Pendientes de Aprobación</h3>
-    <div class="table-responsive">
-        <table class="table table-hover table-striped">
+    <section class="kpi-container">
+        
+        <div class="kpi-card">
+            <div class="kpi-icon icon-proceso"> <i class="fas fa-clock"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ kpis.total_pendientes|default:0 }}</span>
+                <span class="kpi-label">Pendientes de Aprobación</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-resueltos"> <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ kpis.total_aprobados|default:0 }}</span>
+                <span class="kpi-label">Casos Aprobados (Hist.)</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-solicitudes"> <i class="fas fa-times-circle"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ kpis.total_rechazados|default:0 }}</span>
+                <span class="kpi-label">Casos Rechazados (Hist.)</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="table-container">
+        <div class="table-header">
+            <h2 class="casos-pendientes-titulo"><i class="fas fa-exclamation-triangle"></i> Solicitudes Pendientes de Aprobación</h2>
+        </div>
+        
+        <table class="custom-table">
             <thead>
                 <tr>
                     <th>Estudiante</th>
@@ -62,33 +81,46 @@
                     <td>{{ solicitud.estudiantes.carreras.nombre }}</td>
                     <td>{{ solicitud.asunto }}</td>
                     <td>{{ solicitud.created_at|date:"d/m/Y" }}</td>
-                    <td>
-                        <a href="#" class="btn btn-info btn-sm">Ver</a> 
+                    <td class="acciones-container">
+                        <a href="#" class="btn-accion btn-agendar btn-accion-small">
+                            <i class="fas fa-eye"></i> Ver
+                        </a> 
 
-                        <form action="{% url 'aprobar_solicitud_director' solicitud.id %}" method="POST" class="d-inline">
+                        <form action="{% url 'aprobar_solicitud_director' solicitud.id %}" method="POST" style="display: inline-block;">
                             {% csrf_token %}
-                            <button type="submit" class="btn btn-success btn-sm">Aprobar</button>
+                            <button type="submit" class="btn-accion btn-accion-green btn-accion-small">
+                                <i class="fas fa-check"></i> Aprobar
+                            </button>
                         </form>
 
-                        <form action="{% url 'rechazar_solicitud_director' solicitud.id %}" method="POST" class="d-inline">
+                        <form action="{% url 'rechazar_solicitud_director' solicitud.id %}" method="POST" style="display: inline-block;">
                             {% csrf_token %}
-                            <button type="submit" class="btn btn-warning btn-sm">Devolver al Asesor</button>
+                            <button type="submit" class="btn-accion btn-ajuste btn-accion-small">
+                                <i class="fas fa-undo-alt"></i> Devolver
+                            </button>
                         </form>
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" class="text-center">No tienes solicitudes pendientes de aprobación.</td>
+                    <td colspan="6">
+                        <div class="empty-state">
+                            <i class="fas fa-check-circle icono-check"></i>
+                            <p>¡Excelente! No tienes solicitudes pendientes de aprobación.</p>
+                        </div>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-    </div>
+    </section>
 
-    <hr class="my-4">
-    <h3>Historial de Casos Gestionados</h3>
-    <div class="table-responsive">
-        <table class="table">
+    <section class="table-container">
+        <div class="table-header">
+            <h2><i class="fas fa-history"></i> Historial de Casos Gestionados</h2>
+        </div>
+        
+        <table class="custom-table">
             <thead>
                 <tr>
                     <th>Estudiante</th>
@@ -106,23 +138,30 @@
                     <td>{{ solicitud.updated_at|date:"d/m/Y" }}</td>
                     <td>
                         {% if solicitud.estado == 'aprobado' %}
-                            <span class="badge bg-success">Aprobado</span>
+                            <span class="status status-aprobado">Aprobado</span>
                         {% else %}
-                            <span class="badge bg-danger">Devuelto</span>
+                            <span class="status status-rechazado">Rechazado</span>
                         {% endif %}
                     </td>
                     <td>
-                        <a href="#" class="btn btn-info btn-sm">Ver Detalles</a>
+                        <a href="#" class="btn-accion btn-agendar btn-accion-small">
+                            <i class="fas fa-eye"></i> Ver Detalles
+                        </a>
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="5" class="text-center">No hay casos en el historial.</td>
+                    <td colspan="5">
+                        <div class="empty-state">
+                            <i class="fas fa-inbox"></i>
+                            <p>No hay casos en el historial.</p>
+                        </div>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-    </div>
+    </section>
 
 </div>
 {% endblock %}
