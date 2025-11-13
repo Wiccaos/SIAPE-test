@@ -932,6 +932,36 @@ def dashboard_director(request):
     }
     return render(request, 'SIAPE/dashboard_director.html', context)
 
+# ---- Vista de las Carreras de un Director ----
+@login_required
+def carreras_director(request):
+    """
+    Muestra las carreras asignadas al Director de Carrera logueado.
+    """
+    try:
+        perfil_director = request.user.perfil
+        if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para esta acción.')
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+
+    # Buscamos las carreras donde el director sea el usuario actual
+    # Usamos .select_related para traer el 'area' en la misma consulta
+    # Usamos .annotate para contar los estudiantes de cada carrera
+    carreras_list = Carreras.objects.filter(
+        director=perfil_director
+    ).select_related(
+        'area'
+    ).annotate(
+        total_estudiantes=Count('estudiantes') # Contamos los estudiantes via FK
+    ).order_by('nombre')
+
+    context = {
+        'carreras_list': carreras_list,
+        'total_carreras': carreras_list.count()
+    }
+    return render(request, 'SIAPE/carreras_director.html', context)
 
 # ----------- Vistas de los modelos (API) ------------
 # (Sin cambios)
