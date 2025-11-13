@@ -32,13 +32,17 @@ urlpatterns = [
         'solicitud/aprobar/<int:solicitud_id>/', 
         views.aprobar_solicitud_director, 
         name='aprobar_solicitud_director'
-    ),
+        ),
     path(
         'solicitud/rechazar/<int:solicitud_id>/', 
         views.rechazar_solicitud_director, 
         name='rechazar_solicitud_director'
-    ),
-    
+        ),
+    path(
+        'dashboard/director/carreras/', 
+        views.carreras_director, 
+        name='carreras_director'
+        ),
     path('casos-coordinadora/', views.casos_coordinadora, name='casos_coordinadora'),
     path('panel-control-coordinadora/', views.panel_control_coordinadora, name='panel_control_coordinadora'),
 ]
