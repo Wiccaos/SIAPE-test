@@ -2,11 +2,12 @@
 {% load static %}
 
 {% block title %}
-    Panel de Control - Coordinadora | SIAPE
+    Gestión de Citas - Coordinadora | SIAPE
 {% endblock %}
 
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'css/formulario.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -22,8 +23,12 @@
             Casos
         </a>
         <a href="{% url 'panel_control_coordinadora' %}" class="nav-item active">
-            <i class="fas fa-tachometer-alt"></i>
-            Panel de Control
+            <i class="fas fa-calendar-alt"></i>
+            Gestión de Citas
+        </a>
+        <a href="{% url 'gestionar_horarios_bloqueados' %}" class="nav-item">
+            <i class="fas fa-ban"></i>
+            Horarios Bloqueados
         </a>
     </nav>
 
@@ -39,41 +44,45 @@
         
         <div class="panel-col-stack">
             
-            <div class="panel-section">
+            <div class="panel-section panel-section-scrollable">
                 <h3><i class="fas fa-calendar-day"></i> Citas del Día</h3>
-                {% if citas_hoy_list %}
-                    {% for cita in citas_hoy_list %}
-                        <div class="cal-cita-item estado-{{ cita.estado }}">
-                            <span class="cal-cita-hora"><i class="fas fa-clock"></i> {{ cita.fecha_entrevista|date:"H:i" }} hrs</span>
-                            <strong class="cal-cita-estudiante">{{ cita.solicitudes.estudiantes.nombres }} {{ cita.solicitudes.estudiantes.apellidos }}</strong>
-                            <span class="cal-cita-asunto">{{ cita.solicitudes.asunto }}</span>
-                            <span class="cal-cita-estado">Estado: {{ cita.get_estado_display }}</span>
+                <div class="panel-section-content">
+                    {% if citas_hoy_list %}
+                        {% for cita in citas_hoy_list %}
+                            <div class="cal-cita-item estado-{{ cita.estado }}">
+                                <span class="cal-cita-hora"><i class="fas fa-clock"></i> {{ cita.fecha_entrevista|date:"H:i" }} hrs</span>
+                                <strong class="cal-cita-estudiante">{{ cita.solicitudes.estudiantes.nombres }} {{ cita.solicitudes.estudiantes.apellidos }}</strong>
+                                <span class="cal-cita-asunto">{{ cita.solicitudes.asunto }}</span>
+                                <span class="cal-cita-estado">Estado: {{ cita.get_estado_display }}</span>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state p-10">
+                            <i class="fas fa-check-circle text-muted"></i>
+                            <p class="text-small">No hay citas programadas para hoy.</p>
                         </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="empty-state p-10">
-                        <i class="fas fa-check-circle text-muted"></i>
-                        <p class="text-small">No hay citas programadas para hoy.</p>
-                    </div>
-                {% endif %}
+                    {% endif %}
+                </div>
             </div>
 
-            <div class="panel-section">
+            <div class="panel-section panel-section-scrollable">
                 <h3><i class="fas fa-calendar-week"></i> Próximas Citas de la Semana</h3>
-                {% if citas_semana_list %}
-                    {% for cita in citas_semana_list %}
-                        <div class="cal-cita-item estado-{{ cita.estado }}">
-                            <span class="cal-cita-hora"><i class="fas fa-calendar-alt"></i> {{ cita.fecha_entrevista|date:"d/m/Y H:i" }} hrs</span>
-                            <strong class="cal-cita-estudiante">{{ cita.solicitudes.estudiantes.nombres }} {{ cita.solicitudes.estudiantes.apellidos }}</strong>
-                            <span class="cal-cita-asunto">{{ cita.solicitudes.asunto }}</span>
+                <div class="panel-section-content">
+                    {% if citas_semana_list %}
+                        {% for cita in citas_semana_list %}
+                            <div class="cal-cita-item estado-{{ cita.estado }}">
+                                <span class="cal-cita-hora"><i class="fas fa-calendar-alt"></i> {{ cita.fecha_entrevista|date:"d/m/Y H:i" }} hrs</span>
+                                <strong class="cal-cita-estudiante">{{ cita.solicitudes.estudiantes.nombres }} {{ cita.solicitudes.estudiantes.apellidos }}</strong>
+                                <span class="cal-cita-asunto">{{ cita.solicitudes.asunto }}</span>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state p-10">
+                            <i class="fas fa-check-circle text-muted"></i>
+                            <p class="text-small">No hay más citas programadas para esta semana.</p>
                         </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="empty-state p-10">
-                        <i class="fas fa-check-circle text-muted"></i>
-                        <p class="text-small">No hay más citas programadas para esta semana.</p>
-                    </div>
-                {% endif %}
+                    {% endif %}
+                </div>
             </div>
 
         </div> <div class="panel-section">
@@ -253,7 +262,7 @@
     </div>
 
     <div id="modalReagendar" class="modal">
-        <div class="modal-content">
+        <div class="modal-content modal-calendario">
             <div class="modal-header">
                 <h4><i class="fas fa-redo"></i> Reagendar Cita</h4>
                 <button class="close" onclick="cerrarModalReagendar()">&times;</button>
@@ -267,8 +276,53 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="nueva_fecha_entrevista">Nueva Fecha y Hora:</label>
-                    <input type="datetime-local" name="nueva_fecha_entrevista" id="nueva_fecha_entrevista" required>
+                    <label>
+                        <strong>Seleccione Nueva Fecha y Hora:</strong>
+                    </label>
+                    <p class="form-hint">
+                        Seleccione un día del calendario y luego el horario disponible.
+                    </p>
+
+                    <!-- Contenedor del calendario -->
+                    <div class="cal-layout-container">
+                        
+                        <!-- Columna 1: El Calendario -->
+                        <div class="cal-widget">
+                            <div class="detalle-card" id="card-calendario-reagendar">
+                                <div class="calendario-header" id="cal-header-reagendar">
+                                    <!-- El mes se inserta aquí por JS -->
+                                </div>
+                                <div class="cal-nav">
+                                    <button type="button" id="cal-prev-reagendar" class="btn-accion btn-accion-gray btn-accion-small"><i class="fas fa-chevron-left"></i> Ant</button>
+                                    <button type="button" id="cal-today-reagendar" class="btn-accion btn-accion-gray btn-accion-small">Hoy</button>
+                                    <button type="button" id="cal-next-reagendar" class="btn-accion btn-accion-gray btn-accion-small">Sig <i class="fas fa-chevron-right"></i></button>
+                                </div>
+                                <div class="calendario-grid" id="cal-grid-body-reagendar">
+                                    <!-- Los días se insertan aquí por JS -->
+                                </div>
+                                <div class="calendario-leyenda calendario-leyenda-mt">
+                                    <div><span class="dot dot-disponible"></span> Día Disponible</div>
+                                    <div><span class="dot dot-lleno"></span> Día Completo</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Columna 2: El Selector de Hora -->
+                        <div class="cal-citas-list">
+                            <h4 id="cal-citas-titulo-reagendar">Horarios Disponibles</h4>
+                            <div id="cal-citas-dia-reagendar">
+                                <div class="empty-state empty-state-10">
+                                    <i class="fas fa-calendar-day empty-state-icon"></i>
+                                    <p class="empty-state-text">Seleccione un día del calendario para ver los horarios disponibles.</p>
+                                </div>
+                                <div class="horarios-botones horarios-botones-hidden" id="horarios-botones-reagendar"></div>
+                                <input type="hidden" id="hora_reagendar" name="hora_reagendar" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Input oculto para enviar la fecha seleccionada -->
+                    <input type="hidden" id="fecha_reagendar" name="fecha_reagendar" required>
                 </div>
                 
                 <div class="form-group">
@@ -277,7 +331,6 @@
                         <option value="">Seleccione una modalidad</option>
                         <option value="Presencial">Presencial</option>
                         <option value="Virtual">Virtual</option>
-                        <option value="Híbrida">Híbrida</option>
                     </select>
                 </div>
                 
@@ -336,18 +389,361 @@
         document.getElementById('modalEditarNotas').style.display = 'none';
     }
 
+    // --- LÓGICA DEL CALENDARIO PARA REAGENDAR CITA ---
+    let navDateReagendar = new Date();
+    const hoyReagendar = new Date();
+    const hoyStrReagendar = `${hoyReagendar.getFullYear()}-${String(hoyReagendar.getMonth() + 1).padStart(2, '0')}-${String(hoyReagendar.getDate()).padStart(2, '0')}`;
+    let diaSeleccionadoReagendar = null; 
+    let diaSeleccionadoStrReagendar = null;
+    let calendarioDataReagendar = {};
+
+    const calHeaderReagendar = document.getElementById('cal-header-reagendar');
+    const calGridBodyReagendar = document.getElementById('cal-grid-body-reagendar');
+    const btnPrevReagendar = document.getElementById('cal-prev-reagendar');
+    const btnNextReagendar = document.getElementById('cal-next-reagendar');
+    const btnTodayReagendar = document.getElementById('cal-today-reagendar');
+    const citasDiaContainerReagendar = document.getElementById('cal-citas-dia-reagendar');
+    const citasDiaTituloReagendar = document.getElementById('cal-citas-titulo-reagendar');
+    const horariosBotonesReagendar = document.getElementById('horarios-botones-reagendar');
+    const fechaHiddenInputReagendar = document.getElementById('fecha_reagendar');
+    const horaHiddenInputReagendar = document.getElementById('hora_reagendar');
+    
+    const meses = [
+        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ];
+
+    async function fetchCalendarioDelMesReagendar(year, month) {
+        if (!calHeaderReagendar) return;
+        
+        calHeaderReagendar.innerText = `Cargando ${meses[month]} ${year}...`;
+        
+        try {
+            const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+            const response = await fetch(`/api/calendario-disponible/?month=${monthStr}`);
+            
+            if (!response.ok) throw new Error('Error de red');
+            
+            calendarioDataReagendar = await response.json();
+            renderCalendarReagendar(year, month);
+
+        } catch (error) {
+            console.error('Error fetching calendario:', error);
+            if (calHeaderReagendar) calHeaderReagendar.innerText = "Error al cargar calendario";
+        }
+    }
+
+    function mostrarHorariosDelDiaReagendar(fechaStr, diaEl) {
+        if (!calHeaderReagendar || !horariosBotonesReagendar) return;
+        
+        const [year, month, day] = fechaStr.split('-');
+        citasDiaTituloReagendar.innerText = `Horarios para ${day}/${month}/${year}`;
+
+        if (diaSeleccionadoReagendar) {
+            diaSeleccionadoReagendar.classList.remove('cal-day-selected');
+        }
+        
+        if(diaEl) {
+            diaEl.classList.add('cal-day-selected');
+            diaSeleccionadoReagendar = diaEl;
+            diaSeleccionadoStrReagendar = fechaStr;
+        } else {
+            diaSeleccionadoReagendar = calGridBodyReagendar.querySelector(`[data-fecha="${fechaStr}"]`);
+            if (diaSeleccionadoReagendar) {
+                diaSeleccionadoReagendar.classList.add('cal-day-selected');
+            }
+        }
+
+        if (fechaHiddenInputReagendar) {
+            fechaHiddenInputReagendar.value = fechaStr;
+        }
+        if (horaHiddenInputReagendar) {
+            horaHiddenInputReagendar.value = '';
+        }
+
+        const slotsDisponibles = (calendarioDataReagendar && calendarioDataReagendar.slotsDetallados && calendarioDataReagendar.slotsDetallados[fechaStr]) ? calendarioDataReagendar.slotsDetallados[fechaStr] : [];
+        const slotsNoDisponibles = (calendarioDataReagendar && calendarioDataReagendar.slotsNoDisponibles && calendarioDataReagendar.slotsNoDisponibles[fechaStr]) ? calendarioDataReagendar.slotsNoDisponibles[fechaStr] : [];
+        
+        // Asegurarse de que horariosBotonesReagendar esté en el DOM
+        if (horariosBotonesReagendar && horariosBotonesReagendar.parentElement !== citasDiaContainerReagendar) {
+            citasDiaContainerReagendar.appendChild(horariosBotonesReagendar);
+        }
+        
+        const existingEmptyStates = citasDiaContainerReagendar.querySelectorAll('.empty-state');
+        existingEmptyStates.forEach(el => el.remove());
+        
+        horariosBotonesReagendar.innerHTML = '';
+        horariosBotonesReagendar.classList.remove('horarios-botones-hidden');
+        horariosBotonesReagendar.style.display = 'flex';
+
+        const allSlots = [];
+        for (let h = 9; h <= 17; h++) {
+            allSlots.push(`${h.toString().padStart(2, '0')}:00`);
+        }
+
+        for (const slot of allSlots) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn-horario';
+            const horaInicio = parseInt(slot.split(':')[0]);
+            const horaFin = horaInicio + 1;
+            btn.textContent = `${slot} - ${horaFin.toString().padStart(2, '0')}:00`;
+            btn.dataset.hora = slot;
+
+            const estaDisponible = slotsDisponibles.includes(slot);
+            const estaNoDisponible = slotsNoDisponibles.includes(slot);
+
+            if (estaNoDisponible) {
+                btn.disabled = true;
+                btn.classList.add('no-disponible');
+                btn.title = 'Hora no disponible (ya tomada o bloqueada)';
+            } else if (estaDisponible) {
+                btn.disabled = false;
+                btn.classList.remove('no-disponible');
+                btn.addEventListener('click', function() {
+                    horariosBotonesReagendar.querySelectorAll('.btn-horario').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    if (horaHiddenInputReagendar) {
+                        horaHiddenInputReagendar.value = slot;
+                    }
+                });
+            } else {
+                btn.disabled = true;
+                btn.classList.add('no-disponible');
+                btn.title = 'Hora no disponible';
+            }
+            
+            horariosBotonesReagendar.appendChild(btn);
+        }
+        
+        if (slotsDisponibles.length === 0) {
+            horariosBotonesReagendar.insertAdjacentHTML('afterend', `
+                <div class="empty-state empty-state-10" style="margin-top: 15px;">
+                    <i class="fas fa-calendar-times"></i>
+                    <p class="empty-state-text">No hay horarios disponibles para este día.</p>
+                </div>
+            `);
+        }
+    }
+    
+    function renderCalendarReagendar(year, month) {
+        if (!calHeaderReagendar) return;
+        
+        calHeaderReagendar.innerText = `${meses[month]} ${year}`;
+        
+        calGridBodyReagendar.innerHTML = `
+            <div class="cal-day-header">L</div>
+            <div class="cal-day-header">M</div>
+            <div class="cal-day-header">X</div>
+            <div class="cal-day-header">J</div>
+            <div class="cal-day-header">V</div>
+            <div class="cal-day-header">S</div>
+            <div class="cal-day-header">D</div>
+        `;
+        
+        const primerDiaDelMes = new Date(year, month, 1);
+        const ultimoDiaDelMes = new Date(year, month + 1, 0);
+        const ultimoDiaNum = ultimoDiaDelMes.getDate();
+        let diaInicioSemana = (primerDiaDelMes.getDay() + 6) % 7;
+        const ultimoDiaMesAnterior = new Date(year, month, 0).getDate();
+
+        for (let i = diaInicioSemana; i > 0; i--) {
+            const dia = ultimoDiaMesAnterior - i + 1;
+            const dayDiv = document.createElement('div');
+            dayDiv.classList.add('cal-day', 'other-month');
+            dayDiv.innerText = dia;
+            calGridBodyReagendar.appendChild(dayDiv);
+        }
+
+        for (let dia = 1; dia <= ultimoDiaNum; dia++) {
+            const dayDiv = document.createElement('div');
+            dayDiv.classList.add('cal-day');
+            dayDiv.innerText = dia;
+
+            const fechaStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+            dayDiv.dataset.fecha = fechaStr;
+
+            const fechaDate = new Date(year, month, dia);
+            const diaSemana = fechaDate.getDay();
+            const esFinDeSemana = diaSemana === 0 || diaSemana === 6;
+            const hoyDate = new Date(hoyReagendar.getFullYear(), hoyReagendar.getMonth(), hoyReagendar.getDate());
+            const esDiaPasado = fechaDate < hoyDate;
+            const esSeleccionable = !esFinDeSemana && !esDiaPasado;
+
+            if (fechaStr === hoyStrReagendar) {
+                dayDiv.classList.add('day-today');
+            }
+
+            if (esSeleccionable) {
+                if (calendarioDataReagendar.fechasConDisponibilidad?.includes(fechaStr)) {
+                    dayDiv.classList.add('day-disponible');
+                } else if (calendarioDataReagendar.diasCompletos?.includes(fechaStr)) {
+                    dayDiv.classList.add('day-lleno');
+                }
+            } else if (esFinDeSemana) {
+                dayDiv.classList.add('day-inabil');
+            } else if (esDiaPasado) {
+                dayDiv.classList.add('day-inabil');
+            }
+
+            if (esSeleccionable) {
+                dayDiv.addEventListener('click', () => {
+                    mostrarHorariosDelDiaReagendar(fechaStr, dayDiv);
+                });
+            }
+            
+            calGridBodyReagendar.appendChild(dayDiv);
+        }
+
+        const totalDiasGrid = calGridBodyReagendar.children.length;
+        const diasSiguientes = (7 - (totalDiasGrid % 7)) % 7;
+        for (let i = 1; i <= diasSiguientes; i++) {
+            const dayDiv = document.createElement('div');
+            dayDiv.classList.add('cal-day', 'other-month');
+            dayDiv.innerText = i;
+            calGridBodyReagendar.appendChild(dayDiv);
+        }
+        
+        // Si hay un día seleccionado y está en el mes actual, mostrar sus horarios
+        if (diaSeleccionadoStrReagendar && calendarioDataReagendar && calendarioDataReagendar.slotsDetallados) {
+            const [selYear, selMonth] = diaSeleccionadoStrReagendar.split('-');
+            if (parseInt(selYear) === year && parseInt(selMonth) === (month + 1)) {
+                // El día seleccionado está en el mes actual, mostrar sus horarios
+                mostrarHorariosDelDiaReagendar(diaSeleccionadoStrReagendar, null);
+            } else {
+                // El día seleccionado no está en el mes actual, limpiar selección
+                diaSeleccionadoReagendar = null;
+                diaSeleccionadoStrReagendar = null;
+                if (citasDiaTituloReagendar) citasDiaTituloReagendar.innerText = `Horarios Disponibles`;
+                if (citasDiaContainerReagendar) {
+                    // Asegurarse de que horariosBotonesReagendar esté dentro del contenedor antes de limpiar
+                    if (horariosBotonesReagendar && horariosBotonesReagendar.parentElement === citasDiaContainerReagendar) {
+                        // No hacer nada, horariosBotonesReagendar ya está en el DOM
+                    }
+                    citasDiaContainerReagendar.innerHTML = `
+                        <div class="empty-state empty-state-10">
+                            <i class="fas fa-calendar-day empty-state-icon"></i>
+                            <p class="empty-state-text">Seleccione un día del calendario para ver los horarios disponibles.</p>
+                        </div>
+                    `;
+                    // Re-agregar horariosBotonesReagendar al contenedor después de limpiar
+                    if (horariosBotonesReagendar) {
+                        citasDiaContainerReagendar.appendChild(horariosBotonesReagendar);
+                    }
+                }
+                if (horariosBotonesReagendar) {
+                    horariosBotonesReagendar.classList.add('horarios-botones-hidden');
+                    horariosBotonesReagendar.style.display = 'none';
+                    horariosBotonesReagendar.innerHTML = '';
+                }
+                if (horaHiddenInputReagendar) horaHiddenInputReagendar.value = '';
+                if (fechaHiddenInputReagendar) fechaHiddenInputReagendar.value = '';
+            }
+        } else {
+            // No hay día seleccionado o no hay datos del calendario, mostrar estado inicial
+            if (citasDiaTituloReagendar) citasDiaTituloReagendar.innerText = `Horarios Disponibles`;
+            if (citasDiaContainerReagendar) {
+                // Asegurarse de que horariosBotonesReagendar esté dentro del contenedor
+                if (horariosBotonesReagendar && horariosBotonesReagendar.parentElement !== citasDiaContainerReagendar) {
+                    citasDiaContainerReagendar.appendChild(horariosBotonesReagendar);
+                }
+                // Verificar si ya hay un empty-state, si no, agregarlo
+                const existingEmptyState = citasDiaContainerReagendar.querySelector('.empty-state');
+                if (!existingEmptyState) {
+                    citasDiaContainerReagendar.innerHTML = `
+                        <div class="empty-state empty-state-10">
+                            <i class="fas fa-calendar-day empty-state-icon"></i>
+                            <p class="empty-state-text">Seleccione un día del calendario para ver los horarios disponibles.</p>
+                        </div>
+                    `;
+                    if (horariosBotonesReagendar) {
+                        citasDiaContainerReagendar.appendChild(horariosBotonesReagendar);
+                    }
+                }
+            }
+            if (horariosBotonesReagendar) {
+                horariosBotonesReagendar.classList.add('horarios-botones-hidden');
+                horariosBotonesReagendar.style.display = 'none';
+            }
+        }
+    }
+
+    if (btnPrevReagendar) {
+        btnPrevReagendar.addEventListener('click', () => {
+            navDateReagendar.setMonth(navDateReagendar.getMonth() - 1);
+            fetchCalendarioDelMesReagendar(navDateReagendar.getFullYear(), navDateReagendar.getMonth());
+        });
+    }
+
+    if (btnNextReagendar) {
+        btnNextReagendar.addEventListener('click', () => {
+            navDateReagendar.setMonth(navDateReagendar.getMonth() + 1);
+            fetchCalendarioDelMesReagendar(navDateReagendar.getFullYear(), navDateReagendar.getMonth());
+        });
+    }
+
+    if (btnTodayReagendar) {
+        btnTodayReagendar.addEventListener('click', () => {
+            navDateReagendar = new Date();
+            // Limpiar selección previa al cambiar a hoy
+            diaSeleccionadoReagendar = null;
+            diaSeleccionadoStrReagendar = null;
+            fetchCalendarioDelMesReagendar(navDateReagendar.getFullYear(), navDateReagendar.getMonth());
+        });
+    }
+
     function abrirModalReagendar(entrevistaId, asunto, modalidad) {
         document.getElementById('reagendar_caso_asunto').value = asunto;
         document.getElementById('nueva_modalidad').value = modalidad;
         // ***** URL ACTUALIZADA *****
         document.getElementById('formReagendar').action = '{% url "coordinadora_reagendar_cita" 0 %}'.replace('0', entrevistaId);
         document.getElementById('modalReagendar').style.display = 'block';
+        // Inicializar calendario cuando se abre el modal
+        if (calHeaderReagendar) {
+            navDateReagendar = new Date();
+            fetchCalendarioDelMesReagendar(navDateReagendar.getFullYear(), navDateReagendar.getMonth());
+        }
     }
 
     function cerrarModalReagendar() {
         document.getElementById('modalReagendar').style.display = 'none';
-        document.getElementById('nueva_fecha_entrevista').value = '';
+        document.getElementById('fecha_reagendar').value = '';
+        document.getElementById('hora_reagendar').value = '';
         document.getElementById('notas_reagendamiento').value = '';
+        // Limpiar calendario
+        diaSeleccionadoReagendar = null;
+        diaSeleccionadoStrReagendar = null;
+        const citasDiaContainer = document.getElementById('cal-citas-dia-reagendar');
+        if (citasDiaContainer) {
+            citasDiaContainer.innerHTML = `
+                <div class="empty-state empty-state-10">
+                    <i class="fas fa-calendar-day empty-state-icon"></i>
+                    <p class="empty-state-text">Seleccione un día del calendario para ver los horarios disponibles.</p>
+                </div>
+            `;
+        }
+        const horariosBotones = document.getElementById('horarios-botones-reagendar');
+        if (horariosBotones) {
+            horariosBotones.classList.add('horarios-botones-hidden');
+            horariosBotones.style.display = 'none';
+        }
+    }
+
+    // Validación del formulario de reagendar
+    const formReagendar = document.getElementById('formReagendar');
+    if (formReagendar) {
+        formReagendar.addEventListener('submit', function(e) {
+            if (!fechaHiddenInputReagendar || !fechaHiddenInputReagendar.value) {
+                e.preventDefault();
+                alert('Por favor, seleccione una fecha del calendario.');
+                return false;
+            }
+            if (!horaHiddenInputReagendar || !horaHiddenInputReagendar.value) {
+                e.preventDefault();
+                alert('Por favor, seleccione un horario disponible.');
+                return false;
+            }
+        });
     }
 
     // Cerrar modales al hacer clic fuera de ellos

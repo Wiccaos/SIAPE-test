@@ -473,7 +473,7 @@ class PublicaSolicitudSerializer(serializers.Serializer):
         hora_normalizada = hora_obj.replace(minute=0, second=0, microsecond=0)
         fecha_hora_cita = timezone.make_aware(datetime.combine(fecha, hora_normalizada))
 
-        # 2. Re-validar que la hora no esté tomada
+        # 2. Re-validar que la hora no esté tomada ni bloqueada
         # Usar rango de fechas para evitar problemas con zonas horarias
         # Buscar citas en el mismo día y hora (normalizada)
         inicio_slot = fecha_hora_cita
@@ -487,10 +487,23 @@ class PublicaSolicitudSerializer(serializers.Serializer):
             fecha_entrevista__gte=inicio_slot,
             fecha_entrevista__lt=fin_slot
         ).exclude(coordinadora__isnull=True).exists()
+        
+        # Buscar horarios bloqueados que se solapen con este slot
+        from .models import HorarioBloqueado
+        horario_bloqueado = HorarioBloqueado.objects.filter(
+            coordinadora__in=coordinadoras,
+            fecha_hora__gte=inicio_slot,
+            fecha_hora__lt=fin_slot
+        ).exists()
 
         if cita_tomada:
             raise serializers.ValidationError(
                 f"Lo sentimos, la hora de las {hora_str} el {fecha.strftime('%d-%m-%Y')} acaba de ser tomada. Por favor, seleccione otra."
+            )
+        
+        if horario_bloqueado:
+            raise serializers.ValidationError(
+                f"Lo sentimos, la hora de las {hora_str} el {fecha.strftime('%d-%m-%Y')} no está disponible. Por favor, seleccione otra."
             )
             
         # 3. Pasar el datetime completo al método .create()
@@ -514,14 +527,19 @@ class PublicaSolicitudSerializer(serializers.Serializer):
         fecha_hora_cita = validated_data['fecha_entrevista_completa']
         coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
         
-        # Buscar una coordinadora que no tenga una cita en ese horario
+        # Buscar una coordinadora que no tenga una cita ni horario bloqueado en ese horario
         coordinadora_asignada = None
+        from .models import HorarioBloqueado
         for coord in coordinadoras:
             tiene_cita = Entrevistas.objects.filter(
                 coordinadora=coord,
                 fecha_entrevista=fecha_hora_cita
             ).exists()
-            if not tiene_cita:
+            tiene_horario_bloqueado = HorarioBloqueado.objects.filter(
+                coordinadora=coord,
+                fecha_hora=fecha_hora_cita
+            ).exists()
+            if not tiene_cita and not tiene_horario_bloqueado:
                 coordinadora_asignada = coord
                 break
         

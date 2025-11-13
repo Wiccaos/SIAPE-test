@@ -30,7 +30,7 @@ from .serializer import (
 )
 from .models import(
     Usuario, PerfilUsuario, Roles, Areas, CategoriasAjustes, Carreras, Estudiantes, Solicitudes, Evidencias,
-    Asignaturas, AsignaturasEnCurso, Entrevistas, AjusteRazonable, AjusteAsignado
+    Asignaturas, AsignaturasEnCurso, Entrevistas, AjusteRazonable, AjusteAsignado, HorarioBloqueado
 )  
 
 # Django-restframework
@@ -142,14 +142,21 @@ def get_horarios_disponibles(request):
             slot_datetime = timezone.make_aware(datetime.combine(selected_date, hora_obj))
             
             # Verificar si al menos una coordinadora tiene este horario libre
-            # Un horario está disponible si AL MENOS UNA coordinadora NO tiene cita en ese horario
+            # Un horario está disponible si AL MENOS UNA coordinadora NO tiene cita ni horario bloqueado en ese horario
             slot_disponible = False
             for coord in coordinadoras:
                 tiene_cita = Entrevistas.objects.filter(
                     coordinadora=coord,
                     fecha_entrevista=slot_datetime
                 ).exclude(coordinadora__isnull=True).exists()
-                if not tiene_cita:
+                
+                # Verificar si el horario está bloqueado para esta coordinadora
+                tiene_horario_bloqueado = HorarioBloqueado.objects.filter(
+                    coordinadora=coord,
+                    fecha_hora=slot_datetime
+                ).exists()
+                
+                if not tiene_cita and not tiene_horario_bloqueado:
                     slot_disponible = True
                     break
             
@@ -191,6 +198,7 @@ def get_calendario_disponible(request):
     # 3. Obtener todas las citas ya tomadas en ese mes, agrupadas por coordinadora y día
     # Estructura: {coordinadora_id: {dia_str: set([hora1, hora2, ...])}}
     citas_por_coordinadora_dia = {}
+    horarios_bloqueados_por_coordinadora_dia = {}
     
     # Obtener TODAS las citas del mes de TODAS las coordinadoras de una vez
     # Usar rango de fechas en lugar de __year y __month para evitar problemas de zona horaria
@@ -210,6 +218,13 @@ def get_calendario_disponible(request):
         fecha_entrevista__lt=ultimo_dia_mes
     ).exclude(coordinadora__isnull=True).select_related('coordinadora').values_list('coordinadora_id', 'fecha_entrevista')
     
+    # Obtener TODOS los horarios bloqueados del mes de TODAS las coordinadoras
+    todos_los_horarios_bloqueados = HorarioBloqueado.objects.filter(
+        coordinadora__in=coordinadoras,
+        fecha_hora__gte=primer_dia_mes,
+        fecha_hora__lt=ultimo_dia_mes
+    ).select_related('coordinadora').values_list('coordinadora_id', 'fecha_hora')
+    
     # Debug: mostrar todas las citas encontradas
     total_citas = todas_las_citas.count()
     print(f"[DEBUG] Total de citas encontradas en {year}-{month:02d}: {total_citas}")
@@ -221,6 +236,7 @@ def get_calendario_disponible(request):
     # Inicializar el diccionario para todas las coordinadoras
     for coord in coordinadoras:
         citas_por_coordinadora_dia[coord.id] = {}
+        horarios_bloqueados_por_coordinadora_dia[coord.id] = {}
     
     # Procesar cada cita
     for coord_id, dt in todas_las_citas:
@@ -239,6 +255,22 @@ def get_calendario_disponible(request):
         
         print(f"[DEBUG] Cita encontrada: Coordinadora {coord_id}, Día {dia_str}, Hora {hora_str} (original: {dt_local.strftime('%Y-%m-%d %H:%M:%S')})")
         logger.debug(f"Cita encontrada: Coordinadora {coord_id}, Día {dia_str}, Hora {hora_str} (original: {dt_local.strftime('%Y-%m-%d %H:%M:%S')})")
+    
+    # Procesar cada horario bloqueado
+    for coord_id, dt in todos_los_horarios_bloqueados:
+        # Convertir a la zona horaria local de forma consistente
+        dt_local = timezone.localtime(dt)
+        dia_str = dt_local.strftime('%Y-%m-%d')
+        # Normalizar la hora a solo la hora en punto
+        hora_str = f"{dt_local.hour:02d}:00"
+        
+        if coord_id not in horarios_bloqueados_por_coordinadora_dia:
+            horarios_bloqueados_por_coordinadora_dia[coord_id] = {}
+        if dia_str not in horarios_bloqueados_por_coordinadora_dia[coord_id]:
+            horarios_bloqueados_por_coordinadora_dia[coord_id][dia_str] = set()
+        horarios_bloqueados_por_coordinadora_dia[coord_id][dia_str].add(hora_str)
+        
+        logger.debug(f"Horario bloqueado encontrado: Coordinadora {coord_id}, Día {dia_str}, Hora {hora_str}")
     
     # Debug: Log de citas encontradas por coordinadora
     for coord in coordinadoras:
@@ -286,34 +318,39 @@ def get_calendario_disponible(request):
                     continue
             
             slot_ocupado = False
+            slot_bloqueado = False
             coordinadora_ocupada = None
             if coordinadoras.exists():
                 for coord in coordinadoras:
                     citas_coord_dia = citas_por_coordinadora_dia.get(coord.id, {}).get(dia_actual_str, set())
-                    # Debug: verificar qué hay en el set
-                    if citas_coord_dia:
-                        print(f"[DEBUG] Coordinadora {coord.id}, Día {dia_actual_str}: horas en set = {sorted(citas_coord_dia)}, buscando {hora_str}")
-                        logger.debug(f"Coordinadora {coord.id}, Día {dia_actual_str}: horas en set = {sorted(citas_coord_dia)}, buscando {hora_str}")
+                    horarios_bloqueados_coord_dia = horarios_bloqueados_por_coordinadora_dia.get(coord.id, {}).get(dia_actual_str, set())
+                    
                     # Si esta coordinadora tiene una cita en este horario, el slot está ocupado
                     if hora_str in citas_coord_dia:
                         slot_ocupado = True
                         coordinadora_ocupada = coord.id
-                        print(f"[DEBUG] ✓ Slot {hora_str} del día {dia_actual_str} está ocupado por coordinadora {coord.id}")
-                        logger.debug(f"✓ Slot {hora_str} del día {dia_actual_str} está ocupado por coordinadora {coord.id}")
+                        logger.debug(f"✓ Slot {hora_str} del día {dia_actual_str} está ocupado por coordinadora {coord.id} (cita)")
+                        break
+                    
+                    # Si esta coordinadora tiene este horario bloqueado, el slot está bloqueado
+                    if hora_str in horarios_bloqueados_coord_dia:
+                        slot_bloqueado = True
+                        coordinadora_ocupada = coord.id
+                        logger.debug(f"✓ Slot {hora_str} del día {dia_actual_str} está bloqueado por coordinadora {coord.id}")
                         break
             
-            # Si ninguna coordinadora tiene el horario ocupado, está disponible
-            if not slot_ocupado and coordinadoras.exists():
+            # Si ninguna coordinadora tiene el horario ocupado ni bloqueado, está disponible
+            if not slot_ocupado and not slot_bloqueado and coordinadoras.exists():
                 slots_libres.append(hora_str)
                 logger.debug(f"  Slot {hora_str} del día {dia_actual_str} está DISPONIBLE")
             else:
-                # Al menos una coordinadora tiene este horario ocupado (o no hay coordinadoras)
+                # Al menos una coordinadora tiene este horario ocupado o bloqueado (o no hay coordinadoras)
                 slots_no_disponibles.append(hora_str)
                 if slot_ocupado:
-                    print(f"[DEBUG] Slot {hora_str} del día {dia_actual_str} agregado a slots_no_disponibles (ocupado por coord {coordinadora_ocupada})")
                     logger.debug(f"  Slot {hora_str} del día {dia_actual_str} agregado a slots_no_disponibles (ocupado por coord {coordinadora_ocupada})")
+                elif slot_bloqueado:
+                    logger.debug(f"  Slot {hora_str} del día {dia_actual_str} agregado a slots_no_disponibles (bloqueado por coord {coordinadora_ocupada})")
                 else:
-                    print(f"[DEBUG] Slot {hora_str} del día {dia_actual_str} agregado a slots_no_disponibles (no hay coordinadoras)")
                     logger.debug(f"  Slot {hora_str} del día {dia_actual_str} agregado a slots_no_disponibles (no hay coordinadoras)")
 
         # Siempre agregar los slots detallados, incluso si no hay disponibles
@@ -909,17 +946,16 @@ def dashboard_coordinadora(request):
     
     kpi_citas_hoy = citas_hoy_qs.count()
 
-    # KPI 2: Citas canceladas (Historial total de esta coordinadora)
+    # KPI 2: Citas canceladas esta semana
     kpi_citas_canceladas = entrevistas_coordinadora.filter(
-        estado='cancelada'
+        estado='cancelada',
+        updated_at__range=(start_of_week_dt, end_of_week_dt)
     ).count()
 
-    # KPI 3: Solicitudes pendientes de entrevista o formulación del caso
-    # Contamos las entrevistas 'pendientes' de esta coordinadora
-    # que correspondan a solicitudes 'pendientes_entrevista' o 'pendientes_formulacion_caso'
-    kpi_solicitudes_pendientes = entrevistas_coordinadora.filter(
-        estado='pendiente',
-        solicitudes__estado__in=['pendiente_entrevista', 'pendiente_formulacion_caso']
+    # KPI 3: Casos pendientes de Formulación del caso
+    # Contamos las solicitudes que están en estado 'pendiente_formulacion_caso'
+    kpi_pendientes_formulacion_caso = Solicitudes.objects.filter(
+        estado='pendiente_formulacion_caso'
     ).count()
     
     # KPI 4: Citas de la semana
@@ -934,7 +970,7 @@ def dashboard_coordinadora(request):
         'kpis': {
             'citas_hoy': kpi_citas_hoy,
             'citas_canceladas': kpi_citas_canceladas,
-            'solicitudes_pendientes': kpi_solicitudes_pendientes,
+            'pendientes_formulacion_caso': kpi_pendientes_formulacion_caso,
             'citas_semana': kpi_citas_semana,
         },
         'citas_del_dia_list': citas_hoy_qs, # Esta es la lista para la sección principal
@@ -942,6 +978,38 @@ def dashboard_coordinadora(request):
 
     # 5. --- Renderizar Template ---
     return render(request, 'SIAPE/dashboard_coordinadora.html', context)
+
+@require_POST
+@login_required
+def cancelar_cita_dashboard(request, entrevista_id):
+    """
+    Vista para que la Coordinadora cancele una cita desde el dashboard.
+    """
+    # 1. Verificar Permiso
+    try:
+        if request.user.perfil.rol.nombre_rol != ROL_COORDINADORA:
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('dashboard_coordinadora')
+    except AttributeError:
+        return redirect('home')
+
+    # 2. Lógica de la Acción
+    try:
+        # Cualquier coordinadora del rol puede cancelar cualquier entrevista del rol
+        todas_las_coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
+        entrevista = get_object_or_404(Entrevistas, id=entrevista_id, coordinadora__in=todas_las_coordinadoras)
+        
+        if entrevista.estado == 'pendiente':
+            entrevista.estado = 'cancelada'
+            entrevista.save()
+            messages.success(request, 'Cita cancelada exitosamente.')
+        else:
+            messages.warning(request, 'Esta cita no puede ser cancelada porque ya fue realizada o cancelada anteriormente.')
+    except Exception as e:
+        messages.error(request, f'Error al cancelar la cita: {str(e)}')
+        
+    # 3. Redirigir siempre al dashboard
+    return redirect('dashboard_coordinadora')
 
 @login_required
 def detalle_casos_coordinadora(request, solicitud_id):
@@ -1770,6 +1838,118 @@ def confirmar_cita_coordinadora(request, entrevista_id):
     # 3. Redirigir siempre al panel de control
     return redirect('panel_control_coordinadora')
 
+@login_required
+def gestionar_horarios_bloqueados(request):
+    """
+    Vista para que la Coordinadora gestione sus horarios bloqueados.
+    Permite ver, crear y eliminar horarios bloqueados.
+    """
+    # 1. Verificar Permiso
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_COORDINADORA:
+            messages.error(request, 'No tienes permisos para acceder a esta página.')
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+    
+    # 2. Obtener horarios bloqueados de esta coordinadora
+    horarios_bloqueados = HorarioBloqueado.objects.filter(
+        coordinadora=perfil
+    ).order_by('fecha_hora')
+    
+    # Filtrar solo horarios futuros o del día actual
+    now = timezone.localtime(timezone.now())
+    horarios_bloqueados = horarios_bloqueados.filter(fecha_hora__gte=now)
+    
+    # 3. Si es POST, crear nuevo horario bloqueado
+    if request.method == 'POST':
+        fecha_str = request.POST.get('fecha_bloqueo')  # Formato: YYYY-MM-DD
+        hora_str = request.POST.get('hora_bloqueo')    # Formato: HH:MM
+        motivo = request.POST.get('motivo', '').strip()
+        
+        if not fecha_str or not hora_str:
+            messages.error(request, 'Debe seleccionar una fecha y un horario.')
+        else:
+            try:
+                # Parsear fecha y hora por separado
+                fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+                hora_obj = datetime.strptime(hora_str, '%H:%M').time()
+                
+                # Normalizar la hora a hora en punto (minutos y segundos en 0)
+                hora_normalizada = hora_obj.replace(minute=0, second=0, microsecond=0)
+                
+                # Combinar fecha y hora en un datetime aware
+                fecha_hora = timezone.make_aware(datetime.combine(fecha_obj, hora_normalizada))
+                
+                # Verificar que no esté en el pasado
+                if fecha_hora < now:
+                    messages.error(request, 'No se pueden bloquear horarios en el pasado.')
+                else:
+                    # Verificar que no haya una cita en ese horario
+                    tiene_cita = Entrevistas.objects.filter(
+                        coordinadora=perfil,
+                        fecha_entrevista=fecha_hora,
+                        estado='pendiente'
+                    ).exists()
+                    
+                    if tiene_cita:
+                        messages.error(request, 'No se puede bloquear un horario que ya tiene una cita programada.')
+                    else:
+                        # Verificar que no esté ya bloqueado
+                        ya_bloqueado = HorarioBloqueado.objects.filter(
+                            coordinadora=perfil,
+                            fecha_hora=fecha_hora
+                        ).exists()
+                        
+                        if ya_bloqueado:
+                            messages.error(request, 'Este horario ya está bloqueado.')
+                        else:
+                            # Crear el horario bloqueado
+                            HorarioBloqueado.objects.create(
+                                coordinadora=perfil,
+                                fecha_hora=fecha_hora,
+                                motivo=motivo
+                            )
+                            messages.success(request, 'Horario bloqueado exitosamente.')
+            except ValueError as e:
+                messages.error(request, f'Formato de fecha u hora inválido: {str(e)}')
+            except Exception as e:
+                messages.error(request, f'Error al bloquear el horario: {str(e)}')
+        
+        return redirect('gestionar_horarios_bloqueados')
+    
+    # 4. Preparar contexto
+    context = {
+        'horarios_bloqueados': horarios_bloqueados,
+    }
+    
+    return render(request, 'SIAPE/gestionar_horarios_bloqueados.html', context)
+
+@require_POST
+@login_required
+def eliminar_horario_bloqueado(request, horario_id):
+    """
+    Vista para que la Coordinadora elimine un horario bloqueado.
+    """
+    # 1. Verificar Permiso
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_COORDINADORA:
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+    
+    # 2. Obtener y eliminar el horario bloqueado
+    try:
+        horario = get_object_or_404(HorarioBloqueado, id=horario_id, coordinadora=perfil)
+        horario.delete()
+        messages.success(request, 'Horario desbloqueado exitosamente.')
+    except Exception as e:
+        messages.error(request, f'Error al desbloquear el horario: {str(e)}')
+    
+    return redirect('gestionar_horarios_bloqueados')
 
 @login_required
 def editar_notas_cita_coordinadora(request, entrevista_id):
@@ -1800,6 +1980,110 @@ def editar_notas_cita_coordinadora(request, entrevista_id):
     # 3. Redirigir
     return redirect('panel_control_coordinadora')
 
+@login_required
+def agendar_cita_coordinadora(request):
+    """
+    Permite a la Coordinadora agendar una nueva cita para un caso.
+    """
+    # 1. Verificar Permiso
+    try:
+        if request.user.perfil.rol.nombre_rol != ROL_COORDINADORA:
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+
+    # 2. Lógica de la Acción
+    if request.method == 'POST':
+        solicitud_id = request.POST.get('solicitud_id')
+        fecha_str = request.POST.get('fecha_agendar')  # Formato: YYYY-MM-DD
+        hora_str = request.POST.get('hora_agendar')    # Formato: HH:MM
+        modalidad = request.POST.get('modalidad', '')
+        notas = request.POST.get('notas', '')
+        
+        try:
+            solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
+            
+            if not fecha_str or not hora_str:
+                messages.error(request, 'Debe seleccionar una fecha y un horario.')
+                return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+            
+            # Parsear fecha y hora por separado
+            fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+            hora_obj = datetime.strptime(hora_str, '%H:%M').time()
+            
+            # Normalizar la hora a hora en punto (minutos y segundos en 0)
+            hora_normalizada = hora_obj.replace(minute=0, second=0, microsecond=0)
+            
+            # Combinar fecha y hora en un datetime aware
+            fecha_entrevista = timezone.make_aware(datetime.combine(fecha_obj, hora_normalizada))
+            
+            # Verificar que no esté en el pasado
+            now = timezone.localtime(timezone.now())
+            if fecha_entrevista < now:
+                messages.error(request, 'No se pueden agendar citas en el pasado.')
+                return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+            
+            # Buscar coordinadora disponible para el horario seleccionado
+            todas_las_coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
+            coordinadora_asignada = None
+            
+            from .models import HorarioBloqueado
+            for coord in todas_las_coordinadoras:
+                tiene_cita = Entrevistas.objects.filter(
+                    coordinadora=coord,
+                    fecha_entrevista=hora_normalizada
+                ).exists()
+                tiene_horario_bloqueado = HorarioBloqueado.objects.filter(
+                    coordinadora=coord,
+                    fecha_hora=hora_normalizada
+                ).exists()
+                if not tiene_cita and not tiene_horario_bloqueado:
+                    coordinadora_asignada = coord
+                    break
+            
+            # Si ninguna coordinadora está disponible, usar la primera (fallback)
+            if not coordinadora_asignada:
+                coordinadora_asignada = todas_las_coordinadoras.first()
+            
+            if not coordinadora_asignada:
+                messages.error(request, 'No hay coordinadoras disponibles para agendar la cita.')
+                return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+            
+            # Verificar que no haya una cita ya agendada para esta solicitud en este horario
+            cita_existente = Entrevistas.objects.filter(
+                solicitudes=solicitud,
+                fecha_entrevista=hora_normalizada
+            ).exists()
+            
+            if cita_existente:
+                messages.error(request, 'Ya existe una cita agendada para este caso en ese horario.')
+                return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+            
+            # Crear la nueva entrevista
+            nueva_entrevista = Entrevistas.objects.create(
+                solicitudes=solicitud,
+                coordinadora=coordinadora_asignada,
+                fecha_entrevista=hora_normalizada,
+                modalidad=modalidad,
+                notas=notas,
+                estado='pendiente'
+            )
+            
+            # Si el caso está en estado 'pendiente_entrevista', mantenerlo así
+            # (no cambiar el estado automáticamente al agendar)
+            
+            messages.success(request, 'Cita agendada correctamente.')
+        except ValueError as e:
+            messages.error(request, f'Formato de fecha inválido: {str(e)}')
+        except Exception as e:
+            messages.error(request, f'Error al agendar la cita: {str(e)}')
+    
+    # 3. Redirigir al detalle del caso
+    solicitud_id = request.POST.get('solicitud_id') if request.method == 'POST' else request.GET.get('solicitud_id')
+    if solicitud_id:
+        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+    return redirect('casos_generales')
 
 @login_required
 def reagendar_cita_coordinadora(request, entrevista_id):
@@ -1817,7 +2101,8 @@ def reagendar_cita_coordinadora(request, entrevista_id):
 
     # 2. Lógica de la Acción
     if request.method == 'POST':
-        nueva_fecha_str = request.POST.get('nueva_fecha_entrevista')
+        fecha_str = request.POST.get('fecha_reagendar')  # Formato: YYYY-MM-DD
+        hora_str = request.POST.get('hora_reagendar')    # Formato: HH:MM
         nueva_modalidad = request.POST.get('nueva_modalidad', '')
         notas_reagendamiento = request.POST.get('notas_reagendamiento', '')
         try:
@@ -1825,8 +2110,19 @@ def reagendar_cita_coordinadora(request, entrevista_id):
             todas_las_coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
             entrevista_original = get_object_or_404(Entrevistas, id=entrevista_id, coordinadora__in=todas_las_coordinadoras)
             
-            nueva_fecha = datetime.strptime(nueva_fecha_str, '%Y-%m-%dT%H:%M')
-            nueva_fecha = timezone.make_aware(nueva_fecha)
+            if not fecha_str or not hora_str:
+                messages.error(request, 'Debe seleccionar una fecha y un horario.')
+                return redirect('panel_control_coordinadora')
+            
+            # Parsear fecha y hora por separado
+            fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+            hora_obj = datetime.strptime(hora_str, '%H:%M').time()
+            
+            # Normalizar la hora a hora en punto (minutos y segundos en 0)
+            hora_normalizada = hora_obj.replace(minute=0, second=0, microsecond=0)
+            
+            # Combinar fecha y hora en un datetime aware
+            nueva_fecha = timezone.make_aware(datetime.combine(fecha_obj, hora_normalizada))
             
             # Crear la nueva cita (mantenemos la misma coordinadora asignada originalmente)
             nueva_entrevista = Entrevistas.objects.create(

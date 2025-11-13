@@ -1,64 +1,6 @@
 /* =============================================================
-   MODO OSCURO - REGLAS ESPECÍFICAS DE DASHBOARD
-   (Las reglas generales están en base.css)
+   ESTILOS GENERALES
    ============================================================= */
-
-/* Modo oscuro: tarjetas internas de casos, citas y calendario */
-body.dark-mode .caso-item,
-body.dark-mode .cita-item,
-body.dark-mode .cal-widget,
-body.dark-mode .cal-citas-list,
-body.dark-mode .empty-state {
-    background-color: #181818 !important;
-    color: #e0e0e0 !important;
-    border-color: #444 !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.25) !important;
-}
-
-body.dark-mode .caso-header,
-body.dark-mode .cita-header,
-body.dark-mode .caso-asunto,
-body.dark-mode .cita-fecha,
-body.dark-mode .caso-estudiante,
-body.dark-mode .cita-estudiante,
-body.dark-mode .kpi-label,
-body.dark-mode .kpi-detail,
-body.dark-mode .kpi-value {
-    color: #fff !important;
-}
-
-body.dark-mode .btn-accion {
-    color: #fff;
-}
-
-/* Fondo oscuro para el div principal del calendario en modo oscuro */
-body.dark-mode .panel-section .cal-layout-container {
-    background-color: #181818 !important;
-    border-radius: 18px !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
-    border: 1.5px solid #333;
-}
-
-/* Restaurar colores de días con citas, seleccionados y día actual en modo oscuro */
-body.dark-mode .cal-day.day-entrevista {
-    background-color: #1d3c5a !important;
-    color: #fff !important;
-}
-body.dark-mode .cal-day.day-today {
-    background-color: #007bff !important;
-    color: #fff !important;
-    border-color: #007bff !important;
-}
-body.dark-mode .cal-day.cal-day-selected {
-    background-color: #cc0000 !important;
-    color: #fff !important;
-    border-color: #cc0000 !important;
-}
-body.dark-mode .cal-day.day-entrevista.day-today {
-    background-color: #007bff !important;
-    color: #fff !important;
-    border-color: #007bff !important;
-}
 
 /* Casos disponibles y asignados uno al lado del otro en desktop, apilados en móvil */
 .panel-control-container.casos-dos-columnas {
@@ -76,45 +18,6 @@ body.dark-mode .cal-day.day-entrevista.day-today {
     }
 }
 
-/* Mejor contraste para casos disponibles y asignados en modo oscuro */
-body.dark-mode .panel-section.casos-disponibles,
-body.dark-mode .panel-section.casos-asignados {
-    background-color: #232323 !important;
-    color: #f0f0f0 !important;
-}
-
-/* Consolidación: Panel, Casos, Citas y Calendario en modo oscuro */
-body.dark-mode .panel-section,
-body.dark-mode .cal-layout-container,
-body.dark-mode .cal-widget,
-body.dark-mode .cal-citas-list,
-body.dark-mode .cita-detalle-item,
-body.dark-mode .empty-state,
-body.dark-mode .citas-detalle {
-    background-color: #232323 !important;
-    color: #e0e0e0 !important;
-    border-color: #444 !important;
-}
-
-body.dark-mode .table-container,
-body.dark-mode .custom-table,
-body.dark-mode .modal-content {
-    background-color: #232323 !important;
-    color: #e0e0e0 !important;
-    border-color: #444 !important;
-}
-
-body.dark-mode .custom-table th,
-body.dark-mode .custom-table td {
-    color: #e0e0e0 !important;
-}
-
-body.dark-mode .cal-day,
-body.dark-mode .cal-day-header {
-    background-color: #232323 !important;
-    color: #e0e0e0 !important;
-    border-color: #444 !important;
-}
 /* Panel Control Asesor clases para reemplazar estilos en línea */
 .ajustes-total {
     color: #666;
@@ -860,18 +763,6 @@ body.dark-mode .cal-day-header {
     background: transparent !important;
 }
 
-/* Celdas de encabezado (L, M, X...) */
-body.dark-mode .cal-day-header {
-    background: transparent !important;
-    color: #e0e0e0 !important;
-}
-
-/* Celdas de día (1, 2, 3...) */
-body.dark-mode .cal-day {
-    background: #232323 !important;
-    color: #e0e0e0 !important;
-    border: none !important;
-}
 
 .cal-day.other-month {
     color: #ccc;
@@ -884,6 +775,25 @@ body.dark-mode .cal-day {
     color: #28a745;
     font-weight: bold;
 }
+
+.day-disponible {
+    background-color: #eaf6ec;
+    color: #28a745;
+    font-weight: bold;
+}
+
+.day-lleno {
+    background-color: #fdecec;
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.day-inabil {
+    color: #ccc;
+    background-color: #f9f9f9;
+    cursor: not-allowed;
+}
+
 .day-habil { /* Este es el día rojo en tu ejemplo de 'detalle_caso' */
     background-color: #fdecec;
     color: #cc0000;
@@ -914,6 +824,8 @@ body.dark-mode .cal-day {
     flex-shrink: 0;
 }
 .dot.dot-entrevista { background-color: #28a745; }
+.dot.dot-disponible { background-color: #28a745; }
+.dot.dot-lleno { background-color: #dc3545; }
 .dot.dot-habil { background-color: #cc0000; }
 .dot.dot-interrupcion { background-color: #e6a800; }
 
@@ -933,6 +845,35 @@ body.dark-mode .cal-day {
     color: #007bff;
     font-weight: bold;
     border: 1px solid #007bff;
+}
+
+/* Día seleccionado */
+.cal-day.cal-day-selected {
+    background-color: #cc0000;
+    color: #ffffff !important;
+    border: 1px solid #a70000;
+    font-weight: bold;
+}
+
+/* Hacer que los días clickeables tengan cursor */
+.cal-day:not(.other-month) {
+    cursor: pointer;
+}
+
+.cal-day:not(.other-month):hover {
+    background-color: #f0f0f0;
+}
+
+/* El seleccionado no debe cambiar en hover */
+.cal-day.cal-day-selected:hover {
+    background-color: #cc0000;
+}
+
+/* Prioridad si un día es "Hoy" y también tiene disponibilidad */
+.cal-day.day-disponible.day-today {
+    background-color: #eaf6ec; 
+    color: #28a745;
+    border: 2px solid #007bff;
 }
 
 /* Prioridad si un día es "Hoy" y también tiene "Cita" */
@@ -1154,6 +1095,20 @@ body.dark-mode .cal-day {
     overflow-y: auto; 
 }
 
+/* Modales con calendario (agendar/reagendar citas) - más grandes */
+.modal-content:has(.cal-layout-container) {
+    max-width: 1200px;
+    width: 95%;
+    padding: 40px;
+}
+
+/* Fallback para navegadores que no soportan :has() */
+.modal-content.modal-calendario {
+    max-width: 1200px;
+    width: 95%;
+    padding: 40px;
+}
+
 .modal-header {
     display: flex;
     justify-content: space-between;
@@ -1273,12 +1228,14 @@ body.dark-mode .cal-day {
 }
 
 .btn-accion-gray {
-    background-color: #6c757d;
-    color: white;
+    background-color: #e9ecef;
+    color: #495057;
+    border: 1px solid #ced4da;
 }
 
 .btn-accion-gray:hover {
-    background-color: #5a6268;
+    background-color: #dee2e6;
+    border-color: #adb5bd;
 }
 
 .btn-accion-red {
@@ -1543,6 +1500,590 @@ body.dark-mode .cal-day {
     margin-bottom: 15px;
 }
 
+/* Panel Section Scrollable */
+.panel-section-scrollable {
+    display: flex;
+    flex-direction: column;
+    height: 500px; /* Altura fija */
+    padding: 25px;
+}
+
+.panel-section-scrollable h3 {
+    flex-shrink: 0; /* Evita que el título se encoja */
+    margin-bottom: 15px;
+}
+
+.panel-section-content {
+    flex: 1; /* Ocupa el espacio restante */
+    overflow-y: auto; /* Habilita el scroll vertical */
+    overflow-x: hidden;
+    padding-right: 10px; /* Espacio para la scrollbar */
+    min-height: 0; /* Necesario para flexbox con overflow */
+}
+
+/* Estilo personalizado para la scrollbar */
+.panel-section-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.panel-section-content::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.panel-section-content::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.panel-section-content::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* =============================================================
+   MODO OSCURO - TODOS LOS ESTILOS CONSOLIDADOS AL FINAL
+   (Mejor contraste y organización)
+   ============================================================= */
+
+/* Fondo principal */
+body.dark-mode {
+    background-color: #121212;
+    color: #ffffff;
+}
+
+/* Componentes principales - Mejor contraste */
+body.dark-mode .app-header,
+body.dark-mode .app-footer,
+body.dark-mode .panel-section,
+body.dark-mode .table-container,
+body.dark-mode .kpi-card,
+body.dark-mode .support-grid-container,
+body.dark-mode .dashboard-nav,
+body.dark-mode .modal-content,
+body.dark-mode .cal-citas-list,
+body.dark-mode .cal-cita-item,
+body.dark-mode .login-container,
+body.dark-mode .form-container,
+body.dark-mode .dropdown-menu,
+body.dark-mode .main-content {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+    border-color: #3a3a3a !important;
+}
+
+/* Tarjetas internas - Mejor contraste */
+body.dark-mode .caso-item,
+body.dark-mode .cita-item,
+body.dark-mode .cal-widget,
+body.dark-mode .cal-citas-list,
+body.dark-mode .empty-state {
+    background-color: #1a1a1a !important;
+    color: #ffffff !important;
+    border-color: #3a3a3a !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+}
+
+/* Textos principales - Blanco para mejor contraste */
+body.dark-mode h1,
+body.dark-mode h2,
+body.dark-mode h3,
+body.dark-mode h4,
+body.dark-mode .kpi-value,
+body.dark-mode .support-title,
+body.dark-mode .header-user-details .user-role,
+body.dark-mode .dropdown-item,
+body.dark-mode .form-group label,
+body.dark-mode .table-header h2,
+body.dark-mode .caso-header,
+body.dark-mode .cita-header,
+body.dark-mode .caso-asunto,
+body.dark-mode .cita-fecha,
+body.dark-mode .caso-estudiante,
+body.dark-mode .cita-estudiante,
+body.dark-mode .kpi-label,
+body.dark-mode .kpi-detail,
+body.dark-mode .detalle-card-content p strong,
+body.dark-mode .support-grid-container h2 {
+    color: #ffffff !important;
+}
+
+/* Tabla custom - Fondo oscuro específico */
+body.dark-mode .custom-table {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+    border-color: #3a3a3a !important;
+}
+
+body.dark-mode .custom-table th {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+    border-bottom-color: #3a3a3a !important;
+}
+
+body.dark-mode .custom-table td {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+    border-bottom-color: #3a3a3a !important;
+}
+
+body.dark-mode .custom-table tr:hover td {
+    background-color: #2a2a2a !important;
+}
+
+body.dark-mode .custom-table tr:not(:last-child) td {
+    border-bottom-color: #3a3a3a !important;
+}
+
+/* Textos secundarios - Gris claro para legibilidad */
+body.dark-mode p,
+body.dark-mode span,
+body.dark-mode .support-total,
+body.dark-mode .header-user-details .user-name,
+body.dark-mode .cal-cita-asunto,
+body.dark-mode .form-group small,
+body.dark-mode .detalle-card-content p,
+body.dark-mode .table-footer,
+body.dark-mode .calendario-leyenda {
+    color: #d0d0d0 !important;
+}
+
+body.dark-mode .app-footer p {
+    color: #b0b0b0 !important;
+}
+
+/* Botones y acciones */
+body.dark-mode .btn-accion {
+    color: #ffffff !important;
+}
+
+body.dark-mode .header-config-link,
+body.dark-mode .header-config-link:hover {
+    background-color: #2a2a2a !important;
+    border-color: #4a4a4a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .header-logout-link {
+    background-color: #1e1e1e !important;
+    border-color: #4a4a4a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .nav-item:hover,
+body.dark-mode .dropdown-item:hover {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .btn-volver {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+    border-color: #4a4a4a !important;
+}
+
+body.dark-mode .btn-volver:hover {
+    background-color: #3a3a3a !important;
+}
+
+/* Formularios - Mejor contraste */
+body.dark-mode .form-group input,
+body.dark-mode .form-group select,
+body.dark-mode .form-group textarea,
+body.dark-mode .search-bar input,
+body.dark-mode .entries-selector select,
+body.dark-mode .input-readonly,
+body.dark-mode .form-descripcion-caso textarea,
+body.dark-mode .main-search-group input {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+    border-color: #4a4a4a !important;
+}
+
+body.dark-mode .drop-zone {
+    background-color: #1a1a1a !important;
+    border-color: #3a3a3a !important;
+}
+
+body.dark-mode .btn-filter-toggle {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+    border: 1px solid #4a4a4a !important;
+}
+
+body.dark-mode .btn-filter-toggle:hover {
+    background-color: #3a3a3a !important;
+}
+
+body.dark-mode .collapsible-filters {
+    background-color: #1e1e1e !important;
+    border-color: #3a3a3a !important;
+}
+
+body.dark-mode .collapsible-filters .form-actions {
+    border-top-color: #3a3a3a !important;
+}
+
+/* Calendario - Mejor contraste */
+body.dark-mode .panel-section .cal-layout-container {
+    background-color: #1a1a1a !important;
+    border-radius: 18px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    border: 1.5px solid #3a3a3a !important;
+}
+
+body.dark-mode .cal-layout-container,
+body.dark-mode .cal-widget,
+body.dark-mode .cita-detalle-item,
+body.dark-mode .citas-detalle {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+    border-color: #3a3a3a !important;
+}
+
+body.dark-mode .cal-day,
+body.dark-mode .cal-day-header {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+    border-color: #3a3a3a !important;
+}
+
+body.dark-mode .cal-day-header {
+    background: transparent !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .cal-day:not(.other-month):hover {
+    background-color: #2a2a2a !important;
+}
+
+body.dark-mode .cal-day.day-today {
+    background-color: #007bff !important;
+    border-color: #007bff !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .cal-day.day-disponible {
+    background-color: #1a4a2a !important;
+    color: #4ade80 !important;
+}
+
+body.dark-mode .cal-day.day-lleno {
+    background-color: #4a1a1a !important;
+    color: #ff6b6b !important;
+}
+
+body.dark-mode .cal-day.day-inabil {
+    background-color: #1a1a1a !important;
+    color: #666 !important;
+}
+
+body.dark-mode .cal-day.day-entrevista {
+    background-color: #1d3c5a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .cal-day.cal-day-selected {
+    background-color: #cc0000 !important;
+    color: #ffffff !important;
+    border-color: #cc0000 !important;
+}
+
+body.dark-mode .cal-day.day-disponible.day-today {
+    background-color: #1a4a2a !important;
+    color: #4ade80 !important;
+    border: 2px solid #007bff !important;
+}
+
+body.dark-mode .cal-day.day-entrevista.day-today {
+    background-color: #1a4a2a !important;
+    color: #4ade80 !important;
+    border: 2px solid #007bff !important;
+}
+
+body.dark-mode .cal-day.other-month {
+    color: #666 !important;
+}
+
+/* Panel sections específicos */
+body.dark-mode .panel-section.casos-disponibles,
+body.dark-mode .panel-section.casos-asignados {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+}
+
+/* Scrollbar en modo oscuro */
+body.dark-mode .panel-section-content::-webkit-scrollbar-track {
+    background: #1a1a1a !important;
+}
+
+body.dark-mode .panel-section-content::-webkit-scrollbar-thumb {
+    background: #4a4a4a !important;
+}
+
+body.dark-mode .panel-section-content::-webkit-scrollbar-thumb:hover {
+    background: #5a5a5a !important;
+}
+
+/* Detalle de caso específico */
+body.dark-mode .detalle-sub-card {
+    background-color: #1a1a1a !important;
+    border-color: #3a3a3a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .notas-box {
+    background-color: #1a1a1a !important;
+    color: #ffffff !important;
+    border-color: #3a3a3a !important;
+}
+
+/* Alerts - Mejor contraste */
+body.dark-mode .alert,
+body.dark-mode .alert-info,
+body.dark-mode .alert-warning,
+body.dark-mode .alert-success,
+body.dark-mode .alert-danger,
+body.dark-mode .custom-alert-info,
+body.dark-mode .custom-alert-warning,
+body.dark-mode .custom-alert-success,
+body.dark-mode .custom-alert-error {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+    border-color: #4a4a4a !important;
+}
+
+body.dark-mode .alert-info,
+body.dark-mode .custom-alert-info {
+    background-color: #1a3a5a !important;
+    border-left-color: #2196F3 !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .alert-warning,
+body.dark-mode .custom-alert-warning {
+    background-color: #3a2a1a !important;
+    border-left-color: #ffc107 !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .alert-success,
+body.dark-mode .custom-alert-success {
+    background-color: #1a3a2a !important;
+    border-left-color: #28a745 !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .alert-danger,
+body.dark-mode .custom-alert-error {
+    background-color: #3a1a1a !important;
+    border-left-color: #dc3545 !important;
+    color: #ffffff !important;
+}
+
+/* Links */
+body.dark-mode .link-rojo,
+body.dark-mode .link-rojo:hover,
+body.dark-mode a[style*="color: #cc0000"],
+body.dark-mode a[style*="color:#cc0000"] {
+    color: #ff4444 !important;
+}
+
+body.dark-mode .link-rojo:hover {
+    text-decoration: underline;
+}
+
+/* Status tags */
+body.dark-mode .status,
+body.dark-mode .status-aprobado,
+body.dark-mode .status-en_proceso,
+body.dark-mode .status-rechazado {
+    color: #ffffff !important;
+}
+
+body.dark-mode .status-aprobado {
+    background-color: #1a4a2a !important;
+    color: #4ade80 !important;
+}
+
+body.dark-mode .status-en_proceso {
+    background-color: #3a2a1a !important;
+    color: #ffb84d !important;
+}
+
+body.dark-mode .status-rechazado {
+    background-color: #4a1a1a !important;
+    color: #ff6b6b !important;
+}
+
+body.dark-mode .status-tag,
+body.dark-mode .status-tag.status-identificado,
+body.dark-mode .status-tag.status-en-proceso,
+body.dark-mode .status-tag.status-pendiente {
+    color: #ffffff !important;
+}
+
+body.dark-mode .status-tag.status-identificado {
+    background-color: #1a4a2a !important;
+    color: #4ade80 !important;
+}
+
+body.dark-mode .status-tag.status-en-proceso {
+    background-color: #3a2a1a !important;
+    color: #ffb84d !important;
+}
+
+body.dark-mode .status-tag.status-pendiente {
+    background-color: #4a1a1a !important;
+    color: #ff6b6b !important;
+}
+
+/* Otros elementos */
+body.dark-mode .doc-status-box {
+    background-color: #1a1a1a !important;
+    border-color: #3a3a3a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .doc-status-box span {
+    color: #d0d0d0 !important;
+}
+
+body.dark-mode .calendario-leyenda {
+    color: #d0d0d0 !important;
+}
+
+body.dark-mode .filter-bar {
+    background-color: transparent !important;
+}
+
+body.dark-mode .form-grid {
+    background-color: transparent !important;
+}
+
+/* Bordes */
+body.dark-mode .border-bottom,
+body.dark-mode .border-top-light {
+    border-color: #3a3a3a !important;
+}
+
+/* Paginación */
+body.dark-mode .pagination-btn,
+body.dark-mode .pagination-page {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+    border-color: #4a4a4a !important;
+}
+
+body.dark-mode .pagination-btn:hover {
+    background-color: #3a3a3a !important;
+}
+
+body.dark-mode .pagination-page.active {
+    background-color: #cc0000 !important;
+    color: #ffffff !important;
+    border-color: #cc0000 !important;
+}
+
+body.dark-mode .pagination-btn.disabled {
+    color: #666 !important;
+}
+
+/* KPI Icons */
+body.dark-mode .icon-solicitudes {
+    background-color: #3a1a1a !important;
+    color: #ff6b6b !important;
+}
+
+body.dark-mode .icon-resueltos {
+    background-color: #1a3a2a !important;
+    color: #4ade80 !important;
+}
+
+body.dark-mode .icon-proceso {
+    background-color: #3a2a1a !important;
+    color: #ffb84d !important;
+}
+
+body.dark-mode .icon-citas {
+    background-color: #1a2a4a !important;
+    color: #6bb6ff !important;
+}
+
+/* Support rows */
+body.dark-mode .support-row {
+    border-bottom-color: #3a3a3a !important;
+}
+
+/* Form actions */
+body.dark-mode .form-actions {
+    border-top-color: #3a3a3a !important;
+}
+
+/* Detalle card */
+body.dark-mode .detalle-card {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+    border-color: #3a3a3a !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+body.dark-mode .detalle-card p,
+body.dark-mode .detalle-card li {
+    color: #d0d0d0 !important;
+}
+
+body.dark-mode .detalle-titulo {
+    color: #b0b0b0 !important;
+}
+
+/* Botones del calendario y otros botones de acción */
+body.dark-mode .btn-accion-gray {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+    border-color: #4a4a4a !important;
+}
+
+body.dark-mode .btn-accion-gray:hover {
+    background-color: #3a3a3a !important;
+}
+
+body.dark-mode .btn-accion-small {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+    border-color: #4a4a4a !important;
+}
+
+body.dark-mode .btn-accion-small:hover {
+    background-color: #3a3a3a !important;
+}
+
+body.dark-mode .btn-accion-green {
+    background-color: #1a4a2a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .btn-accion-green:hover {
+    background-color: #2a5a3a !important;
+}
+
+body.dark-mode .btn-accion-red {
+    background-color: #4a1a1a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .btn-accion-red:hover {
+    background-color: #5a2a2a !important;
+}
+
+body.dark-mode .btn-accion-orange {
+    background-color: #3a2a1a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .btn-accion-orange:hover {
+    background-color: #4a3a2a !important;
+}
+
 /* --- Grid de 2 Columnas para Formularios (Modales) --- */
 .form-grid {
     display: grid;
@@ -1610,29 +2151,6 @@ body.dark-mode .cal-day {
     display: block; /* Se muestra con JS */
 }
 
-/* Modo oscuro para los nuevos filtros */
-body.dark-mode .main-search-group input {
-    background-color: #f0f0f0;
-    color: #111;
-}
-
-body.dark-mode .btn-filter-toggle {
-    background-color: #555;
-    color: #fff;
-    border: 1px solid #777;
-}
-body.dark-mode .btn-filter-toggle:hover {
-    background-color: #666;
-}
-
-body.dark-mode .collapsible-filters {
-    background-color: #3a3a3a;
-    border-color: #555;
-}
-
-body.dark-mode .collapsible-filters .form-actions {
-    border-top-color: #555 !important;
-}
 
 /* =============================================================
    NUEVOS ESTILOS PARA DETALLE DE CASO (detalle_casos_coordinadora.html)
@@ -1717,28 +2235,6 @@ body.dark-mode .collapsible-filters .form-actions {
     }
 }
 
-/* Estilos para modo oscuro */
-body.dark-mode .detalle-card-content p strong {
-    color: #fff;
-}
-body.dark-mode .detalle-card-content p {
-    color: #ccc;
-}
-body.dark-mode .detalle-sub-card {
-    background-color: #181818;
-    border-color: #444;
-}
-body.dark-mode .notas-box {
-    background-color: #111;
-    color: #eee;
-    border-color: #444;
-}
-body.dark-mode .form-descripcion-caso textarea {
-    background-color: #333;
-    border-color: #555;
-    color: #fff;
-}
-
 /* --- Estilos para el nuevo layout del Panel de Control --- */
 
 .panel-col-stack {
@@ -1759,4 +2255,588 @@ body.dark-mode .form-descripcion-caso textarea {
     padding: 0;
     border: none;
     margin-bottom: 15px;
+}
+
+/* Panel Section Scrollable */
+.panel-section-scrollable {
+    display: flex;
+    flex-direction: column;
+    height: 500px; /* Altura fija */
+    padding: 25px;
+}
+
+.panel-section-scrollable h3 {
+    flex-shrink: 0; /* Evita que el título se encoja */
+    margin-bottom: 15px;
+}
+
+.panel-section-content {
+    flex: 1; /* Ocupa el espacio restante */
+    overflow-y: auto; /* Habilita el scroll vertical */
+    overflow-x: hidden;
+    padding-right: 10px; /* Espacio para la scrollbar */
+    min-height: 0; /* Necesario para flexbox con overflow */
+}
+
+/* Estilo personalizado para la scrollbar */
+.panel-section-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.panel-section-content::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.panel-section-content::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.panel-section-content::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* =============================================================
+   MODO OSCURO - TODOS LOS ESTILOS CONSOLIDADOS AL FINAL
+   (Mejor contraste y organización)
+   ============================================================= */
+
+/* Fondo principal */
+body.dark-mode {
+    background-color: #121212;
+    color: #ffffff;
+}
+
+/* Componentes principales - Mejor contraste */
+body.dark-mode .app-header,
+body.dark-mode .app-footer,
+body.dark-mode .panel-section,
+body.dark-mode .table-container,
+body.dark-mode .kpi-card,
+body.dark-mode .support-grid-container,
+body.dark-mode .dashboard-nav,
+body.dark-mode .modal-content,
+body.dark-mode .cal-citas-list,
+body.dark-mode .cal-cita-item,
+body.dark-mode .login-container,
+body.dark-mode .form-container,
+body.dark-mode .dropdown-menu,
+body.dark-mode .main-content {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+    border-color: #3a3a3a !important;
+}
+
+/* Tarjetas internas - Mejor contraste */
+body.dark-mode .caso-item,
+body.dark-mode .cita-item,
+body.dark-mode .cal-widget,
+body.dark-mode .cal-citas-list,
+body.dark-mode .empty-state {
+    background-color: #1a1a1a !important;
+    color: #ffffff !important;
+    border-color: #3a3a3a !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+}
+
+/* Textos principales - Blanco para mejor contraste */
+body.dark-mode h1,
+body.dark-mode h2,
+body.dark-mode h3,
+body.dark-mode h4,
+body.dark-mode .kpi-value,
+body.dark-mode .support-title,
+body.dark-mode .header-user-details .user-role,
+body.dark-mode .dropdown-item,
+body.dark-mode .form-group label,
+body.dark-mode .table-header h2,
+body.dark-mode .caso-header,
+body.dark-mode .cita-header,
+body.dark-mode .caso-asunto,
+body.dark-mode .cita-fecha,
+body.dark-mode .caso-estudiante,
+body.dark-mode .cita-estudiante,
+body.dark-mode .kpi-label,
+body.dark-mode .kpi-detail,
+body.dark-mode .detalle-card-content p strong,
+body.dark-mode .support-grid-container h2 {
+    color: #ffffff !important;
+}
+
+/* Tabla custom - Fondo oscuro específico */
+body.dark-mode .custom-table {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+    border-color: #3a3a3a !important;
+}
+
+body.dark-mode .custom-table th {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+    border-bottom-color: #3a3a3a !important;
+}
+
+body.dark-mode .custom-table td {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+    border-bottom-color: #3a3a3a !important;
+}
+
+body.dark-mode .custom-table tr:hover td {
+    background-color: #2a2a2a !important;
+}
+
+body.dark-mode .custom-table tr:not(:last-child) td {
+    border-bottom-color: #3a3a3a !important;
+}
+
+/* Textos secundarios - Gris claro para legibilidad */
+body.dark-mode p,
+body.dark-mode span,
+body.dark-mode .support-total,
+body.dark-mode .header-user-details .user-name,
+body.dark-mode .cal-cita-asunto,
+body.dark-mode .form-group small,
+body.dark-mode .detalle-card-content p,
+body.dark-mode .table-footer,
+body.dark-mode .calendario-leyenda {
+    color: #d0d0d0 !important;
+}
+
+body.dark-mode .app-footer p {
+    color: #b0b0b0 !important;
+}
+
+/* Botones y acciones */
+body.dark-mode .btn-accion {
+    color: #ffffff !important;
+}
+
+body.dark-mode .header-config-link,
+body.dark-mode .header-config-link:hover {
+    background-color: #2a2a2a !important;
+    border-color: #4a4a4a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .header-logout-link {
+    background-color: #1e1e1e !important;
+    border-color: #4a4a4a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .nav-item:hover,
+body.dark-mode .dropdown-item:hover {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .btn-volver {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+    border-color: #4a4a4a !important;
+}
+
+body.dark-mode .btn-volver:hover {
+    background-color: #3a3a3a !important;
+}
+
+/* Formularios - Mejor contraste */
+body.dark-mode .form-group input,
+body.dark-mode .form-group select,
+body.dark-mode .form-group textarea,
+body.dark-mode .search-bar input,
+body.dark-mode .entries-selector select,
+body.dark-mode .input-readonly,
+body.dark-mode .form-descripcion-caso textarea,
+body.dark-mode .main-search-group input {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+    border-color: #4a4a4a !important;
+}
+
+body.dark-mode .drop-zone {
+    background-color: #1a1a1a !important;
+    border-color: #3a3a3a !important;
+}
+
+body.dark-mode .btn-filter-toggle {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+    border: 1px solid #4a4a4a !important;
+}
+
+body.dark-mode .btn-filter-toggle:hover {
+    background-color: #3a3a3a !important;
+}
+
+body.dark-mode .collapsible-filters {
+    background-color: #1e1e1e !important;
+    border-color: #3a3a3a !important;
+}
+
+body.dark-mode .collapsible-filters .form-actions {
+    border-top-color: #3a3a3a !important;
+}
+
+/* Calendario - Mejor contraste */
+body.dark-mode .panel-section .cal-layout-container {
+    background-color: #1a1a1a !important;
+    border-radius: 18px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    border: 1.5px solid #3a3a3a !important;
+}
+
+body.dark-mode .cal-layout-container,
+body.dark-mode .cal-widget,
+body.dark-mode .cita-detalle-item,
+body.dark-mode .citas-detalle {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+    border-color: #3a3a3a !important;
+}
+
+body.dark-mode .cal-day,
+body.dark-mode .cal-day-header {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+    border-color: #3a3a3a !important;
+}
+
+body.dark-mode .cal-day-header {
+    background: transparent !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .cal-day:not(.other-month):hover {
+    background-color: #2a2a2a !important;
+}
+
+body.dark-mode .cal-day.day-today {
+    background-color: #007bff !important;
+    border-color: #007bff !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .cal-day.day-disponible {
+    background-color: #1a4a2a !important;
+    color: #4ade80 !important;
+}
+
+body.dark-mode .cal-day.day-lleno {
+    background-color: #4a1a1a !important;
+    color: #ff6b6b !important;
+}
+
+body.dark-mode .cal-day.day-inabil {
+    background-color: #1a1a1a !important;
+    color: #666 !important;
+}
+
+body.dark-mode .cal-day.day-entrevista {
+    background-color: #1d3c5a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .cal-day.cal-day-selected {
+    background-color: #cc0000 !important;
+    color: #ffffff !important;
+    border-color: #cc0000 !important;
+}
+
+body.dark-mode .cal-day.day-disponible.day-today {
+    background-color: #1a4a2a !important;
+    color: #4ade80 !important;
+    border: 2px solid #007bff !important;
+}
+
+body.dark-mode .cal-day.day-entrevista.day-today {
+    background-color: #1a4a2a !important;
+    color: #4ade80 !important;
+    border: 2px solid #007bff !important;
+}
+
+body.dark-mode .cal-day.other-month {
+    color: #666 !important;
+}
+
+/* Panel sections específicos */
+body.dark-mode .panel-section.casos-disponibles,
+body.dark-mode .panel-section.casos-asignados {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+}
+
+/* Scrollbar en modo oscuro */
+body.dark-mode .panel-section-content::-webkit-scrollbar-track {
+    background: #1a1a1a !important;
+}
+
+body.dark-mode .panel-section-content::-webkit-scrollbar-thumb {
+    background: #4a4a4a !important;
+}
+
+body.dark-mode .panel-section-content::-webkit-scrollbar-thumb:hover {
+    background: #5a5a5a !important;
+}
+
+/* Detalle de caso específico */
+body.dark-mode .detalle-sub-card {
+    background-color: #1a1a1a !important;
+    border-color: #3a3a3a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .notas-box {
+    background-color: #1a1a1a !important;
+    color: #ffffff !important;
+    border-color: #3a3a3a !important;
+}
+
+/* Alerts - Mejor contraste */
+body.dark-mode .alert,
+body.dark-mode .alert-info,
+body.dark-mode .alert-warning,
+body.dark-mode .alert-success,
+body.dark-mode .alert-danger,
+body.dark-mode .custom-alert-info,
+body.dark-mode .custom-alert-warning,
+body.dark-mode .custom-alert-success,
+body.dark-mode .custom-alert-error {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+    border-color: #4a4a4a !important;
+}
+
+body.dark-mode .alert-info,
+body.dark-mode .custom-alert-info {
+    background-color: #1a3a5a !important;
+    border-left-color: #2196F3 !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .alert-warning,
+body.dark-mode .custom-alert-warning {
+    background-color: #3a2a1a !important;
+    border-left-color: #ffc107 !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .alert-success,
+body.dark-mode .custom-alert-success {
+    background-color: #1a3a2a !important;
+    border-left-color: #28a745 !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .alert-danger,
+body.dark-mode .custom-alert-error {
+    background-color: #3a1a1a !important;
+    border-left-color: #dc3545 !important;
+    color: #ffffff !important;
+}
+
+/* Links */
+body.dark-mode .link-rojo,
+body.dark-mode .link-rojo:hover,
+body.dark-mode a[style*="color: #cc0000"],
+body.dark-mode a[style*="color:#cc0000"] {
+    color: #ff4444 !important;
+}
+
+body.dark-mode .link-rojo:hover {
+    text-decoration: underline;
+}
+
+/* Status tags */
+body.dark-mode .status,
+body.dark-mode .status-aprobado,
+body.dark-mode .status-en_proceso,
+body.dark-mode .status-rechazado {
+    color: #ffffff !important;
+}
+
+body.dark-mode .status-aprobado {
+    background-color: #1a4a2a !important;
+    color: #4ade80 !important;
+}
+
+body.dark-mode .status-en_proceso {
+    background-color: #3a2a1a !important;
+    color: #ffb84d !important;
+}
+
+body.dark-mode .status-rechazado {
+    background-color: #4a1a1a !important;
+    color: #ff6b6b !important;
+}
+
+body.dark-mode .status-tag,
+body.dark-mode .status-tag.status-identificado,
+body.dark-mode .status-tag.status-en-proceso,
+body.dark-mode .status-tag.status-pendiente {
+    color: #ffffff !important;
+}
+
+body.dark-mode .status-tag.status-identificado {
+    background-color: #1a4a2a !important;
+    color: #4ade80 !important;
+}
+
+body.dark-mode .status-tag.status-en-proceso {
+    background-color: #3a2a1a !important;
+    color: #ffb84d !important;
+}
+
+body.dark-mode .status-tag.status-pendiente {
+    background-color: #4a1a1a !important;
+    color: #ff6b6b !important;
+}
+
+/* Otros elementos */
+body.dark-mode .doc-status-box {
+    background-color: #1a1a1a !important;
+    border-color: #3a3a3a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .doc-status-box span {
+    color: #d0d0d0 !important;
+}
+
+body.dark-mode .calendario-leyenda {
+    color: #d0d0d0 !important;
+}
+
+body.dark-mode .filter-bar {
+    background-color: transparent !important;
+}
+
+body.dark-mode .form-grid {
+    background-color: transparent !important;
+}
+
+/* Bordes */
+body.dark-mode .border-bottom,
+body.dark-mode .border-top-light {
+    border-color: #3a3a3a !important;
+}
+
+/* Paginación */
+body.dark-mode .pagination-btn,
+body.dark-mode .pagination-page {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+    border-color: #4a4a4a !important;
+}
+
+body.dark-mode .pagination-btn:hover {
+    background-color: #3a3a3a !important;
+}
+
+body.dark-mode .pagination-page.active {
+    background-color: #cc0000 !important;
+    color: #ffffff !important;
+    border-color: #cc0000 !important;
+}
+
+body.dark-mode .pagination-btn.disabled {
+    color: #666 !important;
+}
+
+/* KPI Icons */
+body.dark-mode .icon-solicitudes {
+    background-color: #3a1a1a !important;
+    color: #ff6b6b !important;
+}
+
+body.dark-mode .icon-resueltos {
+    background-color: #1a3a2a !important;
+    color: #4ade80 !important;
+}
+
+body.dark-mode .icon-proceso {
+    background-color: #3a2a1a !important;
+    color: #ffb84d !important;
+}
+
+body.dark-mode .icon-citas {
+    background-color: #1a2a4a !important;
+    color: #6bb6ff !important;
+}
+
+/* Support rows */
+body.dark-mode .support-row {
+    border-bottom-color: #3a3a3a !important;
+}
+
+/* Form actions */
+body.dark-mode .form-actions {
+    border-top-color: #3a3a3a !important;
+}
+
+/* Detalle card */
+body.dark-mode .detalle-card {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+    border-color: #3a3a3a !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+body.dark-mode .detalle-card p,
+body.dark-mode .detalle-card li {
+    color: #d0d0d0 !important;
+}
+
+body.dark-mode .detalle-titulo {
+    color: #b0b0b0 !important;
+}
+
+/* Botones del calendario y otros botones de acción */
+body.dark-mode .btn-accion-gray {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+    border-color: #4a4a4a !important;
+}
+
+body.dark-mode .btn-accion-gray:hover {
+    background-color: #3a3a3a !important;
+}
+
+body.dark-mode .btn-accion-small {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+    border-color: #4a4a4a !important;
+}
+
+body.dark-mode .btn-accion-small:hover {
+    background-color: #3a3a3a !important;
+}
+
+body.dark-mode .btn-accion-green {
+    background-color: #1a4a2a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .btn-accion-green:hover {
+    background-color: #2a5a3a !important;
+}
+
+body.dark-mode .btn-accion-red {
+    background-color: #4a1a1a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .btn-accion-red:hover {
+    background-color: #5a2a2a !important;
+}
+
+body.dark-mode .btn-accion-orange {
+    background-color: #3a2a1a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .btn-accion-orange:hover {
+    background-color: #4a3a2a !important;
 }

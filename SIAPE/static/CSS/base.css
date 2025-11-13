@@ -1,6 +1,7 @@
 /* --- Tipografía Global y Fondo --- */
 html {
     overflow-y: scroll;
+    font-size: 1.1rem; /* Tamaño base aumentado - esto es lo que se escala con accesibilidad */
 }
 
 body {
@@ -12,6 +13,7 @@ body {
     background-color: #f4f7fa;
     color: #333;
     margin: 0;
+    font-size: 1rem; /* Hereda del html, pero puede ser sobrescrito por JS */
 }
 
 
@@ -75,12 +77,12 @@ textarea,
 }
 .header-user-details .user-role {
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.9rem; /* Relativo al html - escalará con accesibilidad */
     text-transform: uppercase;
     color: #333;
 }
 .header-user-details .user-name {
-    font-size: 0.85rem;
+    font-size: 0.85rem; /* Relativo al html - escalará con accesibilidad */
     color: #666;
 }
 
@@ -104,7 +106,7 @@ textarea,
 }
 .header-config-link .btn-text,
 .header-logout-link .btn-text {
-    font-size: 0.9rem;
+    font-size: 0.9rem; /* Relativo al html - escalará con accesibilidad */
     white-space: nowrap; /* Evita que el texto se parta */
 }
 
@@ -191,7 +193,7 @@ textarea,
     padding: 10px 15px;
     color: #333;
     text-decoration: none;
-    font-size: 0.9rem;
+    font-size: 0.9rem; /* Relativo al html - escalará con accesibilidad */
     white-space: nowrap;
 }
 .dropdown-item:hover {
@@ -220,6 +222,46 @@ textarea,
     margin-right: 12px;
 }
 
+/* Item de accesibilidad con controles inline */
+.dropdown-item.accessibility-item {
+    cursor: default;
+    justify-content: space-between;
+}
+
+.accessibility-controls-inline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.accessibility-btn {
+    background-color: #e9ecef;
+    border: 1px solid #ced4da;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #495057;
+    font-size: 0.85rem; /* Relativo al html - escalará con accesibilidad */
+    padding: 0;
+    flex-shrink: 0;
+}
+
+.accessibility-btn:hover:not(:disabled) {
+    background-color: #dee2e6;
+    border-color: #adb5bd;
+}
+
+.accessibility-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 
 /* =============================================================
    NUEVOS ESTILOS: INTERRUPTOR (TOGGLE SWITCH)
@@ -229,11 +271,18 @@ textarea,
     display: inline-block;
     width: 40px;  /* Ancho del switch */
     height: 20px; /* Alto del switch */
+    cursor: pointer;
 }
 .toggle-switch input {
     opacity: 0;
-    width: 0;
-    height: 0;
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    margin: 0;
+    cursor: pointer;
+    z-index: 2; /* Asegurar que el input esté por encima */
 }
 .slider {
     position: absolute;
@@ -245,6 +294,7 @@ textarea,
     background-color: #ccc;
     border-radius: 20px;
     transition: .4s;
+    z-index: 1;
 }
 .slider:before {
     position: absolute;
@@ -269,12 +319,16 @@ input:checked + .slider:before {
    NUEVOS ESTILOS: MODO OSCURO (CON CORRECCIÓN DE ESPECIFICIDAD)
 ================================================================ */
 
+/* =============================================================
+   MODO OSCURO - BASE.CSS (Mejor contraste)
+   ============================================================= */
+
 body.dark-mode {
-    background-color: #1a1a1a; /* Fondo principal oscuro */
-    color: #e0e0e0;
+    background-color: #121212; /* Fondo más oscuro para mejor contraste */
+    color: #ffffff; /* Texto blanco para mejor legibilidad */
 }
 
-/* --- Componentes Claros en Modo Oscuro --- */
+/* --- Componentes principales - Mejor contraste --- */
 body.dark-mode .app-header,
 body.dark-mode .app-footer,
 body.dark-mode .panel-section,
@@ -288,14 +342,12 @@ body.dark-mode .cal-cita-item,
 body.dark-mode .login-container,
 body.dark-mode .form-container,
 body.dark-mode .dropdown-menu {
-    background-color: #2c2c2c; /* Fondo de tarjetas oscuro */
-    color: #e0e0e0;
-    border-color: #444;
+    background-color: #1e1e1e !important; /* Más oscuro para mejor contraste */
+    color: #ffffff !important; /* Texto blanco */
+    border-color: #3a3a3a !important; /* Bordes más visibles */
 }
 
-/* --- INICIO DE CORRECCIÓN DE ESPECIFICIDAD --- */
-
-/* Textos y Bordes */
+/* --- Textos principales - Blanco para mejor contraste --- */
 body.dark-mode h1,
 body.dark-mode h2,
 body.dark-mode h3,
@@ -306,13 +358,12 @@ body.dark-mode .custom-table td,
 body.dark-mode .header-user-details .user-role,
 body.dark-mode .dropdown-item,
 body.dark-mode .form-group label,
-body.dark-mode .table-header h2, /* REGLA ESPECÍFICA */
-body.dark-mode .custom-table th  /* REGLA ESPECÍFICA */ {
-    color: #ffffff;
+body.dark-mode .table-header h2,
+body.dark-mode .custom-table th {
+    color: #ffffff !important; /* Texto blanco para mejor legibilidad */
 }
-/* --- FIN DE CORRECCIÓN DE ESPECIFICIDAD --- */
 
-
+/* --- Textos secundarios - Gris claro para legibilidad --- */
 body.dark-mode p,
 body.dark-mode span,
 body.dark-mode .kpi-label,
@@ -320,62 +371,84 @@ body.dark-mode .support-total,
 body.dark-mode .header-user-details .user-name,
 body.dark-mode .cal-cita-asunto,
 body.dark-mode .form-group small {
-    color: #b0b0b0;
-}
-body.dark-mode .app-footer p {
-    color: #999;
-}
-body.dark-mode .border-bottom { /* Si usas clases de borde */
-    border-color: #444 !important;
+    color: #d0d0d0 !important; /* Gris más claro para mejor legibilidad */
 }
 
-/* Botones y Links */
+body.dark-mode .app-footer p {
+    color: #b0b0b0 !important;
+}
+
+body.dark-mode .border-bottom {
+    border-color: #3a3a3a !important; /* Bordes más visibles */
+}
+
+/* --- Botones y Links - Mejor contraste --- */
 body.dark-mode .header-config-link,
 body.dark-mode .header-config-link:hover {
-    background-color: #333;
-    border-color: #555;
-    color: #e0e0e0;
-}
-body.dark-mode .header-logout-link {
-    background-color: #2c2c2c;
-    border-color: #555;
-}
-body.dark-mode .nav-item:hover,
-body.dark-mode .dropdown-item:hover {
-    background-color: #383838;
-}
-body.dark-mode .btn-volver {
-    background-color: #444;
-    color: #e0e0e0;
-}
-body.dark-mode .btn-volver:hover {
-    background-color: #555;
+    background-color: #2a2a2a !important;
+    border-color: #4a4a4a !important;
+    color: #ffffff !important;
 }
 
-/* Formularios */
+body.dark-mode .header-logout-link {
+    background-color: #1e1e1e !important;
+    border-color: #4a4a4a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .nav-item:hover,
+body.dark-mode .dropdown-item:hover {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .accessibility-btn {
+    background-color: #2a2a2a !important;
+    border-color: #4a4a4a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .accessibility-btn:hover:not(:disabled) {
+    background-color: #3a3a3a !important;
+    border-color: #5a5a5a !important;
+}
+
+body.dark-mode .btn-volver {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+    border-color: #4a4a4a !important;
+}
+
+body.dark-mode .btn-volver:hover {
+    background-color: #3a3a3a !important;
+}
+
+/* --- Formularios - Mejor contraste --- */
 body.dark-mode .form-group input,
 body.dark-mode .form-group select,
 body.dark-mode .form-group textarea,
 body.dark-mode .search-bar input,
 body.dark-mode .entries-selector select,
 body.dark-mode .input-readonly {
-    background-color: #333;
-    color: #e0e0e0;
-    border-color: #555;
-}
-body.dark-mode .drop-zone {
-    background-color: #222;
-    border-color: #444;
+    background-color: #2a2a2a !important; /* Fondo más claro para inputs */
+    color: #ffffff !important; /* Texto blanco */
+    border-color: #4a4a4a !important; /* Bordes más visibles */
 }
 
-/* Calendario */
-body.dark-mode .cal-day:not(.other-month):hover {
-    background-color: #444;
+body.dark-mode .drop-zone {
+    background-color: #1a1a1a !important;
+    border-color: #3a3a3a !important;
 }
+
+/* --- Calendario - Mejor contraste --- */
+body.dark-mode .cal-day:not(.other-month):hover {
+    background-color: #2a2a2a !important;
+}
+
 body.dark-mode .cal-day.day-today {
-    background-color: #1d3c5a;
-    border-color: #007bff;
-    color: #e0e0e0;
+    background-color: #007bff !important;
+    border-color: #007bff !important;
+    color: #ffffff !important;
 }
 
 

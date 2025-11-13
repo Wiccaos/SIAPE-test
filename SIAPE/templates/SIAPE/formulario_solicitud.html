@@ -136,7 +136,6 @@
                         <option value="">-- Selecciona la modalidad --</option>
                         <option value="Presencial">Presencial</option>
                         <option value="Virtual">Virtual</option>
-                        <option value="Híbrida">Híbrida (Mixta)</option>
                     </select>
                 </div>
             <!-- === FIN SECCIÓN DE AGENDAMIENTO === -->
@@ -301,6 +300,7 @@
             console.log('CalendarioData completo:', calendarioData);
             
             // Limpiar contenido previo - remover todos los empty-state
+            // IMPORTANTE: No usar innerHTML porque elimina horariosBotones del DOM
             const existingEmptyStates = citasDiaContainer.querySelectorAll('.empty-state');
             console.log('Empty states encontrados:', existingEmptyStates.length);
             existingEmptyStates.forEach(el => {
@@ -308,17 +308,22 @@
                 el.remove();
             });
             
-            // Verificar que horariosBotones esté en el DOM, si no, agregarlo
+            // Asegurarse de que horariosBotones esté en el DOM
+            // Si no tiene parentElement, significa que fue eliminado o nunca fue agregado
             if (!horariosBotones.parentElement) {
                 console.warn('horariosBotones no está en el DOM, agregándolo...');
                 citasDiaContainer.appendChild(horariosBotones);
             }
             
-            // Limpiar botones previos
+            // Limpiar botones previos (solo el contenido, no el elemento)
             console.log('Limpiando botones previos. Botones actuales:', horariosBotones.children.length);
             horariosBotones.innerHTML = '';
             console.log('Botones limpiados');
             console.log('horariosBotones parent después de verificar:', horariosBotones.parentElement);
+            
+            // Asegurarse de que horariosBotones esté visible
+            horariosBotones.classList.remove('horarios-botones-hidden');
+            horariosBotones.style.display = 'flex';
 
             // Generar todos los slots de 9:00 a 17:00
             const allSlots = [];
@@ -366,13 +371,22 @@
                     // Si está en la lista de disponibles y no en no disponibles, está disponible
                     btn.disabled = false;
                     btn.classList.remove('no-disponible');
-                    btn.addEventListener('click', function() {
-                        horariosBotones.querySelectorAll('.btn-horario').forEach(b => b.classList.remove('selected'));
+                    btn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Remover selección de todos los botones
+                        horariosBotones.querySelectorAll('.btn-horario').forEach(b => {
+                            b.classList.remove('selected');
+                        });
+                        // Agregar selección al botón clickeado
                         btn.classList.add('selected');
+                        // Establecer el valor en el input
                         const horaCitaInput = document.getElementById('hora_cita');
                         if (horaCitaInput) {
                             horaCitaInput.value = slot;
+                            console.log('Hora seleccionada:', slot, 'Input value:', horaCitaInput.value);
                         }
+                        // Ocultar mensajes de error
                         const mensajeDiv = document.getElementById('mensaje');
                         if (mensajeDiv) mensajeDiv.style.display = 'none';
                     });
@@ -511,16 +525,28 @@
                     diaSeleccionadoStr = null;
                     if (citasDiaTitulo) citasDiaTitulo.innerText = `Horarios Disponibles`;
                     if (citasDiaContainer) {
-                        citasDiaContainer.innerHTML = `
-                            <div class="empty-state empty-state-10">
-                                <i class="fas fa-calendar-day empty-state-icon"></i>
-                                <p class="empty-state-text">Seleccione un día del calendario para ver los horarios disponibles.</p>
-                            </div>
+                        // Limpiar solo los empty-states existentes
+                        const existingEmptyStates = citasDiaContainer.querySelectorAll('.empty-state');
+                        existingEmptyStates.forEach(el => el.remove());
+                        
+                        // Agregar nuevo empty-state
+                        const emptyState = document.createElement('div');
+                        emptyState.className = 'empty-state empty-state-10';
+                        emptyState.innerHTML = `
+                            <i class="fas fa-calendar-day empty-state-icon"></i>
+                            <p class="empty-state-text">Seleccione un día del calendario para ver los horarios disponibles.</p>
                         `;
+                        citasDiaContainer.appendChild(emptyState);
+                        
+                        // Asegurarse de que horariosBotones esté en el DOM pero oculto
+                        if (horariosBotones && !citasDiaContainer.contains(horariosBotones)) {
+                            citasDiaContainer.appendChild(horariosBotones);
+                        }
                     }
                     if (horariosBotones) {
                         horariosBotones.classList.add('horarios-botones-hidden');
                         horariosBotones.style.display = 'none';
+                        horariosBotones.innerHTML = ''; // Limpiar botones
                     }
                     const horaCitaInput = document.getElementById('hora_cita');
                     if (horaCitaInput) horaCitaInput.value = '';
@@ -530,16 +556,28 @@
                 // No hay día seleccionado o no hay datos del calendario
                 if (citasDiaTitulo) citasDiaTitulo.innerText = `Horarios Disponibles`;
                 if (citasDiaContainer) {
-                    citasDiaContainer.innerHTML = `
-                        <div class="empty-state empty-state-10">
-                            <i class="fas fa-calendar-day empty-state-icon"></i>
-                            <p class="empty-state-text">Seleccione un día del calendario para ver los horarios disponibles.</p>
-                        </div>
+                    // Limpiar solo los empty-states existentes
+                    const existingEmptyStates = citasDiaContainer.querySelectorAll('.empty-state');
+                    existingEmptyStates.forEach(el => el.remove());
+                    
+                    // Agregar nuevo empty-state
+                    const emptyState = document.createElement('div');
+                    emptyState.className = 'empty-state empty-state-10';
+                    emptyState.innerHTML = `
+                        <i class="fas fa-calendar-day empty-state-icon"></i>
+                        <p class="empty-state-text">Seleccione un día del calendario para ver los horarios disponibles.</p>
                     `;
+                    citasDiaContainer.appendChild(emptyState);
+                    
+                    // Asegurarse de que horariosBotones esté en el DOM pero oculto
+                    if (horariosBotones && !citasDiaContainer.contains(horariosBotones)) {
+                        citasDiaContainer.appendChild(horariosBotones);
+                    }
                 }
                 if (horariosBotones) {
                     horariosBotones.classList.add('horarios-botones-hidden');
                     horariosBotones.style.display = 'none';
+                    horariosBotones.innerHTML = ''; // Limpiar botones
                 }
             }
         }
@@ -620,17 +658,51 @@
 
             // --- LÓGICA DE ENVÍO ---
             form.addEventListener('submit', async function(e) {
+                e.preventDefault(); // Prevenir envío por defecto primero
+                
                 // Validar que se haya seleccionado una hora
                 const horaCitaInput = document.getElementById('hora_cita');
+                const fechaCitaInput = document.getElementById('fecha_cita');
+                
+                // Verificar también si hay un botón seleccionado
+                const botonSeleccionado = horariosBotones?.querySelector('.btn-horario.selected');
+                
                 if (!horaCitaInput || !horaCitaInput.value) {
+                    // Si no hay valor en el input, verificar si hay un botón seleccionado
+                    if (botonSeleccionado && !botonSeleccionado.disabled) {
+                        // Si hay un botón seleccionado disponible, establecer el valor
+                        const horaSeleccionada = botonSeleccionado.dataset.hora;
+                        if (horaSeleccionada && horaCitaInput) {
+                            horaCitaInput.value = horaSeleccionada;
+                        } else {
+                            mensajeDiv.className = 'error';
+                            mensajeDiv.innerHTML = '<strong>Error de Validación:</strong><ul><li><strong>HORA_CITA:</strong> Debe seleccionar un horario disponible.</li></ul>';
+                            mensajeDiv.style.display = 'block';
+                            return;
+                        }
+                    } else {
+                        mensajeDiv.className = 'error';
+                        mensajeDiv.innerHTML = '<strong>Error de Validación:</strong><ul><li><strong>HORA_CITA:</strong> Debe seleccionar un horario disponible.</li></ul>';
+                        mensajeDiv.style.display = 'block';
+                        return;
+                    }
+                }
+                
+                // Validar también que el botón seleccionado no esté deshabilitado
+                if (botonSeleccionado && botonSeleccionado.disabled) {
                     mensajeDiv.className = 'error';
-                    mensajeDiv.innerHTML = '<strong>Error de Validación:</strong><ul><li><strong>HORA_CITA:</strong> Debe seleccionar un horario disponible.</li></ul>';
+                    mensajeDiv.innerHTML = '<strong>Error de Validación:</strong><ul><li><strong>HORA_CITA:</strong> El horario seleccionado no está disponible. Por favor, seleccione otro horario.</li></ul>';
                     mensajeDiv.style.display = 'block';
-                    e.preventDefault();
                     return;
                 }
-
-                e.preventDefault();
+                
+                // Validar que se haya seleccionado una fecha
+                if (!fechaCitaInput || !fechaCitaInput.value) {
+                    mensajeDiv.className = 'error';
+                    mensajeDiv.innerHTML = '<strong>Error de Validación:</strong><ul><li><strong>FECHA_CITA:</strong> Debe seleccionar una fecha.</li></ul>';
+                    mensajeDiv.style.display = 'block';
+                    return;
+                }
 
                 submitButton.disabled = true;
                 submitButton.innerText = "Enviando Solicitud, espere...";
@@ -667,18 +739,41 @@
                         updateFileList();
 
                         // Resetear calendario
-                        if (fechaHiddenInput) fechaHiddenInput.value = '';
-                        if (horaCitaInput) horaCitaInput.value = '';
+                        const fechaHiddenInputReset = document.getElementById('fecha_cita');
+                        const horaCitaInputReset = document.getElementById('hora_cita');
+                        if (fechaHiddenInputReset) fechaHiddenInputReset.value = '';
+                        if (horaCitaInputReset) horaCitaInputReset.value = '';
                         diaSeleccionado = null;
                         diaSeleccionadoStr = null;
                         if (citasDiaTitulo) citasDiaTitulo.innerText = `Horarios Disponibles`;
                         if (citasDiaContainer) {
-                            citasDiaContainer.innerHTML = `
-                                <div class="empty-state empty-state-10">
-                                    <i class="fas fa-calendar-day empty-state-icon"></i>
-                                    <p class="empty-state-text">Seleccione un día del calendario para ver los horarios disponibles.</p>
-                                </div>
+                            // Limpiar solo los empty-states existentes (NO usar innerHTML)
+                            const existingEmptyStates = citasDiaContainer.querySelectorAll('.empty-state');
+                            existingEmptyStates.forEach(el => el.remove());
+                            
+                            // Agregar nuevo empty-state
+                            const emptyState = document.createElement('div');
+                            emptyState.className = 'empty-state empty-state-10';
+                            emptyState.innerHTML = `
+                                <i class="fas fa-calendar-day empty-state-icon"></i>
+                                <p class="empty-state-text">Seleccione un día del calendario para ver los horarios disponibles.</p>
                             `;
+                            citasDiaContainer.appendChild(emptyState);
+                            
+                            // Asegurarse de que horariosBotones esté en el DOM pero oculto
+                            const horariosBotonesReset = document.getElementById('horarios-botones');
+                            if (horariosBotonesReset) {
+                                if (!citasDiaContainer.contains(horariosBotonesReset)) {
+                                    citasDiaContainer.appendChild(horariosBotonesReset);
+                                }
+                                horariosBotonesReset.classList.add('horarios-botones-hidden');
+                                horariosBotonesReset.style.display = 'none';
+                                horariosBotonesReset.innerHTML = ''; // Limpiar botones
+                            }
+                            // Asegurarse de que el input hora_cita esté en el DOM
+                            if (horaCitaInputReset && !citasDiaContainer.contains(horaCitaInputReset)) {
+                                citasDiaContainer.appendChild(horaCitaInputReset);
+                            }
                         }
                         if (horariosBotones) {
                             horariosBotones.classList.add('horarios-botones-hidden');
@@ -702,7 +797,8 @@
                              if (calendarioDisponible) {
                                  fetchCalendarioDelMes(navDate.getFullYear(), navDate.getMonth());
                              }
-                             if (horaCitaInput) horaCitaInput.value = '';
+                             const horaCitaInputError = document.getElementById('hora_cita');
+                             if (horaCitaInputError) horaCitaInputError.value = '';
                         }
 
                         for (const [campo, mensajes] of Object.entries(data)) {

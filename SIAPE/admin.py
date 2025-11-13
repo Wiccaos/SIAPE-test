@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from .models import (
     Usuario, Roles, Areas, CategoriasAjustes, PerfilUsuario, Carreras, Estudiantes, Solicitudes, 
-    Evidencias, Asignaturas, AsignaturasEnCurso, Entrevistas, AjusteRazonable, AjusteAsignado
+    Evidencias, Asignaturas, AsignaturasEnCurso, Entrevistas, AjusteRazonable, AjusteAsignado, HorarioBloqueado
 )
 
 try:
@@ -51,3 +51,4 @@ admin.site.register(AsignaturasEnCurso)
 admin.site.register(Entrevistas)
 admin.site.register(AjusteRazonable)
 admin.site.register(AjusteAsignado)
+admin.site.register(HorarioBloqueado)

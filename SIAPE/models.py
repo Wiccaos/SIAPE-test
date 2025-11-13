@@ -330,6 +330,41 @@ class Entrevistas(models.Model):
     def __str__(self):
             return f"Entrevista sobre {self.solicitudes}"
 
+class HorarioBloqueado(models.Model):
+    """
+    Modelo para que la Coordinadora pueda bloquear horarios específicos
+    que no estarán disponibles para agendar citas (reuniones, etc.)
+    """
+    coordinadora = models.ForeignKey(
+        PerfilUsuario,
+        on_delete=models.CASCADE,
+        limit_choices_to={'rol__nombre_rol': 'Coordinadora de Inclusión'},
+        related_name='horarios_bloqueados',
+        verbose_name="Coordinadora"
+    )
+    fecha_hora = models.DateTimeField(
+        verbose_name="Fecha y Hora Bloqueada"
+    )
+    motivo = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name="Motivo del Bloqueo",
+        help_text="Ej: Reunión, Capacitación, etc."
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'horarios_bloqueados'
+        verbose_name = "Horario Bloqueado"
+        verbose_name_plural = "Horarios Bloqueados"
+        # Evitar duplicados: una coordinadora no puede bloquear el mismo horario dos veces
+        unique_together = [['coordinadora', 'fecha_hora']]
+
+    def __str__(self):
+        return f"Horario bloqueado: {self.fecha_hora.strftime('%d/%m/%Y %H:%M')} - {self.coordinadora}"
+
 class AjusteRazonable(models.Model):
     descripcion = models.TextField()
     categorias_ajustes = models.ForeignKey(CategoriasAjustes, on_delete=models.CASCADE)

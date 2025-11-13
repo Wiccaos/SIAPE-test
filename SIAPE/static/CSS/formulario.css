@@ -564,3 +564,272 @@
     }
 }
 
+/* =============================================================
+   MODO OSCURO - TODOS LOS ESTILOS CONSOLIDADOS AL FINAL
+   (Mejor contraste y organización)
+   ============================================================= */
+
+/* Contenedor principal del formulario */
+body.dark-mode .form-container {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+    border-color: #3a3a3a !important;
+}
+
+/* Headers y textos */
+body.dark-mode .form-header h1 {
+    color: #ffffff !important;
+}
+
+body.dark-mode .form-header p {
+    color: #d0d0d0 !important;
+}
+
+/* Campos del formulario */
+body.dark-mode .form-group label {
+    color: #ffffff !important;
+}
+
+body.dark-mode .form-group input[type="text"],
+body.dark-mode .form-group input[type="email"],
+body.dark-mode .form-group textarea,
+body.dark-mode .form-group select {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+    border-color: #4a4a4a !important;
+}
+
+body.dark-mode .form-group input:focus,
+body.dark-mode .form-group textarea:focus,
+body.dark-mode .form-group select:focus {
+    background-color: #2a2a2a !important;
+    border-color: #007bff !important;
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.3) !important;
+}
+
+body.dark-mode .form-group small {
+    color: #b0b0b0 !important;
+}
+
+body.dark-mode .form-hint {
+    color: #d0d0d0 !important;
+}
+
+/* Drop zone */
+body.dark-mode .drop-zone {
+    background-color: #1a1a1a !important;
+    border-color: #3a3a3a !important;
+    color: #d0d0d0 !important;
+}
+
+body.dark-mode .drop-zone.dragover {
+    background-color: #2a2a2a !important;
+    border-color: #007bff !important;
+}
+
+body.dark-mode .drop-zone__prompt strong {
+    color: #6bb6ff !important;
+}
+
+/* Info box */
+body.dark-mode .info-box {
+    background-color: #1a1a1a !important;
+    border-color: #3a3a3a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .info-box h4 {
+    color: #ffffff !important;
+}
+
+body.dark-mode .info-box ul {
+    color: #d0d0d0 !important;
+}
+
+/* Auth group */
+body.dark-mode .auth-group label {
+    color: #d0d0d0 !important;
+}
+
+/* Botones */
+body.dark-mode .btn-primary {
+    background-color: #cc0000 !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .btn-primary:hover {
+    background-color: #b40000 !important;
+}
+
+body.dark-mode .btn-secondary {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+    border-color: #4a4a4a !important;
+}
+
+body.dark-mode .btn-secondary:hover {
+    background-color: #3a3a3a !important;
+}
+
+body.dark-mode .button-group {
+    border-top-color: #3a3a3a !important;
+}
+
+/* Detalle card (calendario) */
+body.dark-mode .detalle-card {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+    border-color: #3a3a3a !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Calendario */
+body.dark-mode .calendario-header {
+    color: #ffffff !important;
+}
+
+body.dark-mode .cal-day,
+body.dark-mode .cal-day-header {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+    border-color: #3a3a3a !important;
+}
+
+body.dark-mode .cal-day-header {
+    background: transparent !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .cal-day:not(.other-month):hover {
+    background-color: #2a2a2a !important;
+}
+
+body.dark-mode .cal-day.day-today {
+    background-color: #007bff !important;
+    border-color: #007bff !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .cal-day.day-disponible {
+    background-color: #1a4a2a !important;
+    color: #4ade80 !important;
+}
+
+body.dark-mode .cal-day.day-lleno {
+    background-color: #4a1a1a !important;
+    color: #ff6b6b !important;
+}
+
+body.dark-mode .cal-day.day-inabil {
+    background-color: #1a1a1a !important;
+    color: #666 !important;
+}
+
+body.dark-mode .cal-day.cal-day-selected {
+    background-color: #cc0000 !important;
+    color: #ffffff !important;
+    border-color: #cc0000 !important;
+}
+
+body.dark-mode .cal-day.day-disponible.day-today {
+    background-color: #1a4a2a !important;
+    color: #4ade80 !important;
+    border: 2px solid #007bff !important;
+}
+
+body.dark-mode .cal-day.other-month {
+    color: #666 !important;
+}
+
+/* Calendario leyenda */
+body.dark-mode .calendario-leyenda {
+    color: #d0d0d0 !important;
+}
+
+/* Botones de navegación del calendario */
+body.dark-mode .btn-accion-gray {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+    border-color: #4a4a4a !important;
+}
+
+body.dark-mode .btn-accion-gray:hover {
+    background-color: #3a3a3a !important;
+}
+
+/* Cal citas list */
+body.dark-mode .cal-citas-list {
+    background-color: #1a1a1a !important;
+    border-color: #3a3a3a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .cal-citas-list h4 {
+    color: #ff4444 !important;
+    border-bottom-color: #3a3a3a !important;
+}
+
+/* Botones de horarios */
+body.dark-mode .btn-horario {
+    background-color: #2a2a2a !important;
+    color: #4ade80 !important;
+    border-color: #4a4a4a !important;
+}
+
+body.dark-mode .btn-horario:hover:not(:disabled):not(.no-disponible) {
+    background-color: #1a4a2a !important;
+    border-color: #4ade80 !important;
+}
+
+body.dark-mode .btn-horario.selected {
+    background-color: #cc0000 !important;
+    color: #ffffff !important;
+    border-color: #cc0000 !important;
+}
+
+body.dark-mode .btn-horario:disabled,
+body.dark-mode .btn-horario.no-disponible {
+    background-color: #1a1a1a !important;
+    color: #666 !important;
+    border-color: #3a3a3a !important;
+}
+
+/* Empty state */
+body.dark-mode .empty-state {
+    color: #d0d0d0 !important;
+}
+
+body.dark-mode .empty-state i {
+    color: #666 !important;
+}
+
+body.dark-mode .empty-state-error-icon {
+    color: #ff6b6b !important;
+}
+
+body.dark-mode .empty-state-error-text {
+    color: #ff6b6b !important;
+}
+
+/* Mensajes */
+body.dark-mode #mensaje.exito {
+    background-color: #1a3a2a !important;
+    color: #4ade80 !important;
+    border-color: #28a745 !important;
+}
+
+body.dark-mode #mensaje.error {
+    background-color: #3a1a1a !important;
+    color: #ff6b6b !important;
+    border-color: #dc3545 !important;
+}
+
+/* Cal layout container */
+body.dark-mode .cal-layout-container {
+    background-color: transparent !important;
+}
+
+body.dark-mode .cal-widget {
+    background-color: transparent !important;
+}
+

@@ -7,6 +7,7 @@
 
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'css/formulario.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -18,6 +19,12 @@
                 <i class="fas fa-home"></i> Panel Principal
             </a>
             <a href="{% url 'casos_generales' %}" class="nav-item active"> <i class="fas fa-folder-open"></i> Casos
+            </a>
+            <a href="{% url 'panel_control_coordinadora' %}" class="nav-item">
+                <i class="fas fa-calendar-alt"></i> Gestión de Citas
+            </a>
+            <a href="{% url 'gestionar_horarios_bloqueados' %}" class="nav-item">
+                <i class="fas fa-ban"></i> Horarios Bloqueados
             </a>
         {% elif user.perfil.rol.nombre_rol == "Asesora Técnica Pedagógica" %}
             <a href="{% url 'dashboard_asesor_técnico' %}" class="nav-item">
@@ -450,9 +457,448 @@
     </div>
     {% endif %}
 
+    <!-- Modal para Agendar Cita -->
+    {% if puede_agendar_cita %}
+    <div id="modalAgendar" class="modal">
+        <div class="modal-content modal-calendario">
+            <div class="modal-header">
+                <h4><i class="fas fa-calendar-plus"></i> Agendar Nueva Cita</h4>
+                <button class="close" onclick="cerrarModalAgendar()">&times;</button>
+            </div>
+            <form method="post" action="{% url 'agendar_cita_coordinadora' %}">
+                {% csrf_token %}
+                <input type="hidden" name="solicitud_id" id="agendar_solicitud_id">
+                
+                <div class="form-group">
+                    <label>Caso:</label>
+                    <input type="text" id="agendar_caso_asunto" class="input-readonly" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <strong>Seleccione Fecha y Hora:</strong>
+                    </label>
+                    <p class="form-hint">
+                        Seleccione un día del calendario y luego el horario disponible.
+                    </p>
+
+                    <!-- Contenedor del calendario -->
+                    <div class="cal-layout-container">
+                        
+                        <!-- Columna 1: El Calendario -->
+                        <div class="cal-widget">
+                            <div class="detalle-card" id="card-calendario-agendar">
+                                <div class="calendario-header" id="cal-header-agendar">
+                                    <!-- El mes se inserta aquí por JS -->
+                                </div>
+                                <div class="cal-nav">
+                                    <button type="button" id="cal-prev-agendar" class="btn-accion btn-accion-gray btn-accion-small"><i class="fas fa-chevron-left"></i> Ant</button>
+                                    <button type="button" id="cal-today-agendar" class="btn-accion btn-accion-gray btn-accion-small">Hoy</button>
+                                    <button type="button" id="cal-next-agendar" class="btn-accion btn-accion-gray btn-accion-small">Sig <i class="fas fa-chevron-right"></i></button>
+                                </div>
+                                <div class="calendario-grid" id="cal-grid-body-agendar">
+                                    <!-- Los días se insertan aquí por JS -->
+                                </div>
+                                <div class="calendario-leyenda calendario-leyenda-mt">
+                                    <div><span class="dot dot-disponible"></span> Día Disponible</div>
+                                    <div><span class="dot dot-lleno"></span> Día Completo</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Columna 2: El Selector de Hora -->
+                        <div class="cal-citas-list">
+                            <h4 id="cal-citas-titulo-agendar">Horarios Disponibles</h4>
+                            <div id="cal-citas-dia-agendar">
+                                <div class="empty-state empty-state-10">
+                                    <i class="fas fa-calendar-day empty-state-icon"></i>
+                                    <p class="empty-state-text">Seleccione un día del calendario para ver los horarios disponibles.</p>
+                                </div>
+                                <div class="horarios-botones horarios-botones-hidden" id="horarios-botones-agendar"></div>
+                                <input type="hidden" id="hora_agendar" name="hora_agendar" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Input oculto para enviar la fecha seleccionada -->
+                    <input type="hidden" id="fecha_agendar" name="fecha_agendar" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="modalidad">Modalidad:</label>
+                    <select name="modalidad" id="modalidad" required>
+                        <option value="">Seleccione una modalidad</option>
+                        <option value="Presencial">Presencial</option>
+                        <option value="Virtual">Virtual</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="notas">Notas (opcional):</label>
+                    <textarea name="notas" id="notas" placeholder="Agregar notas adicionales sobre la cita..."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalAgendar()">Cancelar</button>
+                    <button type="submit" class="btn-accion btn-agendar">
+                        <i class="fas fa-save"></i> Guardar Cita
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
 </div>
 
 <script>
+    // --- LÓGICA DEL CALENDARIO PARA AGENDAR CITA ---
+    {% if puede_agendar_cita %}
+    let navDateAgendar = new Date();
+    const hoyAgendar = new Date();
+    const hoyStrAgendar = `${hoyAgendar.getFullYear()}-${String(hoyAgendar.getMonth() + 1).padStart(2, '0')}-${String(hoyAgendar.getDate()).padStart(2, '0')}`;
+    let diaSeleccionadoAgendar = null; 
+    let diaSeleccionadoStrAgendar = null;
+    let calendarioDataAgendar = {};
+
+    const calHeaderAgendar = document.getElementById('cal-header-agendar');
+    const calGridBodyAgendar = document.getElementById('cal-grid-body-agendar');
+    const btnPrevAgendar = document.getElementById('cal-prev-agendar');
+    const btnNextAgendar = document.getElementById('cal-next-agendar');
+    const btnTodayAgendar = document.getElementById('cal-today-agendar');
+    const citasDiaContainerAgendar = document.getElementById('cal-citas-dia-agendar');
+    const citasDiaTituloAgendar = document.getElementById('cal-citas-titulo-agendar');
+    const horariosBotonesAgendar = document.getElementById('horarios-botones-agendar');
+    const fechaHiddenInputAgendar = document.getElementById('fecha_agendar');
+    const horaHiddenInputAgendar = document.getElementById('hora_agendar');
+    
+    const meses = [
+        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ];
+
+    async function fetchCalendarioDelMesAgendar(year, month) {
+        if (!calHeaderAgendar) return;
+        
+        calHeaderAgendar.innerText = `Cargando ${meses[month]} ${year}...`;
+        
+        try {
+            const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+            const response = await fetch(`/api/calendario-disponible/?month=${monthStr}`);
+            
+            if (!response.ok) throw new Error('Error de red');
+            
+            calendarioDataAgendar = await response.json();
+            renderCalendarAgendar(year, month);
+
+        } catch (error) {
+            console.error('Error fetching calendario:', error);
+            if (calHeaderAgendar) calHeaderAgendar.innerText = "Error al cargar calendario";
+        }
+    }
+
+    function mostrarHorariosDelDiaAgendar(fechaStr, diaEl) {
+        if (!calHeaderAgendar || !horariosBotonesAgendar) return;
+        
+        const [year, month, day] = fechaStr.split('-');
+        citasDiaTituloAgendar.innerText = `Horarios para ${day}/${month}/${year}`;
+
+        if (diaSeleccionadoAgendar) {
+            diaSeleccionadoAgendar.classList.remove('cal-day-selected');
+        }
+        
+        if(diaEl) {
+            diaEl.classList.add('cal-day-selected');
+            diaSeleccionadoAgendar = diaEl;
+            diaSeleccionadoStrAgendar = fechaStr;
+        } else {
+            diaSeleccionadoAgendar = calGridBodyAgendar.querySelector(`[data-fecha="${fechaStr}"]`);
+            if (diaSeleccionadoAgendar) {
+                diaSeleccionadoAgendar.classList.add('cal-day-selected');
+            }
+        }
+
+        if (fechaHiddenInputAgendar) {
+            fechaHiddenInputAgendar.value = fechaStr;
+        }
+        if (horaHiddenInputAgendar) {
+            horaHiddenInputAgendar.value = '';
+        }
+
+        const slotsDisponibles = (calendarioDataAgendar && calendarioDataAgendar.slotsDetallados && calendarioDataAgendar.slotsDetallados[fechaStr]) ? calendarioDataAgendar.slotsDetallados[fechaStr] : [];
+        const slotsNoDisponibles = (calendarioDataAgendar && calendarioDataAgendar.slotsNoDisponibles && calendarioDataAgendar.slotsNoDisponibles[fechaStr]) ? calendarioDataAgendar.slotsNoDisponibles[fechaStr] : [];
+        
+        // Asegurarse de que horariosBotonesAgendar esté en el DOM
+        if (horariosBotonesAgendar && horariosBotonesAgendar.parentElement !== citasDiaContainerAgendar) {
+            citasDiaContainerAgendar.appendChild(horariosBotonesAgendar);
+        }
+        
+        const existingEmptyStates = citasDiaContainerAgendar.querySelectorAll('.empty-state');
+        existingEmptyStates.forEach(el => el.remove());
+        
+        horariosBotonesAgendar.innerHTML = '';
+        horariosBotonesAgendar.classList.remove('horarios-botones-hidden');
+        horariosBotonesAgendar.style.display = 'flex';
+
+        const allSlots = [];
+        for (let h = 9; h <= 17; h++) {
+            allSlots.push(`${h.toString().padStart(2, '0')}:00`);
+        }
+
+        for (const slot of allSlots) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn-horario';
+            const horaInicio = parseInt(slot.split(':')[0]);
+            const horaFin = horaInicio + 1;
+            btn.textContent = `${slot} - ${horaFin.toString().padStart(2, '0')}:00`;
+            btn.dataset.hora = slot;
+
+            const estaDisponible = slotsDisponibles.includes(slot);
+            const estaNoDisponible = slotsNoDisponibles.includes(slot);
+
+            if (estaNoDisponible) {
+                btn.disabled = true;
+                btn.classList.add('no-disponible');
+                btn.title = 'Hora no disponible (ya tomada o bloqueada)';
+            } else if (estaDisponible) {
+                btn.disabled = false;
+                btn.classList.remove('no-disponible');
+                btn.addEventListener('click', function() {
+                    horariosBotonesAgendar.querySelectorAll('.btn-horario').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    if (horaHiddenInputAgendar) {
+                        horaHiddenInputAgendar.value = slot;
+                    }
+                });
+            } else {
+                btn.disabled = true;
+                btn.classList.add('no-disponible');
+                btn.title = 'Hora no disponible';
+            }
+            
+            horariosBotonesAgendar.appendChild(btn);
+        }
+        
+        if (slotsDisponibles.length === 0) {
+            horariosBotonesAgendar.insertAdjacentHTML('afterend', `
+                <div class="empty-state empty-state-10" style="margin-top: 15px;">
+                    <i class="fas fa-calendar-times"></i>
+                    <p class="empty-state-text">No hay horarios disponibles para este día.</p>
+                </div>
+            `);
+        }
+    }
+    
+    function renderCalendarAgendar(year, month) {
+        if (!calHeaderAgendar) return;
+        
+        calHeaderAgendar.innerText = `${meses[month]} ${year}`;
+        
+        calGridBodyAgendar.innerHTML = `
+            <div class="cal-day-header">L</div>
+            <div class="cal-day-header">M</div>
+            <div class="cal-day-header">X</div>
+            <div class="cal-day-header">J</div>
+            <div class="cal-day-header">V</div>
+            <div class="cal-day-header">S</div>
+            <div class="cal-day-header">D</div>
+        `;
+        
+        const primerDiaDelMes = new Date(year, month, 1);
+        const ultimoDiaDelMes = new Date(year, month + 1, 0);
+        const ultimoDiaNum = ultimoDiaDelMes.getDate();
+        let diaInicioSemana = (primerDiaDelMes.getDay() + 6) % 7;
+        const ultimoDiaMesAnterior = new Date(year, month, 0).getDate();
+
+        for (let i = diaInicioSemana; i > 0; i--) {
+            const dia = ultimoDiaMesAnterior - i + 1;
+            const dayDiv = document.createElement('div');
+            dayDiv.classList.add('cal-day', 'other-month');
+            dayDiv.innerText = dia;
+            calGridBodyAgendar.appendChild(dayDiv);
+        }
+
+        for (let dia = 1; dia <= ultimoDiaNum; dia++) {
+            const dayDiv = document.createElement('div');
+            dayDiv.classList.add('cal-day');
+            dayDiv.innerText = dia;
+
+            const fechaStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+            dayDiv.dataset.fecha = fechaStr;
+
+            const fechaDate = new Date(year, month, dia);
+            const diaSemana = fechaDate.getDay();
+            const esFinDeSemana = diaSemana === 0 || diaSemana === 6;
+            const hoyDate = new Date(hoyAgendar.getFullYear(), hoyAgendar.getMonth(), hoyAgendar.getDate());
+            const esDiaPasado = fechaDate < hoyDate;
+            const esSeleccionable = !esFinDeSemana && !esDiaPasado;
+
+            if (fechaStr === hoyStrAgendar) {
+                dayDiv.classList.add('day-today');
+            }
+
+            if (esSeleccionable) {
+                if (calendarioDataAgendar.fechasConDisponibilidad?.includes(fechaStr)) {
+                    dayDiv.classList.add('day-disponible');
+                } else if (calendarioDataAgendar.diasCompletos?.includes(fechaStr)) {
+                    dayDiv.classList.add('day-lleno');
+                }
+            } else if (esFinDeSemana) {
+                dayDiv.classList.add('day-inabil');
+            } else if (esDiaPasado) {
+                dayDiv.classList.add('day-inabil');
+            }
+
+            if (esSeleccionable) {
+                dayDiv.addEventListener('click', () => {
+                    mostrarHorariosDelDiaAgendar(fechaStr, dayDiv);
+                });
+            }
+            
+            calGridBodyAgendar.appendChild(dayDiv);
+        }
+
+        const totalDiasGrid = calGridBodyAgendar.children.length;
+        const diasSiguientes = (7 - (totalDiasGrid % 7)) % 7;
+        for (let i = 1; i <= diasSiguientes; i++) {
+            const dayDiv = document.createElement('div');
+            dayDiv.classList.add('cal-day', 'other-month');
+            dayDiv.innerText = i;
+            calGridBodyAgendar.appendChild(dayDiv);
+        }
+        
+        // Si hay un día seleccionado y está en el mes actual, mostrar sus horarios
+        if (diaSeleccionadoStrAgendar && calendarioDataAgendar && calendarioDataAgendar.slotsDetallados) {
+            const [selYear, selMonth] = diaSeleccionadoStrAgendar.split('-');
+            if (parseInt(selYear) === year && parseInt(selMonth) === (month + 1)) {
+                // El día seleccionado está en el mes actual, mostrar sus horarios
+                mostrarHorariosDelDiaAgendar(diaSeleccionadoStrAgendar, null);
+            } else {
+                // El día seleccionado no está en el mes actual, limpiar selección
+                diaSeleccionadoAgendar = null;
+                diaSeleccionadoStrAgendar = null;
+                if (citasDiaTituloAgendar) citasDiaTituloAgendar.innerText = `Horarios Disponibles`;
+                if (citasDiaContainerAgendar) {
+                    // Asegurarse de que horariosBotonesAgendar esté dentro del contenedor antes de limpiar
+                    if (horariosBotonesAgendar && horariosBotonesAgendar.parentElement === citasDiaContainerAgendar) {
+                        // No hacer nada, horariosBotonesAgendar ya está en el DOM
+                    }
+                    citasDiaContainerAgendar.innerHTML = `
+                        <div class="empty-state empty-state-10">
+                            <i class="fas fa-calendar-day empty-state-icon"></i>
+                            <p class="empty-state-text">Seleccione un día del calendario para ver los horarios disponibles.</p>
+                        </div>
+                    `;
+                    // Re-agregar horariosBotonesAgendar al contenedor después de limpiar
+                    if (horariosBotonesAgendar) {
+                        citasDiaContainerAgendar.appendChild(horariosBotonesAgendar);
+                    }
+                }
+                if (horariosBotonesAgendar) {
+                    horariosBotonesAgendar.classList.add('horarios-botones-hidden');
+                    horariosBotonesAgendar.style.display = 'none';
+                    horariosBotonesAgendar.innerHTML = '';
+                }
+                if (horaHiddenInputAgendar) horaHiddenInputAgendar.value = '';
+                if (fechaHiddenInputAgendar) fechaHiddenInputAgendar.value = '';
+            }
+        } else {
+            // No hay día seleccionado o no hay datos del calendario, mostrar estado inicial
+            if (citasDiaTituloAgendar) citasDiaTituloAgendar.innerText = `Horarios Disponibles`;
+            if (citasDiaContainerAgendar) {
+                // Asegurarse de que horariosBotonesAgendar esté dentro del contenedor
+                if (horariosBotonesAgendar && horariosBotonesAgendar.parentElement !== citasDiaContainerAgendar) {
+                    citasDiaContainerAgendar.appendChild(horariosBotonesAgendar);
+                }
+                // Verificar si ya hay un empty-state, si no, agregarlo
+                const existingEmptyState = citasDiaContainerAgendar.querySelector('.empty-state');
+                if (!existingEmptyState) {
+                    citasDiaContainerAgendar.innerHTML = `
+                        <div class="empty-state empty-state-10">
+                            <i class="fas fa-calendar-day empty-state-icon"></i>
+                            <p class="empty-state-text">Seleccione un día del calendario para ver los horarios disponibles.</p>
+                        </div>
+                    `;
+                    if (horariosBotonesAgendar) {
+                        citasDiaContainerAgendar.appendChild(horariosBotonesAgendar);
+                    }
+                }
+            }
+            if (horariosBotonesAgendar) {
+                horariosBotonesAgendar.classList.add('horarios-botones-hidden');
+                horariosBotonesAgendar.style.display = 'none';
+            }
+        }
+    }
+
+    if (btnPrevAgendar) {
+        btnPrevAgendar.addEventListener('click', () => {
+            navDateAgendar.setMonth(navDateAgendar.getMonth() - 1);
+            fetchCalendarioDelMesAgendar(navDateAgendar.getFullYear(), navDateAgendar.getMonth());
+        });
+    }
+
+    if (btnNextAgendar) {
+        btnNextAgendar.addEventListener('click', () => {
+            navDateAgendar.setMonth(navDateAgendar.getMonth() + 1);
+            fetchCalendarioDelMesAgendar(navDateAgendar.getFullYear(), navDateAgendar.getMonth());
+        });
+    }
+
+    if (btnTodayAgendar) {
+        btnTodayAgendar.addEventListener('click', () => {
+            navDateAgendar = new Date();
+            // Limpiar selección previa al cambiar a hoy
+            diaSeleccionadoAgendar = null;
+            diaSeleccionadoStrAgendar = null;
+            fetchCalendarioDelMesAgendar(navDateAgendar.getFullYear(), navDateAgendar.getMonth());
+        });
+    }
+    {% endif %}
+
+    // Función para abrir modal de agendar cita
+    function abrirModalAgendar(solicitudId, asunto) {
+        document.getElementById('agendar_solicitud_id').value = solicitudId;
+        document.getElementById('agendar_caso_asunto').value = asunto;
+        document.getElementById('modalAgendar').style.display = 'block';
+        {% if puede_agendar_cita %}
+        // Inicializar calendario cuando se abre el modal
+        if (calHeaderAgendar) {
+            navDateAgendar = new Date();
+            fetchCalendarioDelMesAgendar(navDateAgendar.getFullYear(), navDateAgendar.getMonth());
+        }
+        {% endif %}
+    }
+
+    // Función para cerrar modal de agendar cita
+    function cerrarModalAgendar() {
+        document.getElementById('modalAgendar').style.display = 'none';
+        document.getElementById('fecha_agendar').value = '';
+        document.getElementById('hora_agendar').value = '';
+        document.getElementById('modalidad').value = '';
+        document.getElementById('notas').value = '';
+        {% if puede_agendar_cita %}
+        // Limpiar calendario
+        diaSeleccionadoAgendar = null;
+        diaSeleccionadoStrAgendar = null;
+        const citasDiaContainer = document.getElementById('cal-citas-dia-agendar');
+        if (citasDiaContainer) {
+            citasDiaContainer.innerHTML = `
+                <div class="empty-state empty-state-10">
+                    <i class="fas fa-calendar-day empty-state-icon"></i>
+                    <p class="empty-state-text">Seleccione un día del calendario para ver los horarios disponibles.</p>
+                </div>
+            `;
+        }
+        const horariosBotones = document.getElementById('horarios-botones-agendar');
+        if (horariosBotones) {
+            horariosBotones.classList.add('horarios-botones-hidden');
+            horariosBotones.style.display = 'none';
+        }
+        {% endif %}
+    }
+
     // Función para abrir modal de formular ajuste
     function abrirModalFormularAjuste(solicitudId, asunto) {
         document.getElementById('ajuste_caso_asunto').value = asunto;
@@ -536,14 +982,40 @@
         }
     }
 
+    // Validación del formulario de agendar
+    const formAgendar = document.getElementById('modalAgendar');
+    if (formAgendar) {
+        const formElement = formAgendar.querySelector('form');
+        if (formElement) {
+            formElement.addEventListener('submit', function(e) {
+                const fechaInput = document.getElementById('fecha_agendar');
+                const horaInput = document.getElementById('hora_agendar');
+                if (!fechaInput || !fechaInput.value) {
+                    e.preventDefault();
+                    alert('Por favor, seleccione una fecha del calendario.');
+                    return false;
+                }
+                if (!horaInput || !horaInput.value) {
+                    e.preventDefault();
+                    alert('Por favor, seleccione un horario disponible.');
+                    return false;
+                }
+            });
+        }
+    }
+
     // Cerrar modal al hacer clic fuera de él
     window.onclick = function(event) {
+        const modalAgendar = document.getElementById('modalAgendar');
         const modalFormular = document.getElementById('modalFormularAjuste');
         const modalEditar = document.getElementById('modalEditarAjuste');
-        if (event.target == modalFormular) {
+        if (modalAgendar && event.target == modalAgendar) {
+            cerrarModalAgendar();
+        }
+        if (modalFormular && event.target == modalFormular) {
             cerrarModalFormularAjuste();
         }
-        if (event.target == modalEditar) {
+        if (modalEditar && event.target == modalEditar) {
             cerrarModalEditarAjuste();
         }
     }
