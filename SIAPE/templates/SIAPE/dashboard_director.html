@@ -17,8 +17,16 @@
             <i class="fas fa-user-tie"></i>
             Panel Principal
         </a>
-        </nav>
+        
+        <a href="#" class="nav-item"> <i class="fas fa-chart-bar"></i>
+            Estadísticas
+        </a>
 
+        <a href="{% url 'carreras_director' %}" class="nav-item">
+            <i class="fas fa-graduation-cap"></i>
+            Mis Carreras
+        </a>
+        </nav>
     {% if messages %}
         {% for message in messages %}
             <div class="alert alert-{{ message.tags }} custom-alert-{{ message.tags }}">
@@ -30,7 +38,8 @@
     <section class="kpi-container">
         
         <div class="kpi-card">
-            <div class="kpi-icon icon-proceso"> <i class="fas fa-clock"></i>
+            <div class="kpi-icon icon-proceso"> 
+                <i class="fas fa-clock"></i>
             </div>
             <div class="kpi-info">
                 <span class="kpi-value">{{ kpis.total_pendientes|default:0 }}</span>
@@ -39,7 +48,8 @@
         </div>
 
         <div class="kpi-card">
-            <div class="kpi-icon icon-resueltos"> <i class="fas fa-check-circle"></i>
+            <div class="kpi-icon icon-resueltos"> 
+                <i class="fas fa-check-circle"></i>
             </div>
             <div class="kpi-info">
                 <span class="kpi-value">{{ kpis.total_aprobados|default:0 }}</span>
@@ -48,7 +58,8 @@
         </div>
 
         <div class="kpi-card">
-            <div class="kpi-icon icon-solicitudes"> <i class="fas fa-times-circle"></i>
+            <div class="kpi-icon icon-solicitudes"> 
+                <i class="fas fa-times-circle"></i>
             </div>
             <div class="kpi-info">
                 <span class="kpi-value">{{ kpis.total_rechazados|default:0 }}</span>
@@ -85,14 +96,12 @@
                         <a href="#" class="btn-accion btn-agendar btn-accion-small">
                             <i class="fas fa-eye"></i> Ver
                         </a> 
-
                         <form action="{% url 'aprobar_solicitud_director' solicitud.id %}" method="POST" style="display: inline-block;">
                             {% csrf_token %}
                             <button type="submit" class="btn-accion btn-accion-green btn-accion-small">
                                 <i class="fas fa-check"></i> Aprobar
                             </button>
                         </form>
-
                         <form action="{% url 'rechazar_solicitud_director' solicitud.id %}" method="POST" style="display: inline-block;">
                             {% csrf_token %}
                             <button type="submit" class="btn-accion btn-ajuste btn-accion-small">
