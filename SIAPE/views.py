@@ -449,11 +449,11 @@ def casos_generales(request):
     
     if aplicar_filtro_por_rol:
         if rol_nombre == ROL_COORDINADORA:
-            # Coordinadora: Solo casos pendientes de entrevista (sin importar asignación)
-            filtros = Q(estado='pendiente_entrevista')
+            # Coordinadora: Casos pendientes de entrevista o pendientes de formulación del caso
+            filtros = Q(estado='pendiente_entrevista') | Q(estado='pendiente_formulacion_caso')
         elif rol_nombre == ROL_ASESORA_TECNICA:
-            # Asesora Técnica: Casos pendientes de formulación (que debe formular)
-            filtros = Q(estado='pendiente_formulacion')
+            # Asesora Técnica: Casos pendientes de formulación de ajustes (que debe formular)
+            filtros = Q(estado='pendiente_formulacion_ajustes')
         elif rol_nombre == ROL_ASESOR:
             # Asesor Pedagógico: Casos pendientes de preaprobación
             filtros = Q(estado='pendiente_preaprobacion')
@@ -914,12 +914,12 @@ def dashboard_coordinadora(request):
         estado='cancelada'
     ).count()
 
-    # KPI 3: Solicitudes pendientes de entrevista
+    # KPI 3: Solicitudes pendientes de entrevista o formulación del caso
     # Contamos las entrevistas 'pendientes' de esta coordinadora
-    # que correspondan a solicitudes 'pendientes_entrevista'
+    # que correspondan a solicitudes 'pendientes_entrevista' o 'pendientes_formulacion_caso'
     kpi_solicitudes_pendientes = entrevistas_coordinadora.filter(
         estado='pendiente',
-        solicitudes__estado='pendiente_entrevista'
+        solicitudes__estado__in=['pendiente_entrevista', 'pendiente_formulacion_caso']
     ).count()
     
     # KPI 4: Citas de la semana
@@ -988,17 +988,19 @@ def detalle_casos_coordinadora(request, solicitud_id):
 
     # 3. --- Determinar acciones permitidas según el rol ---
     rol_nombre = perfil.rol.nombre_rol if perfil else None
-    # Permisos de edición: Coordinadora, Asesora Técnica, Asesor Pedagógico y Admin pueden editar
-    puede_editar_descripcion = rol_nombre in [ROL_COORDINADORA, ROL_ASESORA_TECNICA, ROL_ASESOR, ROL_ADMIN]
+    # Permisos de edición: Solo Coordinadora, Asesor Pedagógico y Admin pueden editar la descripción del caso
+    # La Asesora Técnica NO puede editar el caso formulado por la Coordinadora
+    puede_editar_descripcion = rol_nombre in [ROL_COORDINADORA, ROL_ASESOR, ROL_ADMIN]
     puede_agendar_cita = rol_nombre == ROL_COORDINADORA
     
     # Acciones de Coordinadora
-    puede_enviar_asesor_tecnico = rol_nombre == ROL_COORDINADORA and solicitud.estado == 'pendiente_entrevista'
+    puede_formular_caso = rol_nombre == ROL_COORDINADORA and solicitud.estado == 'pendiente_formulacion_caso'
+    puede_enviar_asesor_tecnico = rol_nombre == ROL_COORDINADORA and solicitud.estado == 'pendiente_formulacion_caso'
     
     # Acciones de Asesora Técnica Pedagógica
-    puede_formular_ajustes = rol_nombre == ROL_ASESORA_TECNICA and solicitud.estado == 'pendiente_formulacion'
-    puede_enviar_asesor_pedagogico = rol_nombre == ROL_ASESORA_TECNICA and solicitud.estado == 'pendiente_formulacion'
-    puede_devolver_a_coordinadora = rol_nombre == ROL_ASESORA_TECNICA and solicitud.estado == 'pendiente_formulacion'
+    puede_formular_ajustes = rol_nombre == ROL_ASESORA_TECNICA and solicitud.estado == 'pendiente_formulacion_ajustes'
+    puede_enviar_asesor_pedagogico = rol_nombre == ROL_ASESORA_TECNICA and solicitud.estado == 'pendiente_formulacion_ajustes'
+    puede_devolver_a_coordinadora = rol_nombre == ROL_ASESORA_TECNICA and solicitud.estado == 'pendiente_formulacion_ajustes'
     
     # Acciones de Asesor Pedagógico
     puede_enviar_a_director = rol_nombre == ROL_ASESOR and solicitud.estado == 'pendiente_preaprobacion'
@@ -1018,6 +1020,7 @@ def detalle_casos_coordinadora(request, solicitud_id):
         'rol_usuario': rol_nombre,
         'puede_editar_descripcion': puede_editar_descripcion,
         'puede_agendar_cita': puede_agendar_cita,
+        'puede_formular_caso': puede_formular_caso,
         'puede_enviar_asesor_tecnico': puede_enviar_asesor_tecnico,
         'puede_formular_ajustes': puede_formular_ajustes,
         'puede_enviar_asesor_pedagogico': puede_enviar_asesor_pedagogico,
@@ -1071,8 +1074,8 @@ def formular_ajuste_asesor_tecnico(request, solicitud_id):
     solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
     
     # Verificar que el caso está en el estado correcto
-    if solicitud.estado != 'pendiente_formulacion':
-        messages.error(request, 'Este caso no está en estado de formulación.')
+    if solicitud.estado != 'pendiente_formulacion_ajustes':
+        messages.error(request, 'Este caso no está en estado de formulación de ajustes.')
         return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
 
     # 3. --- Obtener Datos del Formulario ---
@@ -1145,10 +1148,137 @@ def formular_ajuste_asesor_tecnico(request, solicitud_id):
 
 @require_POST
 @login_required
+def editar_ajuste_asesor_tecnico(request, ajuste_asignado_id):
+    """
+    Vista para que la Asesora Técnica Pedagógica pueda editar un ajuste ya asignado.
+    """
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_ASESORA_TECNICA:
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+        perfil = None
+
+    # 2. --- Obtener el Ajuste Asignado ---
+    ajuste_asignado = get_object_or_404(AjusteAsignado, id=ajuste_asignado_id)
+    solicitud = ajuste_asignado.solicitudes
+    
+    # Verificar que el caso está en el estado correcto
+    if solicitud.estado != 'pendiente_formulacion_ajustes':
+        messages.error(request, 'Solo se pueden editar ajustes de casos en estado de formulación de ajustes.')
+        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud.id)
+
+    # 3. --- Obtener Datos del Formulario ---
+    descripcion = request.POST.get('descripcion', '').strip()
+    categoria_id = request.POST.get('categoria_id', '')
+    nueva_categoria = request.POST.get('nueva_categoria', '').strip()
+
+    # 4. --- Validaciones ---
+    if not descripcion:
+        messages.error(request, 'La descripción del ajuste es requerida.')
+        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud.id)
+
+    # Verificar si se seleccionó "nueva" o si hay una categoría seleccionada
+    crear_nueva_categoria = categoria_id == 'nueva' or (not categoria_id and nueva_categoria)
+    
+    if not categoria_id and not nueva_categoria:
+        messages.error(request, 'Debe seleccionar una categoría o crear una nueva.')
+        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud.id)
+
+    if categoria_id and categoria_id != 'nueva' and nueva_categoria:
+        messages.error(request, 'No puede seleccionar una categoría existente y crear una nueva a la vez.')
+        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud.id)
+
+    if crear_nueva_categoria and not nueva_categoria:
+        messages.error(request, 'Debe proporcionar el nombre de la nueva categoría.')
+        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud.id)
+
+    try:
+        # 5. --- Obtener o Crear Categoría ---
+        if crear_nueva_categoria:
+            if not nueva_categoria:
+                messages.error(request, 'Debe proporcionar el nombre de la nueva categoría.')
+                return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud.id)
+            categoria, created = CategoriasAjustes.objects.get_or_create(
+                nombre_categoria=nueva_categoria.strip().capitalize()
+            )
+            if created:
+                messages.info(request, f'Categoría "{categoria.nombre_categoria}" creada exitosamente.')
+        else:
+            if not categoria_id or categoria_id == 'nueva':
+                messages.error(request, 'Debe seleccionar una categoría válida.')
+                return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud.id)
+            categoria = get_object_or_404(CategoriasAjustes, id=categoria_id)
+
+        # 6. --- Actualizar Ajuste Razonable ---
+        ajuste_razonable = ajuste_asignado.ajuste_razonable
+        ajuste_razonable.descripcion = descripcion
+        ajuste_razonable.categorias_ajustes = categoria
+        ajuste_razonable.save()
+
+        messages.success(request, 'Ajuste actualizado exitosamente.')
+
+    except Exception as e:
+        logger.error(f"Error al editar ajuste: {str(e)}")
+        messages.error(request, f'Error al editar el ajuste: {str(e)}')
+
+    # 7. --- Redirigir de vuelta al detalle ---
+    return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud.id)
+
+@require_POST
+@login_required
+def eliminar_ajuste_asesor_tecnico(request, ajuste_asignado_id):
+    """
+    Vista para que la Asesora Técnica Pedagógica pueda eliminar un ajuste asignado.
+    """
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_ASESORA_TECNICA:
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+        perfil = None
+
+    # 2. --- Obtener el Ajuste Asignado ---
+    ajuste_asignado = get_object_or_404(AjusteAsignado, id=ajuste_asignado_id)
+    solicitud = ajuste_asignado.solicitudes
+    
+    # Verificar que el caso está en el estado correcto
+    if solicitud.estado != 'pendiente_formulacion_ajustes':
+        messages.error(request, 'Solo se pueden eliminar ajustes de casos en estado de formulación de ajustes.')
+        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud.id)
+
+    try:
+        # 3. --- Eliminar el Ajuste Asignado y el Ajuste Razonable asociado ---
+        ajuste_razonable = ajuste_asignado.ajuste_razonable
+        solicitud_id = solicitud.id
+        ajuste_asignado.delete()
+        # También eliminamos el ajuste razonable si no está siendo usado por otros ajustes asignados
+        if not AjusteAsignado.objects.filter(ajuste_razonable=ajuste_razonable).exists():
+            ajuste_razonable.delete()
+        
+        messages.success(request, 'Ajuste eliminado exitosamente.')
+
+    except Exception as e:
+        logger.error(f"Error al eliminar ajuste: {str(e)}")
+        messages.error(request, f'Error al eliminar el ajuste: {str(e)}')
+
+    # 4. --- Redirigir de vuelta al detalle ---
+    return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+
+@require_POST
+@login_required
 def enviar_a_asesor_tecnico(request, solicitud_id):
     """
     Vista para que la Coordinadora envíe el caso a la Asesora Técnica Pedagógica.
-    Cambia el estado del caso de 'pendiente_entrevista' a 'pendiente_formulacion'.
+    Cambia el estado del caso de 'pendiente_formulacion_caso' a 'pendiente_formulacion_ajustes'.
     """
     # 1. --- Verificación de Permisos ---
     try:
@@ -1165,16 +1295,16 @@ def enviar_a_asesor_tecnico(request, solicitud_id):
     solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
     
     # 3. --- Verificar que el caso está en el estado correcto ---
-    if solicitud.estado != 'pendiente_entrevista':
-        messages.error(request, 'Este caso no está en estado de entrevista. Solo se pueden enviar casos pendientes de entrevista.')
+    if solicitud.estado != 'pendiente_formulacion_caso':
+        messages.error(request, 'Este caso no está en estado de formulación del caso. Solo se pueden enviar casos después de formular el caso.')
         return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
     
     try:
         # 4. --- Cambiar el estado del caso ---
-        solicitud.estado = 'pendiente_formulacion'
+        solicitud.estado = 'pendiente_formulacion_ajustes'
         solicitud.save()
         
-        messages.success(request, 'Caso enviado a la Asesora Técnica Pedagógica exitosamente. El caso ahora está pendiente de formulación.')
+        messages.success(request, 'Caso enviado a la Asesora Técnica Pedagógica exitosamente. El caso ahora está pendiente de formulación de ajustes.')
         
     except Exception as e:
         logger.error(f"Error al enviar caso a asesora técnica: {str(e)}")
@@ -1204,8 +1334,8 @@ def enviar_a_asesor_pedagogico(request, solicitud_id):
     solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
     
     # Verificar que el caso está en el estado correcto
-    if solicitud.estado != 'pendiente_formulacion':
-        messages.error(request, 'Este caso no está en estado de formulación.')
+    if solicitud.estado != 'pendiente_formulacion_ajustes':
+        messages.error(request, 'Este caso no está en estado de formulación de ajustes.')
         return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
 
     # 3. --- Verificar que hay ajustes asignados ---
@@ -1233,7 +1363,7 @@ def enviar_a_asesor_pedagogico(request, solicitud_id):
 def devolver_a_coordinadora(request, solicitud_id):
     """
     Vista para que la Asesora Técnica Pedagógica devuelva el caso a la Coordinadora.
-    Cambia el estado del caso de 'pendiente_formulacion' a 'pendiente_entrevista'.
+    Cambia el estado del caso de 'pendiente_formulacion_ajustes' a 'pendiente_formulacion_caso'.
     """
     # 1. --- Verificación de Permisos ---
     try:
@@ -1250,16 +1380,16 @@ def devolver_a_coordinadora(request, solicitud_id):
     solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
     
     # 3. --- Verificar que el caso está en el estado correcto ---
-    if solicitud.estado != 'pendiente_formulacion':
-        messages.error(request, 'Este caso no está en estado de formulación. Solo se pueden devolver casos pendientes de formulación.')
+    if solicitud.estado != 'pendiente_formulacion_ajustes':
+        messages.error(request, 'Este caso no está en estado de formulación de ajustes. Solo se pueden devolver casos pendientes de formulación de ajustes.')
         return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
     
     try:
         # 4. --- Cambiar el estado del caso ---
-        solicitud.estado = 'pendiente_entrevista'
+        solicitud.estado = 'pendiente_formulacion_caso'
         solicitud.save()
         
-        messages.success(request, 'Caso devuelto a la Coordinadora exitosamente. El caso ahora está pendiente de entrevista.')
+        messages.success(request, 'Caso devuelto a la Coordinadora exitosamente. El caso ahora está pendiente de formulación del caso.')
         
     except Exception as e:
         logger.error(f"Error al devolver caso a coordinadora: {str(e)}")
@@ -1313,7 +1443,7 @@ def enviar_a_director(request, solicitud_id):
 def devolver_a_asesor_tecnico(request, solicitud_id):
     """
     Vista para que el Asesor Pedagógico devuelva el caso al Asesor Técnico Pedagógico.
-    Cambia el estado del caso de 'pendiente_preaprobacion' a 'pendiente_formulacion'.
+    Cambia el estado del caso de 'pendiente_preaprobacion' a 'pendiente_formulacion_ajustes'.
     """
     # 1. --- Verificación de Permisos ---
     try:
@@ -1336,10 +1466,10 @@ def devolver_a_asesor_tecnico(request, solicitud_id):
     
     try:
         # 4. --- Cambiar el estado del caso ---
-        solicitud.estado = 'pendiente_formulacion'
+        solicitud.estado = 'pendiente_formulacion_ajustes'
         solicitud.save()
         
-        messages.success(request, 'Caso devuelto al Asesor Técnico Pedagógico exitosamente. El caso ahora está pendiente de formulación.')
+        messages.success(request, 'Caso devuelto al Asesor Técnico Pedagógico exitosamente. El caso ahora está pendiente de formulación de ajustes.')
         
     except Exception as e:
         logger.error(f"Error al devolver caso a asesor técnico: {str(e)}")
@@ -1439,9 +1569,10 @@ def actualizar_descripcion_caso(request, solicitud_id):
     # 1. --- Verificación de Permisos (Ampliado) ---
     try:
         perfil = request.user.perfil
+        # Solo Coordinadora, Asesor Pedagógico y Admin pueden editar la descripción del caso
+        # La Asesora Técnica NO puede editar el caso formulado por la Coordinadora
         ROLES_PERMITIDOS = [
             ROL_COORDINADORA,
-            ROL_ASESORA_TECNICA,
             ROL_ASESOR,
             ROL_ADMIN
         ]
@@ -1623,7 +1754,12 @@ def confirmar_cita_coordinadora(request, entrevista_id):
                 entrevista.save()
                 
                 if accion == 'realizada':
-                    messages.success(request, 'Cita marcada como realizada.')
+                    # Cuando la entrevista se marca como realizada, el caso pasa a pendiente_formulacion_caso
+                    solicitud = entrevista.solicitudes
+                    if solicitud.estado == 'pendiente_entrevista':
+                        solicitud.estado = 'pendiente_formulacion_caso'
+                        solicitud.save()
+                    messages.success(request, 'Cita marcada como realizada. El caso ahora está pendiente de formulación del caso.')
                 else:
                     messages.info(request, 'Cita marcada como no asistió. Puedes reagendarla.')
             else:
@@ -1791,20 +1927,20 @@ def dashboard_asesor_técnico(request):
     # Base de solicitudes para todas las asesoras técnicas (filtramos por rol)
     todas_las_asesoras_tecnicas = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_ASESORA_TECNICA)
     
-    # KPI 1: Casos nuevos (pendiente_formulacion esta semana)
-    # Casos que cambiaron a pendiente_formulacion esta semana
+    # KPI 1: Casos nuevos (pendiente_formulacion_ajustes esta semana)
+    # Casos que cambiaron a pendiente_formulacion_ajustes esta semana
     casos_nuevos_semana = Solicitudes.objects.filter(
-        estado='pendiente_formulacion',
+        estado='pendiente_formulacion_ajustes',
         updated_at__range=(start_of_week_dt, end_of_week_dt)
     ).select_related('estudiantes', 'estudiantes__carreras').count()
     
-    # KPI 2: Casos pendientes de formulación en total
+    # KPI 2: Casos pendientes de formulación de ajustes en total
     casos_pendientes_formulacion = Solicitudes.objects.filter(
-        estado='pendiente_formulacion'
+        estado='pendiente_formulacion_ajustes'
     ).select_related('estudiantes', 'estudiantes__carreras')
     kpi_casos_pendientes_total = casos_pendientes_formulacion.count()
     
-    # KPI 3: Casos completados (que pasaron de pendiente_formulacion a estados más avanzados)
+    # KPI 3: Casos completados (que pasaron de pendiente_formulacion_ajustes a estados más avanzados)
     # Esto incluye casos que ya están en preaprobación, aprobación o aprobados
     casos_completados = Solicitudes.objects.filter(
         estado__in=['pendiente_preaprobacion', 'pendiente_aprobacion', 'aprobado']
@@ -1813,7 +1949,7 @@ def dashboard_asesor_técnico(request):
     # KPI 4: Casos asignados a esta asesora técnica específica
     casos_asignados = Solicitudes.objects.filter(
         asesor_tecnico_asignado=perfil,
-        estado='pendiente_formulacion'
+        estado='pendiente_formulacion_ajustes'
     ).select_related('estudiantes', 'estudiantes__carreras').count()
     
     # KPI 5: Casos en proceso (pendiente_preaprobacion, pendiente_aprobacion)

@@ -101,6 +101,8 @@ urlpatterns = [
     path('dashboard/asesor-tecnico/', views.dashboard_asesor_técnico, name='dashboard_asesor_técnico'),
     path('dashboard/asesor-tecnico/casos/<int:solicitud_id>/', views.detalle_casos_asesor_tecnico, name='detalle_casos_asesor_tecnico'),
     path('dashboard/asesor-tecnico/casos/<int:solicitud_id>/formular-ajuste/', views.formular_ajuste_asesor_tecnico, name='formular_ajuste_asesor_tecnico'),
+    path('dashboard/asesor-tecnico/ajustes/<int:ajuste_asignado_id>/editar/', views.editar_ajuste_asesor_tecnico, name='editar_ajuste_asesor_tecnico'),
+    path('dashboard/asesor-tecnico/ajustes/<int:ajuste_asignado_id>/eliminar/', views.eliminar_ajuste_asesor_tecnico, name='eliminar_ajuste_asesor_tecnico'),
     path('dashboard/asesor-tecnico/casos/<int:solicitud_id>/enviar-asesor-pedagogico/', views.enviar_a_asesor_pedagogico, name='enviar_a_asesor_pedagogico'),
     path('dashboard/asesor-tecnico/casos/<int:solicitud_id>/devolver-coordinadora/', views.devolver_a_coordinadora, name='devolver_a_coordinadora'),
     

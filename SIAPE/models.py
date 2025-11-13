@@ -221,7 +221,8 @@ class Solicitudes(models.Model):
 
     ESTADO_CHOICES = (
         ('pendiente_entrevista', 'Pendiente de Entrevista (Coordinadora)'),
-        ('pendiente_formulacion', 'Pendiente de Formulación (Asesora Técnica)'),
+        ('pendiente_formulacion_caso', 'Pendiente de Formulación del Caso (Coordinadora)'),
+        ('pendiente_formulacion_ajustes', 'Pendiente de Formulación de Ajustes (Asesora Técnica)'),
         ('pendiente_preaprobacion', 'Pendiente de Preaprobación (Asesor Pedagógico)'),
         ('pendiente_aprobacion', 'Pendiente de Aprobación (Director)'),
         ('aprobado', 'Aprobado e Informado'),
@@ -344,6 +345,39 @@ class AjusteRazonable(models.Model):
 class AjusteAsignado(models.Model):
     ajuste_razonable = models.ForeignKey(AjusteRazonable, on_delete=models.CASCADE)
     solicitudes = models.ForeignKey(Solicitudes, on_delete=models.CASCADE)
+    
+    # Campos para aprobación individual del Director
+    ESTADO_APROBACION_CHOICES = (
+        ('pendiente', 'Pendiente de Aprobación'),
+        ('aprobado', 'Aprobado'),
+        ('rechazado', 'Rechazado'),
+    )
+    estado_aprobacion = models.CharField(
+        max_length=20,
+        choices=ESTADO_APROBACION_CHOICES,
+        default='pendiente',
+        verbose_name="Estado de Aprobación"
+    )
+    director_aprobador = models.ForeignKey(
+        'PerfilUsuario',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        limit_choices_to={'rol__nombre_rol': 'Director de Carrera'},
+        related_name='ajustes_aprobados',
+        verbose_name="Director que Aprobó/Rechazó"
+    )
+    fecha_aprobacion = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Aprobación/Rechazo"
+    )
+    comentarios_director = models.TextField(
+        blank=True,
+        default='',
+        verbose_name="Comentarios del Director"
+    )
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

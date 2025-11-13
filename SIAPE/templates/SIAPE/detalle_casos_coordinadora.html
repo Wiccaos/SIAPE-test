@@ -136,13 +136,26 @@
                 <div class="detalle-card-content">
                     {% if ajustes_asignados %}
                         {% for item in ajustes_asignados %}
-                        <div class="detalle-sub-card">
+                        <div class="detalle-sub-card" style="position: relative;">
                             <p><strong>Categoría:</strong> {{ item.ajuste_razonable.categorias_ajustes.nombre_categoria }}</p>
                             <p><strong>Descripción:</strong></p>
                             <pre class="notas-box">{{ item.ajuste_razonable.descripcion }}</pre>
                             <p class="text-small text-muted">
                                 <i class="fas fa-calendar"></i> Formulado el {{ item.created_at|date:"d/m/Y H:i" }}
                             </p>
+                            {% if puede_formular_ajustes %}
+                            <div style="margin-top: 10px; display: flex; gap: 10px;">
+                                <button type="button" class="btn-accion btn-accion-small" onclick="abrirModalEditarAjuste({{ item.id }}, event)" style="padding: 5px 10px; font-size: 0.85em;" data-descripcion="{{ item.ajuste_razonable.descripcion|escapejs }}" data-categoria-id="{{ item.ajuste_razonable.categorias_ajustes.id }}" data-categoria-nombre="{{ item.ajuste_razonable.categorias_ajustes.nombre_categoria|escapejs }}">
+                                    <i class="fas fa-edit"></i> Editar
+                                </button>
+                                <form method="POST" action="{% url 'eliminar_ajuste_asesor_tecnico' item.id %}" style="display: inline;" onsubmit="return confirm('¿Está seguro de que desea eliminar este ajuste?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn-accion btn-accion-small btn-accion-red" style="padding: 5px 10px; font-size: 0.85em;">
+                                        <i class="fas fa-trash"></i> Eliminar
+                                    </button>
+                                </form>
+                            </div>
+                            {% endif %}
                         </div>
                         {% endfor %}
                     {% else %}
@@ -150,7 +163,7 @@
                             {% if rol_usuario == "Asesora Técnica Pedagógica" %}
                                 <p class="text-small">Aún no se han formulado ajustes para este caso.</p>
                                 <p class="text-small text-muted" style="margin-top: 10px;">
-                                    <i class="fas fa-info-circle"></i> Debe formular al menos un ajuste antes de enviar el caso al siguiente estado.
+                                    <i class="fas fa-info-circle"></i> Debe formular al menos un ajuste antes de enviar el caso al siguiente estado. Puede agregar múltiples ajustes según sea necesario.
                                 </p>
                             {% else %}
                                 <p class="text-small">Aún no se han asignado ajustes.</p>
@@ -169,31 +182,37 @@
                     <div class="detalle-card-content">
                         <p class="text-muted" style="margin-bottom: 15px;">
                             <i class="fas fa-info-circle"></i> Esta es la descripción del caso generada por la coordinadora. 
-                            Lea atentamente el caso y luego formule los ajustes necesarios utilizando el botón "Formular Ajuste" más abajo.
+                            Lea atentamente el caso y luego formule los ajustes necesarios utilizando el botón "Formular Nuevo Ajuste" más abajo.
                         </p>
                         <div class="panel-section" style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
                             <p>{{ solicitud.descripcion|default:"No hay descripción disponible del caso."|linebreaks }}</p>
                         </div>
+                    </div>
+                {% elif rol_usuario == "Coordinadora de Inclusión" and solicitud.estado == "pendiente_formulacion_caso" %}
+                    <h3>
+                        <i class="fas fa-file-medical-alt"></i> Formular Caso (Después de la Entrevista)
+                    </h3>
+                    <div class="detalle-card-content">
+                        <p class="text-muted" style="margin-bottom: 15px;">
+                            <i class="fas fa-info-circle"></i> La entrevista ha sido realizada. Ahora debe formular el caso basándose en la información recopilada durante la entrevista. 
+                            Complete la descripción del caso a continuación y luego envíelo a la Asesora Técnica Pedagógica.
+                        </p>
                         {% if puede_editar_descripcion %}
-                            <details style="margin-top: 15px;">
-                                <summary style="cursor: pointer; color: #cc0000; font-weight: bold;">
-                                    <i class="fas fa-edit"></i> Editar Descripción del Caso (Opcional)
-                                </summary>
-                                <form method="POST" action="{% url 'actualizar_descripcion_caso' solicitud.id %}" class="form-descripcion-caso" style="margin-top: 15px;">
-                                    {% csrf_token %}
-                                    <div class="form-group">
-                                        <label for="descripcion_caso">
-                                            Puede editar la descripción del caso si es necesario:
-                                        </label>
-                                        <textarea name="descripcion_caso" id="descripcion_caso" rows="6">{{ solicitud.descripcion }}</textarea>
-                                    </div>
-                                    <div class="form-actions flex-end">
-                                        <button type="submit" class="btn-accion btn-agendar">
-                                            <i class="fas fa-save"></i> Guardar Descripción
-                                        </button>
-                                    </div>
-                                </form>
-                            </details>
+                            <form method="POST" action="{% url 'actualizar_descripcion_caso' solicitud.id %}" class="form-descripcion-caso">
+                                {% csrf_token %}
+                                <div class="form-group">
+                                    <label for="descripcion_caso">
+                                        <strong>Descripción del Caso:</strong>
+                                    </label>
+                                    <textarea name="descripcion_caso" id="descripcion_caso" rows="10" placeholder="Describa el caso basándose en la información de la entrevista...">{{ solicitud.descripcion }}</textarea>
+                                    <small class="text-muted">Esta descripción será utilizada por la Asesora Técnica Pedagógica para formular los ajustes necesarios.</small>
+                                </div>
+                                <div class="form-actions flex-end">
+                                    <button type="submit" class="btn-accion btn-agendar">
+                                        <i class="fas fa-save"></i> Guardar Descripción del Caso
+                                    </button>
+                                </div>
+                            </form>
                         {% endif %}
                     </div>
                 {% else %}
@@ -238,18 +257,30 @@
                         {% endif %}
                         
                         {% if puede_enviar_asesor_tecnico %}
-                            <form method="POST" action="{% url 'enviar_a_asesor_tecnico' solicitud.id %}" style="display: inline;">
-                                {% csrf_token %}
-                                <button type="submit" class="btn-accion btn-accion-green" onclick="return confirm('¿Está seguro de que desea enviar este caso a la Asesora Técnica Pedagógica? El caso cambiará de estado a \'Pendiente de Formulación\'.')">
+                            {% if solicitud.descripcion %}
+                                <form method="POST" action="{% url 'enviar_a_asesor_tecnico' solicitud.id %}" style="display: inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn-accion btn-accion-green" onclick="return confirm('¿Está seguro de que desea enviar este caso a la Asesora Técnica Pedagógica? El caso cambiará de estado a \'Pendiente de Formulación de Ajustes\'.')">
+                                        <i class="fas fa-arrow-right"></i> Enviar a Asesora Técnica
+                                    </button>
+                                </form>
+                            {% else %}
+                                <button type="button" class="btn-accion btn-accion-gray" disabled title="Debe formular el caso antes de enviarlo">
                                     <i class="fas fa-arrow-right"></i> Enviar a Asesora Técnica
                                 </button>
-                            </form>
+                                <small class="text-muted" style="display: block; margin-top: 5px;">
+                                    <i class="fas fa-info-circle"></i> Debe completar la descripción del caso antes de enviarlo
+                                </small>
+                            {% endif %}
                         {% endif %}
                         
                         {% if puede_formular_ajustes %}
                             <button type="button" class="btn-accion btn-ajuste" onclick="abrirModalFormularAjuste({{ solicitud.id }}, '{{ solicitud.asunto }}')">
-                                <i class="fas fa-tools"></i> Formular Ajuste
+                                <i class="fas fa-tools"></i> Formular Nuevo Ajuste
                             </button>
+                            <small class="text-muted" style="display: block; margin-top: 5px;">
+                                <i class="fas fa-info-circle"></i> Puede agregar múltiples ajustes a este caso
+                            </small>
                         {% endif %}
                         
                         {% if puede_enviar_asesor_pedagogico %}
@@ -333,7 +364,7 @@
     <div id="modalFormularAjuste" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h4><i class="fas fa-tools"></i> Formular Ajuste para el Caso</h4>
+                <h4><i class="fas fa-tools"></i> Formular Nuevo Ajuste para el Caso</h4>
                 <button class="close" onclick="cerrarModalFormularAjuste()">&times;</button>
             </div>
             <form method="POST" action="{% url 'formular_ajuste_asesor_tecnico' solicitud.id %}" id="formFormularAjuste">
@@ -347,7 +378,7 @@
                 <div class="form-group">
                     <label for="descripcion_ajuste">Descripción del Ajuste:</label>
                     <textarea name="descripcion" id="descripcion_ajuste" required rows="6" placeholder="Describa el ajuste razonable que se debe implementar para este estudiante..."></textarea>
-                    <small class="text-muted">Esta es la formulación del ajuste que se establecerá para el estudiante basado en el caso generado por la coordinadora.</small>
+                    <small class="text-muted">Esta es la formulación del ajuste que se establecerá para el estudiante basado en el caso generado por la coordinadora. Puede agregar múltiples ajustes según sea necesario.</small>
                 </div>
                 
                 <div class="form-group">
@@ -370,6 +401,48 @@
                     <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalFormularAjuste()">Cancelar</button>
                     <button type="submit" class="btn-accion btn-ajuste">
                         <i class="fas fa-save"></i> Formular y Asignar Ajuste
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para Editar Ajuste (Asesora Técnica) -->
+    <div id="modalEditarAjuste" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4><i class="fas fa-edit"></i> Editar Ajuste Asignado</h4>
+                <button class="close" onclick="cerrarModalEditarAjuste()">&times;</button>
+            </div>
+            <form method="POST" action="" id="formEditarAjuste">
+                {% csrf_token %}
+                <input type="hidden" id="editar_ajuste_id" name="ajuste_asignado_id">
+                
+                <div class="form-group">
+                    <label for="descripcion_ajuste_editar">Descripción del Ajuste:</label>
+                    <textarea name="descripcion" id="descripcion_ajuste_editar" required rows="6" placeholder="Describa el ajuste razonable que se debe implementar para este estudiante..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="categoria_id_ajuste_editar">Categoría del Ajuste:</label>
+                    <select name="categoria_id" id="categoria_id_ajuste_editar" onchange="toggleNuevaCategoriaAjusteEditar()" required>
+                        <option value="">Seleccione una categoría</option>
+                        {% for categoria in categorias_ajustes %}
+                            <option value="{{ categoria.id }}">{{ categoria.nombre_categoria }}</option>
+                        {% endfor %}
+                        <option value="nueva">Crear nueva categoría</option>
+                    </select>
+                </div>
+                
+                <div class="form-group hidden" id="nuevaCategoriaGroupAjusteEditar">
+                    <label for="nueva_categoria_ajuste_editar">Nombre de Nueva Categoría:</label>
+                    <input type="text" name="nueva_categoria" id="nueva_categoria_ajuste_editar" placeholder="Ingrese el nombre de la nueva categoría">
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalEditarAjuste()">Cancelar</button>
+                    <button type="submit" class="btn-accion btn-ajuste">
+                        <i class="fas fa-save"></i> Guardar Cambios
                     </button>
                 </div>
             </form>
@@ -413,11 +486,65 @@
         }
     }
 
+    // Función para abrir modal de editar ajuste
+    function abrirModalEditarAjuste(ajusteAsignadoId, event) {
+        // Obtener el botón que activó la función
+        const button = (event && event.target) ? event.target.closest('button') : document.querySelector(`button[onclick*="${ajusteAsignadoId}"]`);
+        const descripcion = button ? button.getAttribute('data-descripcion') : '';
+        const categoriaId = button ? button.getAttribute('data-categoria-id') : '';
+        
+        document.getElementById('editar_ajuste_id').value = ajusteAsignadoId;
+        document.getElementById('descripcion_ajuste_editar').value = descripcion || '';
+        document.getElementById('categoria_id_ajuste_editar').value = categoriaId || '';
+        
+        // Establecer la URL del formulario
+        const form = document.getElementById('formEditarAjuste');
+        form.action = '/dashboard/asesor-tecnico/ajustes/' + ajusteAsignadoId + '/editar/';
+        
+        // Limpiar campo de nueva categoría
+        document.getElementById('nueva_categoria_ajuste_editar').value = '';
+        document.getElementById('nuevaCategoriaGroupAjusteEditar').classList.add('hidden');
+        document.getElementById('nuevaCategoriaGroupAjusteEditar').style.display = 'none';
+        
+        document.getElementById('modalEditarAjuste').style.display = 'block';
+    }
+
+    // Función para cerrar modal de editar ajuste
+    function cerrarModalEditarAjuste() {
+        document.getElementById('modalEditarAjuste').style.display = 'none';
+        document.getElementById('descripcion_ajuste_editar').value = '';
+        document.getElementById('categoria_id_ajuste_editar').value = '';
+        document.getElementById('nueva_categoria_ajuste_editar').value = '';
+        document.getElementById('nuevaCategoriaGroupAjusteEditar').style.display = 'none';
+    }
+
+    // Función para mostrar/ocultar campo de nueva categoría en edición
+    function toggleNuevaCategoriaAjusteEditar() {
+        const categoriaSelect = document.getElementById('categoria_id_ajuste_editar');
+        const nuevaCategoriaGroup = document.getElementById('nuevaCategoriaGroupAjusteEditar');
+        const nuevaCategoriaInput = document.getElementById('nueva_categoria_ajuste_editar');
+        
+        if (categoriaSelect.value === 'nueva') {
+            nuevaCategoriaGroup.classList.remove('hidden');
+            nuevaCategoriaGroup.style.display = 'block';
+            nuevaCategoriaInput.required = true;
+        } else {
+            nuevaCategoriaGroup.classList.add('hidden');
+            nuevaCategoriaGroup.style.display = 'none';
+            nuevaCategoriaInput.required = false;
+            nuevaCategoriaInput.value = '';
+        }
+    }
+
     // Cerrar modal al hacer clic fuera de él
     window.onclick = function(event) {
-        const modal = document.getElementById('modalFormularAjuste');
-        if (event.target == modal) {
+        const modalFormular = document.getElementById('modalFormularAjuste');
+        const modalEditar = document.getElementById('modalEditarAjuste');
+        if (event.target == modalFormular) {
             cerrarModalFormularAjuste();
+        }
+        if (event.target == modalEditar) {
+            cerrarModalEditarAjuste();
         }
     }
 </script>
