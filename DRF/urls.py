@@ -113,6 +113,8 @@ urlpatterns = [
     # URLs de Asesor Pedagógico
     path('dashboard/asesor/casos/<int:solicitud_id>/enviar-director/', views.enviar_a_director, name='enviar_a_director'),
     path('dashboard/asesor/casos/<int:solicitud_id>/devolver-asesor-tecnico/', views.devolver_a_asesor_tecnico, name='devolver_a_asesor_tecnico'),
+    path('dashboard/asesor/ajustes/<int:ajuste_asignado_id>/editar/', views.editar_ajuste_asesor, name='editar_ajuste_asesor'),
+    path('dashboard/asesor/ajustes/<int:ajuste_asignado_id>/eliminar/', views.eliminar_ajuste_asesor, name='eliminar_ajuste_asesor'),
     
     # URLs de Director de Carrera
     path('dashboard/director/casos/<int:solicitud_id>/aprobar/', views.aprobar_caso, name='aprobar_caso'),

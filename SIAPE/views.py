@@ -500,11 +500,16 @@ def casos_generales(request):
 
     # 3. Filtro por estado explícito (si se proporciona)
     # Si tiene_todos=True: El estado seleccionado es el único filtro (reemplaza el filtro por rol)
-    # Si tiene_todos=False: El estado se combina con el filtro por rol (si existe)
+    # Si tiene_todos=False y es Asesora Pedagógica: Ignorar estado explícito, mantener filtro por rol
+    # Si tiene_todos=False y tiene filtro por rol: El estado se combina con el filtro por rol (si existe)
     if tiene_estado_explicito:
         if tiene_todos:
             # Si quiere ver todos los casos, el estado seleccionado es el único filtro
             filtros = Q(estado=q_estado)
+        elif rol_nombre == ROL_ASESOR and aplicar_filtro_por_rol:
+            # Para Asesora Pedagógica, siempre mantener el filtro por rol (pendiente_preaprobacion)
+            # Ignorar el estado seleccionado si no es "Ver Todos"
+            pass  # Mantener el filtro por rol aplicado anteriormente
         elif aplicar_filtro_por_rol and filtros:
             # Si tiene filtro por rol activo, combinar con el estado seleccionado
             # Nota: Esto puede resultar en 0 resultados si el estado no coincide con el rol
@@ -958,11 +963,13 @@ def dashboard_coordinadora(request):
         estado='pendiente_formulacion_caso'
     ).count()
     
-    # KPI 4: Citas de la semana
-    kpi_citas_semana = entrevistas_coordinadora.filter(
-        fecha_entrevista__range=(start_of_week_dt, end_of_week_dt),
-        estado__in=['pendiente', 'realizada'] # Contamos solo las programadas o hechas
-    ).count()
+    # KPI 4: Casos devueltos desde Asesora Técnica
+    # Casos que están en 'pendiente_formulacion_caso' y que tienen ajustes asignados
+    # (lo que indica que fueron formulados por la asesora técnica y luego devueltos)
+    kpi_casos_devueltos_asesor_tecnico = Solicitudes.objects.filter(
+        estado='pendiente_formulacion_caso',
+        ajusteasignado__isnull=False
+    ).distinct().count()
 
     # 4. --- Preparar Contexto ---
     context = {
@@ -971,7 +978,7 @@ def dashboard_coordinadora(request):
             'citas_hoy': kpi_citas_hoy,
             'citas_canceladas': kpi_citas_canceladas,
             'pendientes_formulacion_caso': kpi_pendientes_formulacion_caso,
-            'citas_semana': kpi_citas_semana,
+            'casos_devueltos_asesor_tecnico': kpi_casos_devueltos_asesor_tecnico,
         },
         'citas_del_dia_list': citas_hoy_qs, # Esta es la lista para la sección principal
     }
@@ -1073,6 +1080,7 @@ def detalle_casos_coordinadora(request, solicitud_id):
     # Acciones de Asesor Pedagógico
     puede_enviar_a_director = rol_nombre == ROL_ASESOR and solicitud.estado == 'pendiente_preaprobacion'
     puede_devolver_a_asesor_tecnico = rol_nombre == ROL_ASESOR and solicitud.estado == 'pendiente_preaprobacion'
+    puede_editar_ajustes_asesor = rol_nombre == ROL_ASESOR and solicitud.estado == 'pendiente_preaprobacion'  # Asesora Pedagógica puede editar ajustes antes de enviar a Director
     
     # Acciones de Director
     puede_aprobar = rol_nombre == ROL_DIRECTOR and solicitud.estado == 'pendiente_aprobacion'
@@ -1095,6 +1103,7 @@ def detalle_casos_coordinadora(request, solicitud_id):
         'puede_devolver_a_coordinadora': puede_devolver_a_coordinadora,
         'puede_enviar_a_director': puede_enviar_a_director,
         'puede_devolver_a_asesor_tecnico': puede_devolver_a_asesor_tecnico,
+        'puede_editar_ajustes_asesor': puede_editar_ajustes_asesor,
         'puede_aprobar': puede_aprobar,
         'puede_rechazar': puede_rechazar,
     }
@@ -1544,6 +1553,135 @@ def devolver_a_asesor_tecnico(request, solicitud_id):
         messages.error(request, f'Error al devolver el caso: {str(e)}')
     
     # 5. --- Redirigir de vuelta al detalle ---
+    return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+
+@require_POST
+@login_required
+def editar_ajuste_asesor(request, ajuste_asignado_id):
+    """
+    Vista para que la Asesora Pedagógica pueda editar un ajuste ya asignado
+    cuando el caso está en estado 'pendiente_preaprobacion'.
+    """
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_ASESOR:
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+        perfil = None
+
+    # 2. --- Obtener el Ajuste Asignado ---
+    ajuste_asignado = get_object_or_404(AjusteAsignado, id=ajuste_asignado_id)
+    solicitud = ajuste_asignado.solicitudes
+    
+    # Verificar que el caso está en el estado correcto
+    if solicitud.estado != 'pendiente_preaprobacion':
+        messages.error(request, 'Solo se pueden editar ajustes de casos en estado de preaprobación.')
+        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud.id)
+
+    # 3. --- Obtener Datos del Formulario ---
+    descripcion = request.POST.get('descripcion', '').strip()
+    categoria_id = request.POST.get('categoria_id', '')
+    nueva_categoria = request.POST.get('nueva_categoria', '').strip()
+
+    # 4. --- Validaciones ---
+    if not descripcion:
+        messages.error(request, 'La descripción del ajuste es requerida.')
+        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud.id)
+
+    # Verificar si se seleccionó "nueva" o si hay una categoría seleccionada
+    crear_nueva_categoria = categoria_id == 'nueva' or (not categoria_id and nueva_categoria)
+    
+    if not categoria_id and not nueva_categoria:
+        messages.error(request, 'Debe seleccionar una categoría o crear una nueva.')
+        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud.id)
+
+    if categoria_id and categoria_id != 'nueva' and nueva_categoria:
+        messages.error(request, 'No puede seleccionar una categoría existente y crear una nueva a la vez.')
+        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud.id)
+
+    if crear_nueva_categoria and not nueva_categoria:
+        messages.error(request, 'Debe proporcionar el nombre de la nueva categoría.')
+        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud.id)
+
+    try:
+        # 5. --- Obtener o Crear Categoría ---
+        if crear_nueva_categoria:
+            if not nueva_categoria:
+                messages.error(request, 'Debe proporcionar el nombre de la nueva categoría.')
+                return redirect('detalle_casos_coordinadora', solicitud_id=solicitud.id)
+            categoria, created = CategoriasAjustes.objects.get_or_create(
+                nombre_categoria=nueva_categoria.strip().capitalize()
+            )
+            if created:
+                messages.info(request, f'Categoría "{categoria.nombre_categoria}" creada exitosamente.')
+        else:
+            if not categoria_id or categoria_id == 'nueva':
+                messages.error(request, 'Debe seleccionar una categoría válida.')
+                return redirect('detalle_casos_coordinadora', solicitud_id=solicitud.id)
+            categoria = get_object_or_404(CategoriasAjustes, id=categoria_id)
+
+        # 6. --- Actualizar Ajuste Razonable ---
+        ajuste_razonable = ajuste_asignado.ajuste_razonable
+        ajuste_razonable.descripcion = descripcion
+        ajuste_razonable.categorias_ajustes = categoria
+        ajuste_razonable.save()
+
+        messages.success(request, 'Ajuste actualizado exitosamente.')
+
+    except Exception as e:
+        logger.error(f"Error al editar ajuste: {str(e)}")
+        messages.error(request, f'Error al editar el ajuste: {str(e)}')
+
+    # 7. --- Redirigir de vuelta al detalle ---
+    return redirect('detalle_casos_coordinadora', solicitud_id=solicitud.id)
+
+@require_POST
+@login_required
+def eliminar_ajuste_asesor(request, ajuste_asignado_id):
+    """
+    Vista para que la Asesora Pedagógica pueda eliminar un ajuste asignado
+    cuando el caso está en estado 'pendiente_preaprobacion'.
+    """
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_ASESOR:
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+        perfil = None
+
+    # 2. --- Obtener el Ajuste Asignado ---
+    ajuste_asignado = get_object_or_404(AjusteAsignado, id=ajuste_asignado_id)
+    solicitud = ajuste_asignado.solicitudes
+    
+    # Verificar que el caso está en el estado correcto
+    if solicitud.estado != 'pendiente_preaprobacion':
+        messages.error(request, 'Solo se pueden eliminar ajustes de casos en estado de preaprobación.')
+        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud.id)
+
+    try:
+        # 3. --- Eliminar el Ajuste Asignado y el Ajuste Razonable asociado ---
+        ajuste_razonable = ajuste_asignado.ajuste_razonable
+        solicitud_id = solicitud.id
+        ajuste_asignado.delete()
+        # También eliminamos el ajuste razonable si no está siendo usado por otros ajustes asignados
+        if not AjusteAsignado.objects.filter(ajuste_razonable=ajuste_razonable).exists():
+            ajuste_razonable.delete()
+        
+        messages.success(request, 'Ajuste eliminado exitosamente.')
+
+    except Exception as e:
+        logger.error(f"Error al eliminar ajuste: {str(e)}")
+        messages.error(request, f'Error al eliminar el ajuste: {str(e)}')
+
+    # 4. --- Redirigir de vuelta al detalle ---
     return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
 
 @require_POST
@@ -2151,18 +2289,78 @@ def reagendar_cita_coordinadora(request, entrevista_id):
 # --- VISTA ASESOR PEDAGÓGICO ---
 @login_required
 def dashboard_asesor(request):
+    """
+    Dashboard principal para la Asesora Pedagógica.
+    La Asesora Pedagógica es la Jefa del área de asesoría pedagógica,
+    por ende debe monitorear la información de todos los casos.
+    """
+    # 1. --- Verificación de Permisos ---
     try:
-        if request.user.perfil.rol.nombre_rol != ROL_ASESOR:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_ASESOR:
+            messages.error(request, 'No tienes permisos para acceder a este panel.')
             return redirect('home')
     except AttributeError:
+        logger.warning(f"Usuario {request.user.email} sin perfil/rol intentó acceder al dashboard de asesora pedagógica.")
         return redirect('home')
-    total_solicitudes = Solicitudes.objects.count()
-    casos_resueltos = Solicitudes.objects.filter(estado='aprobado', ajusteasignado__isnull=False).distinct().count()
-    casos_en_proceso = Solicitudes.objects.filter(estado='en_proceso').count()
+    
+    # 2. --- Configuración de Fechas ---
+    now = timezone.localtime(timezone.now())
+    today = now.date()
+    
+    # Cálculo de la semana (Lunes a Domingo)
+    start_of_week = today - timedelta(days=today.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
+    start_of_week_dt = timezone.make_aware(datetime.combine(start_of_week, datetime.min.time()))
+    end_of_week_dt = timezone.make_aware(datetime.combine(end_of_week, datetime.max.time()))
+    
+    # 3. --- Obtener Datos para KPIs ---
+    
+    # KPI 1: Casos nuevos (creados esta semana)
+    casos_nuevos_semana = Solicitudes.objects.filter(
+        created_at__range=(start_of_week_dt, end_of_week_dt)
+    ).count()
+    
+    # KPI 2: Casos devueltos desde Director de Carrera
+    # Casos que están en 'pendiente_preaprobacion' y que tienen ajustes asignados
+    # (lo que indica que fueron preaprobados y enviados al Director, pero fueron rechazados/devueltos)
+    # Esto es una aproximación: casos con ajustes que están en preaprobación
+    casos_devueltos_director = Solicitudes.objects.filter(
+        estado='pendiente_preaprobacion',
+        ajusteasignado__isnull=False
+    ).distinct().count()
+    
+    # KPI 3-9: Un KPI por cada estado de los casos
+    # Crear lista de tuplas (estado_valor, estado_nombre, cantidad) para facilitar el acceso en el template
+    estados_con_cantidad = []
+    for estado_valor, estado_nombre in Solicitudes.ESTADO_CHOICES:
+        cantidad = Solicitudes.objects.filter(estado=estado_valor).count()
+        estados_con_cantidad.append({
+            'valor': estado_valor,
+            'nombre': estado_nombre,
+            'cantidad': cantidad
+        })
+    
+    # 4. --- Obtener Lista de Casos Pendientes de Preaprobación ---
+    # Casos que están en estado 'pendiente_preaprobacion' y que requieren revisión por parte de la Asesora Pedagógica
+    casos_pendientes_preaprobacion = Solicitudes.objects.filter(
+        estado='pendiente_preaprobacion'
+    ).select_related(
+        'estudiantes',
+        'estudiantes__carreras'
+    ).order_by('-updated_at')[:10]  # Los más recientes primero, limitar a 10
+    
+    # 5. --- Preparar Contexto ---
     context = {
-        'nombre_usuario': request.user.first_name, 'total_solicitudes': total_solicitudes, 'casos_resueltos': casos_resueltos,
-        'casos_en_proceso': casos_en_proceso,
+        'nombre_usuario': request.user.first_name,
+        'kpis': {
+            'casos_nuevos_semana': casos_nuevos_semana,
+            'casos_devueltos_director': casos_devueltos_director,
+        },
+        'estados_con_cantidad': estados_con_cantidad,
+        'casos_pendientes_preaprobacion': casos_pendientes_preaprobacion,
     }
+    
     return render(request, 'SIAPE/dashboard_asesor.html', context)
 
 # ----------------------------------------------------
@@ -2236,26 +2434,14 @@ def dashboard_asesor_técnico(request):
     ).select_related('estudiantes', 'estudiantes__carreras')
     kpi_casos_pendientes_total = casos_pendientes_formulacion.count()
     
-    # KPI 3: Casos completados (que pasaron de pendiente_formulacion_ajustes a estados más avanzados)
-    # Esto incluye casos que ya están en preaprobación, aprobación o aprobados
-    casos_completados = Solicitudes.objects.filter(
-        estado__in=['pendiente_preaprobacion', 'pendiente_aprobacion', 'aprobado']
-    ).count()
-    
-    # KPI 4: Casos asignados a esta asesora técnica específica
-    casos_asignados = Solicitudes.objects.filter(
-        asesor_tecnico_asignado=perfil,
-        estado='pendiente_formulacion_ajustes'
-    ).select_related('estudiantes', 'estudiantes__carreras').count()
-    
-    # KPI 5: Casos en proceso (pendiente_preaprobacion, pendiente_aprobacion)
-    # Estos son casos que la asesora técnica ya formuló y están en siguientes etapas
-    casos_en_proceso = Solicitudes.objects.filter(
-        estado__in=['pendiente_preaprobacion', 'pendiente_aprobacion']
-    ).count()
-    
-    # KPI 6: Casos aprobados totales (que pasaron por formulación)
-    casos_aprobados = Solicitudes.objects.filter(estado='aprobado').count()
+    # KPI 3: Casos devueltos desde Asesora Pedagógica
+    # Casos que están en 'pendiente_formulacion_ajustes' y que tienen ajustes asignados
+    # (lo que indica que fueron formulados y luego devueltos)
+    # Esto es una aproximación: casos con ajustes que están pendientes de formulación
+    casos_devueltos = Solicitudes.objects.filter(
+        estado='pendiente_formulacion_ajustes',
+        ajusteasignado__isnull=False
+    ).distinct().count()
     
     # 4. --- Obtener Lista de Casos Pendientes de Formulación ---
     # Los casos más recientes primero
@@ -2267,10 +2453,7 @@ def dashboard_asesor_técnico(request):
         'kpis': {
             'casos_nuevos_semana': casos_nuevos_semana,
             'casos_pendientes_total': kpi_casos_pendientes_total,
-            'casos_completados': casos_completados,
-            'casos_asignados': casos_asignados,
-            'casos_en_proceso': casos_en_proceso,
-            'casos_aprobados': casos_aprobados,
+            'casos_devueltos': casos_devueltos,
         },
         'casos_pendientes_list': casos_pendientes_list,
     }

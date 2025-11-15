@@ -33,18 +33,12 @@
             <a href="{% url 'casos_generales' %}" class="nav-item active"> 
                 <i class="fas fa-folder-open"></i> Casos
             </a>
-            <a href="#" class="nav-item">
-                <i class="fas fa-tachometer-alt"></i> Panel de Control
-            </a>
         {% elif user.perfil.rol.nombre_rol == "Asesora Pedagógica" %}
             <a href="{% url 'dashboard_asesor' %}" class="nav-item">
                 <i class="fas fa-home"></i> Panel Principal
             </a>
             <a href="{% url 'casos_generales' %}" class="nav-item active"> 
                 <i class="fas fa-folder-open"></i> Casos
-            </a>
-            <a href="{% url 'panel_control_asesor' %}" class="nav-item">
-                <i class="fas fa-tachometer-alt"></i> Panel de Control
             </a>
         {% else %}
             <a href="{% url 'home' %}" class="nav-item">

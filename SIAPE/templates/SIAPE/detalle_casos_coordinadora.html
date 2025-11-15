@@ -32,17 +32,11 @@
             </a>
             <a href="{% url 'casos_generales' %}" class="nav-item active"> <i class="fas fa-folder-open"></i> Casos
             </a>
-            <a href="#" class="nav-item">
-                <i class="fas fa-tachometer-alt"></i> Panel de Control
-            </a>
         {% elif user.perfil.rol.nombre_rol == "Asesora Pedagógica" %}
             <a href="{% url 'dashboard_asesor' %}" class="nav-item">
                 <i class="fas fa-home"></i> Panel Principal
             </a>
             <a href="{% url 'casos_generales' %}" class="nav-item active"> <i class="fas fa-folder-open"></i> Casos
-            </a>
-            <a href="{% url 'panel_control_asesor' %}" class="nav-item">
-                <i class="fas fa-tachometer-alt"></i> Panel de Control
             </a>
         {% else %}
             <a href="{% url 'home' %}" class="nav-item">
@@ -63,8 +57,8 @@
 
     <div class="detalle-caso-grid">
 
-        <div class="detalle-col-left">
-
+        <!-- Fila 1: Información del Estudiante y Estado del Caso (lado a lado) -->
+        <div class="detalle-fila-1-col1">
             <div class="panel-section">
                 <h3><i class="fas fa-user-graduate"></i> Información del Estudiante</h3>
                 <div class="detalle-card-content">
@@ -75,7 +69,9 @@
                     <p><strong>Carrera:</strong> {{ estudiante.carreras.nombre }}</p>
                 </div>
             </div>
+        </div>
 
+        <div class="detalle-fila-1-col2">
             <div class="panel-section">
                 <h3><i class="fas fa-clipboard-check"></i> Estado del Caso</h3>
                 <div class="detalle-card-content">
@@ -92,30 +88,10 @@
                     <p><strong>Fecha Solicitud:</strong> {{ solicitud.created_at|date:"d/m/Y H:i" }}</p>
                 </div>
             </div>
+        </div>
 
-            <div class="panel-section">
-                <h3><i class="fas fa-paperclip"></i> Evidencias Adjuntas</h3>
-                <div class="detalle-card-content">
-                    {% if evidencias %}
-                        <ul>
-                        {% for evidencia in evidencias %}
-                            <li>
-                                <a href="{{ evidencia.archivo.url }}" target="_blank" class="link-rojo">
-                                    <i class="fas fa-file-alt"></i> {{ evidencia.archivo.name|cut:"evidencias/" }}
-                                </a>
-                            </li>
-                        {% endfor %}
-                        </ul>
-                    {% else %}
-                        <div class="empty-state p-10">
-                            <p class="text-small">No hay evidencias adjuntas.</p>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-
-        </div> <div class="detalle-col-right">
-
+        <!-- Fila 2: Historial de Entrevistas (ancho completo) -->
+        <div class="detalle-card-full-width">
             <div class="panel-section">
                 <h3><i class="fas fa-comments"></i> Historial de Entrevistas</h3>
                 <div class="detalle-card-content">
@@ -137,7 +113,33 @@
                     {% endif %}
                 </div>
             </div>
+        </div>
 
+        <!-- Fila 3: Evidencias Adjuntas y Ajustes Asignados (lado a lado) -->
+        <div class="detalle-fila-3-col1">
+            <div class="panel-section">
+                <h3><i class="fas fa-paperclip"></i> Evidencias Adjuntas</h3>
+                <div class="detalle-card-content">
+                    {% if evidencias %}
+                        <ul>
+                        {% for evidencia in evidencias %}
+                            <li>
+                                <a href="{{ evidencia.archivo.url }}" target="_blank" class="link-rojo">
+                                    <i class="fas fa-file-alt"></i> {{ evidencia.archivo.name|cut:"evidencias/" }}
+                                </a>
+                            </li>
+                        {% endfor %}
+                        </ul>
+                    {% else %}
+                        <div class="empty-state p-10">
+                            <p class="text-small">No hay evidencias adjuntas.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="detalle-fila-3-col2">
             <div class="panel-section">
                 <h3><i class="fas fa-tools"></i> Ajustes Asignados</h3>
                 <div class="detalle-card-content">
@@ -162,6 +164,18 @@
                                     </button>
                                 </form>
                             </div>
+                            {% elif puede_editar_ajustes_asesor %}
+                            <div style="margin-top: 10px; display: flex; gap: 10px;">
+                                <button type="button" class="btn-accion btn-accion-small" onclick="abrirModalEditarAjusteAsesor({{ item.id }}, event)" style="padding: 5px 10px; font-size: 0.85em;" data-descripcion="{{ item.ajuste_razonable.descripcion|escapejs }}" data-categoria-id="{{ item.ajuste_razonable.categorias_ajustes.id }}" data-categoria-nombre="{{ item.ajuste_razonable.categorias_ajustes.nombre_categoria|escapejs }}">
+                                    <i class="fas fa-edit"></i> Editar
+                                </button>
+                                <form method="POST" action="{% url 'eliminar_ajuste_asesor' item.id %}" style="display: inline;" onsubmit="return confirm('¿Está seguro de que desea eliminar este ajuste?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn-accion btn-accion-small btn-accion-red" style="padding: 5px 10px; font-size: 0.85em;">
+                                        <i class="fas fa-trash"></i> Eliminar
+                                    </button>
+                                </form>
+                            </div>
                             {% endif %}
                         </div>
                         {% endfor %}
@@ -179,8 +193,10 @@
                     {% endif %}
                 </div>
             </div>
+        </div>
 
-        </div> <div class="detalle-card-full-width">
+        <!-- Descripción del Caso y Acciones (ancho completo) -->
+        <div class="detalle-card-full-width">
             <div class="panel-section">
                 {% if rol_usuario == "Asesora Técnica Pedagógica" %}
                     <h3>
@@ -448,6 +464,50 @@
                 
                 <div class="form-actions">
                     <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalEditarAjuste()">Cancelar</button>
+                    <button type="submit" class="btn-accion btn-ajuste">
+                        <i class="fas fa-save"></i> Guardar Cambios
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Modal para Editar Ajuste (Asesora Pedagógica) -->
+    {% if puede_editar_ajustes_asesor %}
+    <div id="modalEditarAjusteAsesor" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4><i class="fas fa-edit"></i> Editar Ajuste Asignado</h4>
+                <button class="close" onclick="cerrarModalEditarAjusteAsesor()">&times;</button>
+            </div>
+            <form method="POST" action="" id="formEditarAjusteAsesor">
+                {% csrf_token %}
+                <input type="hidden" id="editar_ajuste_id_asesor" name="ajuste_asignado_id">
+                
+                <div class="form-group">
+                    <label for="descripcion_ajuste_editar_asesor">Descripción del Ajuste:</label>
+                    <textarea name="descripcion" id="descripcion_ajuste_editar_asesor" required rows="6" placeholder="Describa el ajuste razonable que se debe implementar para este estudiante..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="categoria_id_ajuste_editar_asesor">Categoría del Ajuste:</label>
+                    <select name="categoria_id" id="categoria_id_ajuste_editar_asesor" onchange="toggleNuevaCategoriaAjusteEditarAsesor()" required>
+                        <option value="">Seleccione una categoría</option>
+                        {% for categoria in categorias_ajustes %}
+                            <option value="{{ categoria.id }}">{{ categoria.nombre_categoria }}</option>
+                        {% endfor %}
+                        <option value="nueva">Crear nueva categoría</option>
+                    </select>
+                </div>
+                
+                <div class="form-group hidden" id="nuevaCategoriaGroupAjusteEditarAsesor">
+                    <label for="nueva_categoria_ajuste_editar_asesor">Nombre de Nueva Categoría:</label>
+                    <input type="text" name="nueva_categoria" id="nueva_categoria_ajuste_editar_asesor" placeholder="Ingrese el nombre de la nueva categoría">
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalEditarAjusteAsesor()">Cancelar</button>
                     <button type="submit" class="btn-accion btn-ajuste">
                         <i class="fas fa-save"></i> Guardar Cambios
                     </button>
@@ -982,6 +1042,58 @@
         }
     }
 
+    {% if puede_editar_ajustes_asesor %}
+    // Función para abrir modal de editar ajuste (Asesora Pedagógica)
+    function abrirModalEditarAjusteAsesor(ajusteAsignadoId, event) {
+        // Obtener el botón que activó la función
+        const button = (event && event.target) ? event.target.closest('button') : document.querySelector(`button[onclick*="${ajusteAsignadoId}"]`);
+        const descripcion = button ? button.getAttribute('data-descripcion') : '';
+        const categoriaId = button ? button.getAttribute('data-categoria-id') : '';
+        
+        document.getElementById('editar_ajuste_id_asesor').value = ajusteAsignadoId;
+        document.getElementById('descripcion_ajuste_editar_asesor').value = descripcion || '';
+        document.getElementById('categoria_id_ajuste_editar_asesor').value = categoriaId || '';
+        
+        // Establecer la URL del formulario
+        const form = document.getElementById('formEditarAjusteAsesor');
+        form.action = '/dashboard/asesor/ajustes/' + ajusteAsignadoId + '/editar/';
+        
+        // Limpiar campo de nueva categoría
+        document.getElementById('nueva_categoria_ajuste_editar_asesor').value = '';
+        document.getElementById('nuevaCategoriaGroupAjusteEditarAsesor').classList.add('hidden');
+        document.getElementById('nuevaCategoriaGroupAjusteEditarAsesor').style.display = 'none';
+        
+        document.getElementById('modalEditarAjusteAsesor').style.display = 'block';
+    }
+
+    // Función para cerrar modal de editar ajuste (Asesora Pedagógica)
+    function cerrarModalEditarAjusteAsesor() {
+        document.getElementById('modalEditarAjusteAsesor').style.display = 'none';
+        document.getElementById('descripcion_ajuste_editar_asesor').value = '';
+        document.getElementById('categoria_id_ajuste_editar_asesor').value = '';
+        document.getElementById('nueva_categoria_ajuste_editar_asesor').value = '';
+        document.getElementById('nuevaCategoriaGroupAjusteEditarAsesor').style.display = 'none';
+    }
+
+    // Función para mostrar/ocultar campo de nueva categoría en edición (Asesora Pedagógica)
+    function toggleNuevaCategoriaAjusteEditarAsesor() {
+        const categoriaSelect = document.getElementById('categoria_id_ajuste_editar_asesor');
+        const nuevaCategoriaGroup = document.getElementById('nuevaCategoriaGroupAjusteEditarAsesor');
+        const nuevaCategoriaInput = document.getElementById('nueva_categoria_ajuste_editar_asesor');
+        
+        if (categoriaSelect.value === 'nueva') {
+            nuevaCategoriaGroup.classList.remove('hidden');
+            nuevaCategoriaGroup.style.display = 'block';
+            nuevaCategoriaInput.required = true;
+        } else {
+            nuevaCategoriaGroup.classList.add('hidden');
+            nuevaCategoriaGroup.style.display = 'none';
+            nuevaCategoriaInput.required = false;
+            nuevaCategoriaInput.value = '';
+        }
+    }
+    {% endif %}
+
     // Validación del formulario de agendar
     const formAgendar = document.getElementById('modalAgendar');
     if (formAgendar) {
@@ -1009,6 +1121,7 @@
         const modalAgendar = document.getElementById('modalAgendar');
         const modalFormular = document.getElementById('modalFormularAjuste');
         const modalEditar = document.getElementById('modalEditarAjuste');
+        const modalEditarAsesor = document.getElementById('modalEditarAjusteAsesor');
         if (modalAgendar && event.target == modalAgendar) {
             cerrarModalAgendar();
         }
@@ -1018,6 +1131,11 @@
         if (modalEditar && event.target == modalEditar) {
             cerrarModalEditarAjuste();
         }
+        {% if puede_editar_ajustes_asesor %}
+        if (modalEditarAsesor && event.target == modalEditarAsesor) {
+            cerrarModalEditarAjusteAsesor();
+        }
+        {% endif %}
     }
 </script>
 

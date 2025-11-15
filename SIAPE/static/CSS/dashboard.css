@@ -2,6 +2,50 @@
    ESTILOS GENERALES
    ============================================================= */
 
+/* =============================================================
+   SCROLLBAR GLOBAL MINIMALISTA - Rojo #cc0000
+   ============================================================= */
+/* Estilos globales para scrollbar en toda la plataforma */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #cc0000 transparent;
+}
+
+*::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: #cc0000;
+    border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: #a00000;
+}
+
+/* Modo oscuro - scrollbar global */
+body.dark-mode * {
+    scrollbar-color: #cc0000 transparent;
+}
+
+body.dark-mode *::-webkit-scrollbar-track {
+    background: transparent !important;
+}
+
+body.dark-mode *::-webkit-scrollbar-thumb {
+    background: #cc0000 !important;
+}
+
+body.dark-mode *::-webkit-scrollbar-thumb:hover {
+    background: #a00000 !important;
+}
+
 /* Casos disponibles y asignados uno al lado del otro en desktop, apilados en móvil */
 .panel-control-container.casos-dos-columnas {
     display: flex;
@@ -1521,23 +1565,22 @@
     min-height: 0; /* Necesario para flexbox con overflow */
 }
 
-/* Estilo personalizado para la scrollbar */
+/* Estilo personalizado para la scrollbar - Minimalista */
 .panel-section-content::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
 }
 
 .panel-section-content::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
+    background: transparent;
 }
 
 .panel-section-content::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 4px;
+    background: #cc0000;
+    border-radius: 3px;
 }
 
 .panel-section-content::-webkit-scrollbar-thumb:hover {
-    background: #555;
+    background: #a00000;
 }
 
 /* =============================================================
@@ -1811,17 +1854,17 @@ body.dark-mode .panel-section.casos-asignados {
     color: #ffffff !important;
 }
 
-/* Scrollbar en modo oscuro */
+/* Scrollbar en modo oscuro - Minimalista */
 body.dark-mode .panel-section-content::-webkit-scrollbar-track {
-    background: #1a1a1a !important;
+    background: transparent !important;
 }
 
 body.dark-mode .panel-section-content::-webkit-scrollbar-thumb {
-    background: #4a4a4a !important;
+    background: #cc0000 !important;
 }
 
 body.dark-mode .panel-section-content::-webkit-scrollbar-thumb:hover {
-    background: #5a5a5a !important;
+    background: #a00000 !important;
 }
 
 /* Detalle de caso específico */
@@ -2163,15 +2206,20 @@ body.dark-mode .btn-accion-orange:hover {
     align-items: flex-start; /* Alinea las tarjetas en la parte superior */
 }
 
+/* Fila 1: Información del Estudiante y Estado del Caso (lado a lado) */
+/* Estas clases usan las columnas del grid por defecto (no requieren estilos adicionales) */
+
+/* Fila 2 y otras filas de ancho completo: Historial de Entrevistas, Descripción del Caso */
+.detalle-card-full-width {
+    grid-column: 1 / -1; /* Ocupa todo el ancho */
+}
+
+/* Mantener compatibilidad con clases antiguas */
 .detalle-col-left,
 .detalle-col-right {
     display: flex;
     flex-direction: column;
     gap: 25px;
-}
-
-.detalle-card-full-width {
-    grid-column: 1 / -1; /* Ocupa todo el ancho */
 }
 
 .detalle-card-content p {
@@ -2278,23 +2326,22 @@ body.dark-mode .btn-accion-orange:hover {
     min-height: 0; /* Necesario para flexbox con overflow */
 }
 
-/* Estilo personalizado para la scrollbar */
+/* Estilo personalizado para la scrollbar - Minimalista */
 .panel-section-content::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
 }
 
 .panel-section-content::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
+    background: transparent;
 }
 
 .panel-section-content::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 4px;
+    background: #cc0000;
+    border-radius: 3px;
 }
 
 .panel-section-content::-webkit-scrollbar-thumb:hover {
-    background: #555;
+    background: #a00000;
 }
 
 /* =============================================================
@@ -2568,17 +2615,17 @@ body.dark-mode .panel-section.casos-asignados {
     color: #ffffff !important;
 }
 
-/* Scrollbar en modo oscuro */
+/* Scrollbar en modo oscuro - Minimalista */
 body.dark-mode .panel-section-content::-webkit-scrollbar-track {
-    background: #1a1a1a !important;
+    background: transparent !important;
 }
 
 body.dark-mode .panel-section-content::-webkit-scrollbar-thumb {
-    background: #4a4a4a !important;
+    background: #cc0000 !important;
 }
 
 body.dark-mode .panel-section-content::-webkit-scrollbar-thumb:hover {
-    background: #5a5a5a !important;
+    background: #a00000 !important;
 }
 
 /* Detalle de caso específico */

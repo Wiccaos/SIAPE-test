@@ -45,42 +45,12 @@
         </div>
 
         <div class="kpi-card">
-            <div class="kpi-icon icon-solicitudes">
-                <i class="fas fa-user-check"></i>
-            </div>
-            <div class="kpi-info">
-                <span class="kpi-value">{{ kpis.casos_asignados|default:0 }}</span>
-                <span class="kpi-label">Casos Asignados a Mí</span>
-            </div>
-        </div>
-
-        <div class="kpi-card">
             <div class="kpi-icon icon-proceso">
-                <i class="fas fa-spinner"></i>
+                <i class="fas fa-undo"></i>
             </div>
             <div class="kpi-info">
-                <span class="kpi-value">{{ kpis.casos_en_proceso|default:0 }}</span>
-                <span class="kpi-label">Casos en Proceso</span>
-            </div>
-        </div>
-
-        <div class="kpi-card">
-            <div class="kpi-icon icon-resueltos">
-                <i class="fas fa-check-circle"></i>
-            </div>
-            <div class="kpi-info">
-                <span class="kpi-value">{{ kpis.casos_completados|default:0 }}</span>
-                <span class="kpi-label">Casos Completados</span>
-            </div>
-        </div>
-
-        <div class="kpi-card">
-            <div class="kpi-icon icon-resueltos">
-                <i class="fas fa-check-double"></i>
-            </div>
-            <div class="kpi-info">
-                <span class="kpi-value">{{ kpis.casos_aprobados|default:0 }}</span>
-                <span class="kpi-label">Casos Aprobados</span>
+                <span class="kpi-value">{{ kpis.casos_devueltos|default:0 }}</span>
+                <span class="kpi-label">Casos Devueltos (Desde Asesora Pedagógica)</span>
             </div>
         </div>
     </section>
