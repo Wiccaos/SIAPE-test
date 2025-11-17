@@ -1,0 +1,76 @@
+{% extends "plantilla.html" %}
+{% load static %}
+
+{% block title %}
+    Mis Carreras | SIAPE
+{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="main-content"> 
+    
+    <nav class="dashboard-nav">
+        <a href="{% url 'dashboard_director' %}" class="nav-item">
+            <i class="fas fa-user-tie"></i>
+            Panel Principal
+        </a>
+        <a href="#" class="nav-item">
+            <i class="fas fa-chart-bar"></i>
+            Estadísticas
+        </a>
+        <a href="{% url 'carreras_director' %}" class="nav-item active">
+            <i class="fas fa-graduation-cap"></i>
+            Mis Carreras
+        </a>
+    </nav>
+
+    <section class="table-container">
+        <div class="table-header">
+            <h2 class="titulo-carreras"><i class="fas fa-graduation-cap"></i> Mis Carreras Asignadas</h2>
+        </div>
+        
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Nombre Carrera</th>
+                    <th>Área Académica</th>
+                    <th>Total Estudiantes</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for carrera in carreras_list %}
+                <tr>
+                    <td>{{ carrera.nombre }}</td>
+                    <td>{{ carrera.area.nombre|default:'N/A' }}</td>
+                    <td>{{ carrera.total_estudiantes }}</td>
+                    <td>
+                        <a href="#" class="btn-accion btn-agendar btn-accion-small">
+                            <i class="fas fa-users"></i> Ver Estudiantes
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4">
+                        <div class="empty-state">
+                            <i class="fas fa-folder-open"></i>
+                            <p>No tienes carreras asignadas a tu perfil.</p>
+                            <small>(Un Administrador debe asignarte como 'Director' en la ficha de la Carrera)</small>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="table-footer">
+            <span>Mostrando {{ total_carreras|default:0 }} carreras</span>
+        </div>
+    </section>
+
+</div>
+{% endblock %}
