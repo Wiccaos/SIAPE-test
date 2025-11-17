@@ -2369,21 +2369,82 @@ def dashboard_asesor(request):
 
 @login_required
 def dashboard_director(request):
+    """
+    Dashboard para el Director de Carrera.
+    Muestra casos pendientes de su aprobación y un historial
+    de casos aprobados de sus carreras.
+    """
     try:
-        if request.user.perfil.rol.nombre_rol != ROL_DIRECTOR:
+        perfil_director = request.user.perfil
+        if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para esta acción.')
             return redirect('home')
     except AttributeError:
         return redirect('home')
-    total_solicitudes = Solicitudes.objects.count()
-    casos_resueltos = Solicitudes.objects.filter(estado='aprobado', ajusteasignado__isnull=False).distinct().count()
-    casos_en_proceso = Solicitudes.objects.filter(estado='en_proceso').count()
-    carreras = Carreras.objects.all() 
-    context = {
-        'nombre_usuario': request.user.first_name, 'total_solicitudes': total_solicitudes, 'casos_resueltos': casos_resueltos,
-        'casos_en_proceso': casos_en_proceso, 'carreras': carreras, 
+
+    # 1. Encontrar las carreras que este director gestiona
+    carreras_del_director = Carreras.objects.filter(director=perfil_director)
+    
+    # 2. Base de solicitudes de sus carreras
+    solicitudes_base = Solicitudes.objects.filter(
+        estudiantes__carreras__in=carreras_del_director
+    ).select_related(
+        'estudiantes', 
+        'estudiantes__carreras'
+    )
+
+    # 3. Filtrar solicitudes PENDIENTES (estado 'pendiente_aprobacion')
+    solicitudes_pendientes = solicitudes_base.filter(
+        estado='pendiente_aprobacion'
+    ).order_by('updated_at') # Más antiguas (recién llegadas) primero
+
+    # 4. Filtrar el HISTORIAL (solo 'aprobado')
+    solicitudes_historial = solicitudes_base.filter(
+        estado='aprobado'
+    ).order_by('-updated_at') # Más recientes primero
+
+    # 5. KPIs (Específicos del Director)
+    kpis = {
+        'total_pendientes': solicitudes_pendientes.count(),
+        'total_aprobados': solicitudes_historial.count(),
     }
+
+    context = {
+        'nombre_usuario': request.user.first_name,
+        'solicitudes_pendientes': solicitudes_pendientes,
+        'solicitudes_historial': solicitudes_historial,
+        'kpis': kpis,
+    }
+    
     return render(request, 'SIAPE/dashboard_director.html', context)
 
+@login_required
+def carreras_director(request):
+    """
+    Muestra las carreras asignadas al Director de Carrera logueado.
+    """
+    try:
+        perfil_director = request.user.perfil
+        if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para esta acción.')
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+
+    # Buscamos las carreras donde el director sea el usuario actual
+    carreras_list = Carreras.objects.filter(
+        director=perfil_director
+    ).select_related(
+        'area'
+    ).annotate(
+        total_estudiantes=Count('estudiantes') # Contamos los estudiantes via FK
+    ).order_by('nombre')
+
+    context = {
+        'carreras_list': carreras_list,
+        'total_carreras': carreras_list.count()
+    }
+    return render(request, 'SIAPE/carreras_director.html', context)
 
 # ----------------------------------------------------
 #                VISTA ASESORA TÉCNICA PEDAGÓGICA
