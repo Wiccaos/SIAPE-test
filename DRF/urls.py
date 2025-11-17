@@ -120,6 +120,8 @@ urlpatterns = [
     path('dashboard/director/casos/<int:solicitud_id>/aprobar/', views.aprobar_caso, name='aprobar_caso'),
     path('dashboard/director/casos/<int:solicitud_id>/rechazar/', views.rechazar_caso, name='rechazar_caso'),
     path('dashboard/director/carreras/', views.carreras_director, name='carreras_director'),
+    path('dashboard/director/carreras/<int:carrera_id>/estudiantes/', views.estudiantes_por_carrera_director, name='estudiantes_carrera_director'),
+    path('dashboard/director/estadisticas/', views.estadisticas_director, name='estadisticas_director'),
 
     # URLs documentación
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),

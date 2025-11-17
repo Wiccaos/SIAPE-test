@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block title %}
-    Mis Carreras | SIAPE
+    Estudiantes de {{ carrera.nombre }} | SIAPE
 {% endblock %}
 
 {% block extra_head %}
@@ -29,37 +29,32 @@
 
     <section class="table-container">
         <div class="table-header">
-            <h2 class="titulo-carreras"><i class="fas fa-graduation-cap"></i> Mis Carreras Asignadas</h2>
+            <h2><i class="fas fa-users"></i> Estudiantes de: {{ carrera.nombre }}</h2>
         </div>
         
         <table class="custom-table">
             <thead>
                 <tr>
-                    <th>Nombre Carrera</th>
-                    <th>Área Académica</th>
-                    <th>Total Estudiantes</th>
-                    <th>Acción</th>
+                    <th>Nombre Completo</th>
+                    <th>RUT</th>
+                    <th>Email</th>
+                    <th>Teléfono</th>
                 </tr>
             </thead>
             <tbody>
-                {% for carrera in carreras_list %}
+                {% for estudiante in estudiantes_list %}
                 <tr>
-                    <td>{{ carrera.nombre }}</td>
-                    <td>{{ carrera.area.nombre|default:'N/A' }}</td>
-                    <td>{{ carrera.total_estudiantes }}</td>
-                    <td>
-                        <a href="{% url 'estudiantes_carrera_director' carrera.id %}" class="btn-accion btn-agendar btn-accion-small">
-                            <i class="fas fa-users"></i> Ver Estudiantes
-                        </a>
-                        </td>
+                    <td>{{ estudiante.nombres }} {{ estudiante.apellidos }}</td>
+                    <td>{{ estudiante.rut }}</td>
+                    <td>{{ estudiante.email }}</td>
+                    <td>{{ estudiante.numero|default:'N/A' }}</td>
                 </tr>
                 {% empty %}
                 <tr>
                     <td colspan="4">
                         <div class="empty-state">
-                            <i class="fas fa-folder-open"></i>
-                            <p>No tienes carreras asignadas a tu perfil.</p>
-                            <small>(Un Administrador debe asignarte como 'Director' en la ficha de la Carrera)</small>
+                            <i class="fas fa-user-graduate"></i>
+                            <p>No hay estudiantes registrados en esta carrera.</p>
                         </div>
                     </td>
                 </tr>
@@ -68,7 +63,13 @@
         </table>
 
         <div class="table-footer">
-            <span>Mostrando {{ total_carreras|default:0 }} carreras</span>
+            <span>Mostrando {{ total_estudiantes|default:0 }} estudiantes</span>
+        </div>
+
+        <div class="grid-column-full mt-15" style="margin-top: 25px;">
+            <a href="{% url 'carreras_director' %}" class="btn-volver">
+                <i class="fas fa-chevron-left"></i> Volver a Mis Carreras
+            </a>
         </div>
     </section>
 

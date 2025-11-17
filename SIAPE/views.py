@@ -14,6 +14,9 @@ import calendar # Importar para el calendario mensual
 import logging
 from django.views.decorators.http import require_POST
 
+import json
+from django.db.models import Count # Para el modelo de estadisticas.
+
 from rest_framework import (
     viewsets, mixins, status
 )
@@ -2367,6 +2370,56 @@ def dashboard_asesor(request):
 #                VISTA DIRECTOR DE CARRERA
 # ----------------------------------------------------
 
+# @login_required
+# def dashboard_director(request):
+#     """
+#     Dashboard para el Director de Carrera.
+#     Muestra casos pendientes de su aprobación y un historial
+#     de casos aprobados de sus carreras.
+#     """
+#     try:
+#         perfil_director = request.user.perfil
+#         if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
+#             messages.error(request, 'No tienes permisos para esta acción.')
+#             return redirect('home')
+#     except AttributeError:
+#         return redirect('home')
+
+#     # 1. Encontrar las carreras que este director gestiona
+#     carreras_del_director = Carreras.objects.filter(director=perfil_director)
+    
+#     # 2. Base de solicitudes de sus carreras
+#     solicitudes_base = Solicitudes.objects.filter(
+#         estudiantes__carreras__in=carreras_del_director
+#     ).select_related(
+#         'estudiantes', 
+#         'estudiantes__carreras'
+#     )
+
+#     # 3. Filtrar solicitudes PENDIENTES (estado 'pendiente_aprobacion')
+#     solicitudes_pendientes = solicitudes_base.filter(
+#         estado='pendiente_aprobacion'
+#     ).order_by('updated_at') # Más antiguas (recién llegadas) primero
+
+#     # 4. Filtrar el HISTORIAL (solo 'aprobado')
+#     solicitudes_historial = solicitudes_base.filter(
+#         estado='aprobado'
+#     ).order_by('-updated_at') # Más recientes primero
+
+#     # 5. KPIs (Específicos del Director)
+#     kpis = {
+#         'total_pendientes': solicitudes_pendientes.count(),
+#         'total_aprobados': solicitudes_historial.count(),
+#     }
+
+#     context = {
+#         'nombre_usuario': request.user.first_name,
+#         'solicitudes_pendientes': solicitudes_pendientes,
+#         'solicitudes_historial': solicitudes_historial,
+#         'kpis': kpis,
+#     }
+    
+#     return render(request, 'SIAPE/dashboard_director.html', context)
 @login_required
 def dashboard_director(request):
     """
@@ -2394,19 +2447,21 @@ def dashboard_director(request):
     )
 
     # 3. Filtrar solicitudes PENDIENTES (estado 'pendiente_aprobacion')
+    # Estos son los casos que el Asesor Pedagógico le envió.
     solicitudes_pendientes = solicitudes_base.filter(
         estado='pendiente_aprobacion'
     ).order_by('updated_at') # Más antiguas (recién llegadas) primero
 
-    # 4. Filtrar el HISTORIAL (solo 'aprobado')
+    # 4. Filtrar el HISTORIAL (casos 'aprobados' o 'rechazados')
     solicitudes_historial = solicitudes_base.filter(
-        estado='aprobado'
+        estado__in=['aprobado', 'rechazado']
     ).order_by('-updated_at') # Más recientes primero
 
     # 5. KPIs (Específicos del Director)
     kpis = {
         'total_pendientes': solicitudes_pendientes.count(),
-        'total_aprobados': solicitudes_historial.count(),
+        'total_aprobados': solicitudes_historial.filter(estado='aprobado').count(),
+        'total_rechazados': solicitudes_historial.filter(estado='rechazado').count(),
     }
 
     context = {
@@ -2445,6 +2500,140 @@ def carreras_director(request):
         'total_carreras': carreras_list.count()
     }
     return render(request, 'SIAPE/carreras_director.html', context)
+
+@login_required
+def estudiantes_por_carrera_director(request, carrera_id):
+    """
+    Muestra la lista de estudiantes de una carrera específica
+    gestionada por el Director de Carrera.
+    """
+    try:
+        perfil_director = request.user.perfil
+        if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para esta acción.')
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+
+    # 1. Obtener la carrera y verificar que el director sea el correcto
+    # Esta es la comprobación de seguridad:
+    carrera = get_object_or_404(Carreras, id=carrera_id, director=perfil_director)
+
+    # 2. Obtener los estudiantes de esa carrera
+    estudiantes_list = Estudiantes.objects.filter(
+        carreras=carrera
+    ).order_by('apellidos', 'nombres')
+
+    context = {
+        'carrera': carrera,
+        'estudiantes_list': estudiantes_list,
+        'total_estudiantes': estudiantes_list.count(),
+        'nombre_usuario': request.user.first_name, # Para la plantilla
+    }
+    # 3. Renderizar un nuevo template que crearemos a continuación
+    return render(request, 'SIAPE/estudiantes_carrera_director.html', context)
+
+@login_required
+def estadisticas_director(request):
+    """
+    Panel de Estadísticas para el Director de Carrera.
+    Muestra gráficos sobre el estado y tipo de ajustes.
+    """
+    
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil_director = request.user.perfil
+        if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para esta acción.')
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+
+    # 2. --- Base Query ---
+    # Obtenemos todos los ajustes asignados a estudiantes de las carreras de este director
+    carreras_del_director = Carreras.objects.filter(director=perfil_director)
+    ajustes_base = AjusteAsignado.objects.filter(
+        solicitudes__estudiantes__carreras__in=carreras_del_director
+    )
+
+    # 3. --- Gráfico 1: Estado de Ajustes (Pie Chart) ---
+    # Esto responde a tu petición de "aprobados/rechazados/pendientes"
+    estado_ajustes = ajustes_base.values('estado_aprobacion').annotate(
+        total=Count('id')
+    ).order_by('estado_aprobacion')
+
+    # Formatear para Chart.js
+    pie_labels = [d['estado_aprobacion'].capitalize() for d in estado_ajustes]
+    pie_data = [d['total'] for d in estado_ajustes]
+    
+    pie_chart_data = {
+        'labels': pie_labels,
+        'datasets': [{
+            'data': pie_data,
+            'backgroundColor': [
+                'rgba(40, 167, 69, 0.7)',  # Aprobado (Verde)
+                'rgba(253, 126, 20, 0.7)', # Pendiente (Naranja)
+                'rgba(220, 53, 69, 0.7)'   # Rechazado (Rojo)
+            ],
+            'borderColor': '#ffffff',
+        }]
+    }
+
+    # 4. --- Gráfico 2: Tipos de Apoyo (Idea Adicional) ---
+    # Muestra qué categorías de apoyo son más comunes.
+    tipos_ajustes = ajustes_base.filter(estado_aprobacion='aprobado').values(
+        'ajuste_razonable__categorias_ajustes__nombre_categoria'
+    ).annotate(
+        total=Count('id')
+    ).order_by('-total') # De más común a menos común
+
+    bar_labels_tipos = [d['ajuste_razonable__categorias_ajustes__nombre_categoria'] for d in tipos_ajustes]
+    bar_data_tipos = [d['total'] for d in tipos_ajustes]
+
+    bar_chart_tipos = {
+        'labels': bar_labels_tipos,
+        'datasets': [{
+            'label': 'Ajustes Aprobados por Categoría',
+            'data': bar_data_tipos,
+            'backgroundColor': 'rgba(0, 123, 255, 0.7)', # Azul
+        }]
+    }
+
+    # 5. --- Gráfico 3: Eficiencia/Concentración por Sección (Tu petición) ---
+    # Muestra las 5 secciones (asignaturas) con más ajustes aprobados
+    secciones_data = AjusteAsignado.objects.filter(
+        solicitudes__estudiantes__carreras__in=carreras_del_director,
+        estado_aprobacion='aprobado'
+    ).values(
+        'solicitudes__asignaturas_solicitadas__nombre', # Agrupa por nombre de asignatura
+        'solicitudes__asignaturas_solicitadas__seccion' # y por sección
+    ).annotate(
+        total=Count('id')
+    ).order_by('-total')[:5] # Top 5
+
+    bar_labels_secciones = [f"{d['solicitudes__asignaturas_solicitadas__nombre']} ({d['solicitudes__asignaturas_solicitadas__seccion']})" for d in secciones_data]
+    bar_data_secciones = [d['total'] for d in secciones_data]
+
+    bar_chart_secciones = {
+        'labels': bar_labels_secciones,
+        'datasets': [{
+            'label': 'Ajustes Aprobados por Sección (Top 5)',
+            'data': bar_data_secciones,
+            'backgroundColor': 'rgba(204, 0, 0, 0.7)', # Rojo INACAP
+        }]
+    }
+
+    context = {
+        'nombre_usuario': request.user.first_name,
+        # Convertimos los datos a JSON para que JavaScript los pueda leer
+        'pie_chart_data_json': json.dumps(pie_chart_data),
+        'bar_chart_tipos_json': json.dumps(bar_chart_tipos),
+        'bar_chart_secciones_json': json.dumps(bar_chart_secciones),
+    }
+    
+    return render(request, 'SIAPE/estadisticas_director.html', context)
+
+
 
 # ----------------------------------------------------
 #                VISTA ASESORA TÉCNICA PEDAGÓGICA
