@@ -1,4 +1,4 @@
-/* =============================================================
+﻿/* =============================================================
    ESTILOS GENERALES
    ============================================================= */
 
@@ -46,7 +46,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     background: #a00000 !important;
 }
 
-/* Casos disponibles y asignados uno al lado del otro en desktop, apilados en móvil */
+/* Casos disponibles y asignados uno al lado del otro en desktop, apilados en mÃ³vil */
 .panel-control-container.casos-dos-columnas {
     display: flex;
     flex-direction: row;
@@ -62,7 +62,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     }
 }
 
-/* Panel Control Asesor clases para reemplazar estilos en línea */
+/* Panel Control Asesor clases para reemplazar estilos en lÃ­nea */
 .ajustes-total {
     color: #666;
 }
@@ -152,7 +152,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     gap: 15px;
 }
 
-/* Clases específicas para dashboard_coordinadora */
+/* Clases especÃ­ficas para dashboard_coordinadora */
 .kpi-icon-danger {
     background-color: #fdecec;
     color: #cc0000;
@@ -241,7 +241,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     border-left: 4px solid #dc3545;
 }
 
-/* Dashboard Admin clases para reemplazar estilos en línea */
+/* Dashboard Admin clases para reemplazar estilos en lÃ­nea */
 .table-mt-30 {
     margin-top: 30px;
 }
@@ -361,7 +361,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     box-sizing: border-box;
 }
 
-/* --- NAVEGACIÓN (NAV) --- */
+/* --- NAVEGACIÃ“N (NAV) --- */
 .dashboard-nav {
     display: flex;
     flex-wrap: wrap; /* Para responsividad en navs largas */
@@ -423,7 +423,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     justify-content: center;
     width: 40px;
     height: 40px;
-    flex-shrink: 0; /* Evita que el ícono se encoja */
+    flex-shrink: 0; /* Evita que el Ã­cono se encoja */
 }
 .icon-solicitudes { color: #cc0000; background-color: #fdecec; }
 .icon-resueltos { color: #28a745; background-color: #eaf6ec; }
@@ -453,7 +453,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     color: #28a745;
 }
 
-/* --- GRILLA DE DISTRIBUCIÓN (Support Grid) --- */
+/* --- GRILLA DE DISTRIBUCIÃ“N (Support Grid) --- */
 .support-grid-container {
     background-color: #ffffff;
     border-radius: 12px;
@@ -498,7 +498,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
 .support-stats {
     display: flex;
     gap: 10px;
-    justify-content: flex-start; /* Mejor alineación en móvil */
+    justify-content: flex-start; /* Mejor alineaciÃ³n en mÃ³vil */
 }
 .stat-box {
     padding: 8px 12px;
@@ -612,7 +612,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     border-bottom: 1px solid #ececec;
 }
 
-/* Link rojo "Ver más" */
+/* Link rojo "Ver mÃ¡s" */
 .link-rojo {
     color: #cc0000;
     font-weight: 500;
@@ -646,7 +646,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
 }
 
 
-/* --- Footer de la Tabla (Paginación) --- */
+/* --- Footer de la Tabla (PaginaciÃ³n) --- */
 .table-footer {
     display: flex;
     justify-content: space-between;
@@ -719,7 +719,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
 #card-calendario    { grid-area: calendario; }
 #card-volver        { grid-area: volver; }
 
-/* Títulos dentro de las tarjetas */
+/* TÃ­tulos dentro de las tarjetas */
 .detalle-titulo {
     font-size: 0.75rem;
     font-weight: 600;
@@ -785,7 +785,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
 
 
 /* =============================================================
-   INICIO DE CORRECCIÓN DEFINITIVA DEL CALENDARIO
+   INICIO DE CORRECCIÃ“N DEFINITIVA DEL CALENDARIO
    Estas reglas se aplican a TODOS los calendarios
 ================================================================ */
 
@@ -793,10 +793,10 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     text-align: center;
     font-weight: bold;
     margin-bottom: 15px;
-    padding: 0 15px; /* Añadido para centrar con botones */
+    padding: 0 15px; /* AÃ±adido para centrar con botones */
 }
 
-/* La grilla principal (contiene encabezados Y días) */
+/* La grilla principal (contiene encabezados Y dÃ­as) */
 .calendario-grid {
     display: grid;
     grid-template-columns: repeat(7, 34px);
@@ -813,7 +813,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     background-color: transparent !important; /* Asegura que no tengan fondo */
 }
 
-/* Colores de estado de los días */
+/* Colores de estado de los dÃ­as */
 .day-entrevista {
     background-color: #eaf6ec;
     color: #28a745;
@@ -838,7 +838,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     cursor: not-allowed;
 }
 
-.day-habil { /* Este es el día rojo en tu ejemplo de 'detalle_caso' */
+.day-habil { /* Este es el dÃ­a rojo en tu ejemplo de 'detalle_caso' */
     background-color: #fdecec;
     color: #cc0000;
     font-weight: bold;
@@ -853,7 +853,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     margin-top: 20px;
     font-size: 0.8rem;
     color: #555;
-    padding: 0 15px; /* Añadido para alinear */
+    padding: 0 15px; /* AÃ±adido para alinear */
 }
 .calendario-leyenda div {
     display: flex;
@@ -873,17 +873,17 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
 .dot.dot-habil { background-color: #cc0000; }
 .dot.dot-interrupcion { background-color: #e6a800; }
 
-/* Contenedor de navegación del calendario */
+/* Contenedor de navegaciÃ³n del calendario */
 .cal-nav {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 15px; /* Ajustado */
-    padding: 0 15px; /* Añadido para alinear */
+    padding: 0 15px; /* AÃ±adido para alinear */
     border: none; /* Limpiado */
 }
 
-/* Estilo para el día de "Hoy" */
+/* Estilo para el dÃ­a de "Hoy" */
 .cal-day.day-today {
     background-color: #e7f3ff;
     color: #007bff;
@@ -891,7 +891,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     border: 1px solid #007bff;
 }
 
-/* Día seleccionado */
+/* DÃ­a seleccionado */
 .cal-day.cal-day-selected {
     background-color: #cc0000;
     color: #ffffff !important;
@@ -899,7 +899,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     font-weight: bold;
 }
 
-/* Hacer que los días clickeables tengan cursor */
+/* Hacer que los dÃ­as clickeables tengan cursor */
 .cal-day:not(.other-month) {
     cursor: pointer;
 }
@@ -913,14 +913,14 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     background-color: #cc0000;
 }
 
-/* Prioridad si un día es "Hoy" y también tiene disponibilidad */
+/* Prioridad si un dÃ­a es "Hoy" y tambiÃ©n tiene disponibilidad */
 .cal-day.day-disponible.day-today {
     background-color: #eaf6ec; 
     color: #28a745;
     border: 2px solid #007bff;
 }
 
-/* Prioridad si un día es "Hoy" y también tiene "Cita" */
+/* Prioridad si un dÃ­a es "Hoy" y tambiÃ©n tiene "Cita" */
 .cal-day.day-entrevista.day-today {
     background-color: #eaf6ec; 
     color: #28a745;
@@ -928,11 +928,11 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
 }
 
 /* =============================================================
-   FIN DE CORRECCIÓN DEFINITIVA DEL CALENDARIO
+   FIN DE CORRECCIÃ“N DEFINITIVA DEL CALENDARIO
 ================================================================ */
 
 
-/* Botón Volver */
+/* BotÃ³n Volver */
 .btn-volver {
     display: inline-block;
     padding: 10px 20px;
@@ -986,7 +986,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
 
 /* Responsivo para el panel de control */
 
-/* Panel de control: apilar verticalmente los contenedores en todas las páginas */
+/* Panel de control: apilar verticalmente los contenedores en todas las pÃ¡ginas */
 .panel-control-container {
     display: flex;
     flex-direction: column;
@@ -1047,7 +1047,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     margin: 5px 0;
 }
 
-/* --- Botones de Acción --- */
+/* --- Botones de AcciÃ³n --- */
 .btn-accion {
     padding: 8px 15px;
     border: none;
@@ -1139,7 +1139,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     overflow-y: auto; 
 }
 
-/* Modales con calendario (agendar/reagendar citas) - más grandes */
+/* Modales con calendario (agendar/reagendar citas) - mÃ¡s grandes */
 .modal-content:has(.cal-layout-container) {
     max-width: 1200px;
     width: 95%;
@@ -1183,7 +1183,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     color: #000;
 }
 
-/* --- Sección de Citas Detalladas --- */
+/* --- SecciÃ³n de Citas Detalladas --- */
 .citas-detalle {
     grid-column: 1 / -1;
     margin-top: 0; /* Ajustado */
@@ -1222,7 +1222,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     text-align: center;
 }
 
-/* --- Estado Vacío --- */
+/* --- Estado VacÃ­o --- */
 .empty-state {
     text-align: center;
     padding: 40px 20px;
@@ -1237,7 +1237,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     color: #e0e0e0;
 }
 
-/* --- Estilos adicionales para elementos específicos --- */
+/* --- Estilos adicionales para elementos especÃ­ficos --- */
 .cita-detalle-header {
     grid-template-columns: 2fr 1fr 1fr 1fr 1.5fr !important; /* 5 columnas */
     background-color: #f0f0f0 !important;
@@ -1399,7 +1399,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
         border-bottom: 1px dotted #ddd;
     }
     .cita-detalle-header {
-        display: none; /* Oculta el header en móvil */
+        display: none; /* Oculta el header en mÃ³vil */
     }
 }
 
@@ -1418,7 +1418,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     align-items: flex-start; 
 }
 
-/* Ajuste responsivo: en pantallas pequeñas, se apilan */
+/* Ajuste responsivo: en pantallas pequeÃ±as, se apilan */
 @media (max-width: 992px) {
     .cal-layout-container {
         grid-template-columns: 1fr; /* Una sola columna */
@@ -1428,9 +1428,9 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
 
 /* Columna 1: El widget del calendario */
 .cal-widget {
-    /* Mantiene el widget en un tamaño razonable */
+    /* Mantiene el widget en un tamaÃ±o razonable */
     max-width: 400px;
-    min-width: 300px; /* Ancho mínimo para que no se rompa */
+    min-width: 300px; /* Ancho mÃ­nimo para que no se rompa */
     margin: 0 auto; /* Centra el widget si hay espacio */
 }
 
@@ -1440,7 +1440,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     border-radius: 8px;
     padding: 20px;
     border: 1px solid #eee;
-    /* Ajustamos la altura mínima para que se vea bien */
+    /* Ajustamos la altura mÃ­nima para que se vea bien */
     min-height: 400px; 
 }
 
@@ -1503,9 +1503,9 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
 }
 
 
-/* --- Estilos de Interacción del Calendario --- */
+/* --- Estilos de InteracciÃ³n del Calendario --- */
 
-/* Día seleccionado */
+/* DÃ­a seleccionado */
 .cal-day.cal-day-selected {
     background-color: #cc0000;
     color: #ffffff !important;
@@ -1513,7 +1513,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     font-weight: bold;
 }
 
-/* Hacer que los días clickeables tengan cursor */
+/* Hacer que los dÃ­as clickeables tengan cursor */
 .cal-day:not(.other-month) {
     cursor: pointer;
 }
@@ -1537,7 +1537,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     padding: 0 0 15px 0;
 }
 
-/* Ajusta los botones de navegación */
+/* Ajusta los botones de navegaciÃ³n */
 #card-calendario-panel .cal-nav {
     padding: 0;
     border: none;
@@ -1553,7 +1553,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
 }
 
 .panel-section-scrollable h3 {
-    flex-shrink: 0; /* Evita que el título se encoja */
+    flex-shrink: 0; /* Evita que el tÃ­tulo se encoja */
     margin-bottom: 15px;
 }
 
@@ -1585,7 +1585,7 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
 
 /* =============================================================
    MODO OSCURO - TODOS LOS ESTILOS CONSOLIDADOS AL FINAL
-   (Mejor contraste y organización)
+   (Mejor contraste y organizaciÃ³n)
    ============================================================= */
 
 /* Fondo principal */
@@ -1650,7 +1650,7 @@ body.dark-mode .support-grid-container h2 {
     color: #ffffff !important;
 }
 
-/* Tabla custom - Fondo oscuro específico */
+/* Tabla custom - Fondo oscuro especÃ­fico */
 body.dark-mode .custom-table {
     background-color: #1e1e1e !important;
     color: #ffffff !important;
@@ -1847,7 +1847,7 @@ body.dark-mode .cal-day.other-month {
     color: #666 !important;
 }
 
-/* Panel sections específicos */
+/* Panel sections especÃ­ficos */
 body.dark-mode .panel-section.casos-disponibles,
 body.dark-mode .panel-section.casos-asignados {
     background-color: #1e1e1e !important;
@@ -1867,7 +1867,7 @@ body.dark-mode .panel-section-content::-webkit-scrollbar-thumb:hover {
     background: #a00000 !important;
 }
 
-/* Detalle de caso específico */
+/* Detalle de caso especÃ­fico */
 body.dark-mode .detalle-sub-card {
     background-color: #1a1a1a !important;
     border-color: #3a3a3a !important;
@@ -2009,7 +2009,7 @@ body.dark-mode .border-top-light {
     border-color: #3a3a3a !important;
 }
 
-/* Paginación */
+/* PaginaciÃ³n */
 body.dark-mode .pagination-btn,
 body.dark-mode .pagination-page {
     background-color: #2a2a2a !important;
@@ -2079,7 +2079,7 @@ body.dark-mode .detalle-titulo {
     color: #b0b0b0 !important;
 }
 
-/* Botones del calendario y otros botones de acción */
+/* Botones del calendario y otros botones de acciÃ³n */
 body.dark-mode .btn-accion-gray {
     background-color: #2a2a2a !important;
     color: #ffffff !important;
@@ -2143,12 +2143,12 @@ body.dark-mode .btn-accion-orange:hover {
 }
 
 /* =============================================================
-   NUEVOS ESTILOS PARA FILTROS DE BÚSQUEDA (casos_generales.html)
+   NUEVOS ESTILOS PARA FILTROS DE BÃšSQUEDA (casos_generales.html)
 ================================================================ */
 
 .filter-bar {
     display: flex;
-    flex-wrap: wrap; /* Para que se adapte en móviles */
+    flex-wrap: wrap; /* Para que se adapte en mÃ³viles */
     gap: 15px;
     align-items: flex-end; /* Alinea los botones y el input en la parte inferior */
     width: 100%;
@@ -2169,7 +2169,7 @@ body.dark-mode .btn-accion-orange:hover {
 }
 
 .btn-filter-toggle {
-    /* Estilo para el botón de Filtros */
+    /* Estilo para el botÃ³n de Filtros */
     background-color: #f0f0f0;
     color: #333;
     border: 1px solid #ccc;
@@ -2201,15 +2201,15 @@ body.dark-mode .btn-accion-orange:hover {
 
 .detalle-caso-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr; /* Dos columnas de igual tamaño */
+    grid-template-columns: 1fr 1fr; /* Dos columnas de igual tamaÃ±o */
     gap: 25px;
     align-items: flex-start; /* Alinea las tarjetas en la parte superior */
 }
 
-/* Fila 1: Información del Estudiante y Estado del Caso (lado a lado) */
+/* Fila 1: InformaciÃ³n del Estudiante y Estado del Caso (lado a lado) */
 /* Estas clases usan las columnas del grid por defecto (no requieren estilos adicionales) */
 
-/* Fila 2 y otras filas de ancho completo: Historial de Entrevistas, Descripción del Caso */
+/* Fila 2 y otras filas de ancho completo: Historial de Entrevistas, DescripciÃ³n del Caso */
 .detalle-card-full-width {
     grid-column: 1 / -1; /* Ocupa todo el ancho */
 }
@@ -2257,14 +2257,14 @@ body.dark-mode .btn-accion-orange:hover {
     background-color: #f4f4f4;
     padding: 10px;
     border-radius: 4px;
-    font-family: inherit; /* Usa la fuente de la página */
-    white-space: pre-wrap; /* Respeta saltos de línea y espacios */
+    font-family: inherit; /* Usa la fuente de la pÃ¡gina */
+    white-space: pre-wrap; /* Respeta saltos de lÃ­nea y espacios */
     font-size: 0.9rem;
     color: #333;
     border: 1px solid #ddd;
 }
 
-/* Formulario de Descripción del Caso */
+/* Formulario de DescripciÃ³n del Caso */
 .form-descripcion-caso textarea {
     width: 100%;
     box-sizing: border-box;
@@ -2276,10 +2276,10 @@ body.dark-mode .btn-accion-orange:hover {
     resize: vertical;
 }
 
-/* Responsividad para la página de detalle */
+/* Responsividad para la pÃ¡gina de detalle */
 @media (max-width: 992px) {
     .detalle-caso-grid {
-        grid-template-columns: 1fr; /* Una sola columna en tablets y móviles */
+        grid-template-columns: 1fr; /* Una sola columna en tablets y mÃ³viles */
     }
 }
 
@@ -2314,7 +2314,7 @@ body.dark-mode .btn-accion-orange:hover {
 }
 
 .panel-section-scrollable h3 {
-    flex-shrink: 0; /* Evita que el título se encoja */
+    flex-shrink: 0; /* Evita que el tÃ­tulo se encoja */
     margin-bottom: 15px;
 }
 
@@ -2346,7 +2346,7 @@ body.dark-mode .btn-accion-orange:hover {
 
 /* =============================================================
    MODO OSCURO - TODOS LOS ESTILOS CONSOLIDADOS AL FINAL
-   (Mejor contraste y organización)
+   (Mejor contraste y organizaciÃ³n)
    ============================================================= */
 
 /* Fondo principal */
@@ -2411,7 +2411,7 @@ body.dark-mode .support-grid-container h2 {
     color: #ffffff !important;
 }
 
-/* Tabla custom - Fondo oscuro específico */
+/* Tabla custom - Fondo oscuro especÃ­fico */
 body.dark-mode .custom-table {
     background-color: #1e1e1e !important;
     color: #ffffff !important;
@@ -2608,7 +2608,7 @@ body.dark-mode .cal-day.other-month {
     color: #666 !important;
 }
 
-/* Panel sections específicos */
+/* Panel sections especÃ­ficos */
 body.dark-mode .panel-section.casos-disponibles,
 body.dark-mode .panel-section.casos-asignados {
     background-color: #1e1e1e !important;
@@ -2628,7 +2628,7 @@ body.dark-mode .panel-section-content::-webkit-scrollbar-thumb:hover {
     background: #a00000 !important;
 }
 
-/* Detalle de caso específico */
+/* Detalle de caso especÃ­fico */
 body.dark-mode .detalle-sub-card {
     background-color: #1a1a1a !important;
     border-color: #3a3a3a !important;
@@ -2770,7 +2770,7 @@ body.dark-mode .border-top-light {
     border-color: #3a3a3a !important;
 }
 
-/* Paginación */
+/* PaginaciÃ³n */
 body.dark-mode .pagination-btn,
 body.dark-mode .pagination-page {
     background-color: #2a2a2a !important;
@@ -2840,7 +2840,7 @@ body.dark-mode .detalle-titulo {
     color: #b0b0b0 !important;
 }
 
-/* Botones del calendario y otros botones de acción */
+/* Botones del calendario y otros botones de acciÃ³n */
 body.dark-mode .btn-accion-gray {
     background-color: #2a2a2a !important;
     color: #ffffff !important;
@@ -2887,3 +2887,104 @@ body.dark-mode .btn-accion-orange {
 body.dark-mode .btn-accion-orange:hover {
     background-color: #4a3a2a !important;
 }
+/* =============================================================
+   ESTILOS PARA ESTADÃSTICAS DEL DIRECTOR
+   ============================================================= */
+
+/* Estilos para los contenedores de los grÃ¡ficos */
+.chart-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    margin-top: 20px;
+}
+
+.chart-container-full {
+    grid-column: 1 / -1;
+    background: #fff;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.chart-container-full h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.chart-container-full p {
+    margin-bottom: 15px;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.chart-container-half {
+    background: #fff;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    min-height: 350px;
+}
+
+.chart-container-half h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.chart-container-half p {
+    margin-bottom: 15px;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.chart-canvas-wrapper {
+    position: relative;
+    width: 100%;
+    max-width: 300px; /* Tamaño máximo reducido para el Pie chart */
+    height: 300px; /* Altura fija para mantener proporción */
+    margin: 0 auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Contenedor específico para gráficos de barras */
+.chart-container-half .chart-canvas-wrapper[style*="max-width: 100%"] {
+    max-width: 100%;
+    height: 250px;
+}
+
+.chart-canvas-wrapper canvas {
+    max-width: 100% !important;
+    max-height: 100% !important;
+    width: auto !important;
+    height: auto !important;
+}
+
+@media (max-width: 992px) {
+    .chart-grid {
+        grid-template-columns: 1fr;
+    }
+    .chart-container-half {
+        min-height: auto;
+    }
+    .chart-canvas-wrapper {
+        max-width: 250px;
+        height: 250px;
+    }
+}
+
+/* Modo oscuro para grÃ¡ficos */
+body.dark-mode .chart-container-full,
+body.dark-mode .chart-container-half {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+    border-color: #3a3a3a !important;
+}
+

@@ -7,7 +7,7 @@ from .models import (
 from datetime import datetime, timedelta, time
 from django.utils import timezone
 
-ROL_COORDINADORA = 'Coordinadora de Inclusión'
+ROL_COORDINADORA = 'Encargado de Inclusión'
 
 class UsuarioSerializer(serializers.ModelSerializer):
     # --- Lectura y Escritura ---
@@ -309,7 +309,7 @@ class EntrevistasSerializer(serializers.ModelSerializer):
     coordinadora = serializers.PrimaryKeyRelatedField(
         queryset=PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA),
         write_only=True,
-        label="Coordinadora de Inclusión"
+        label="Encargado de Inclusión"
     )
     fecha_entrevista = serializers.DateTimeField(
         format="%d-%m-%Y %H:%M",

@@ -8,48 +8,6 @@
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        /* Estilos para los contenedores de los gráficos */
-        .chart-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            margin-top: 20px;
-        }
-        .chart-container-full {
-            grid-column: 1 / -1;
-            background: #fff;
-            padding: 25px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        }
-        .chart-container-half {
-            background: #fff;
-            padding: 25px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-            /* Altura fija para el gráfico circular */
-            height: 450px; 
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        .chart-canvas-wrapper {
-            position: relative;
-            width: 100%;
-            max-width: 400px; /* Tamaño máximo para el Pie chart */
-            margin: auto;
-        }
-
-        @media (max-width: 992px) {
-            .chart-grid {
-                grid-template-columns: 1fr;
-            }
-            .chart-container-half {
-                height: auto;
-            }
-        }
-    </style>
 {% endblock %}
 
 {% block content %}
@@ -116,9 +74,20 @@
                 data: pieData,
                 options: {
                     responsive: true,
-                    maintainAspectRatio: true,
+                    maintainAspectRatio: false,
                     plugins: {
-                        legend: { position: 'top' },
+                        legend: { 
+                            position: 'top',
+                            align: 'center'
+                        },
+                    },
+                    layout: {
+                        padding: {
+                            top: 10,
+                            bottom: 10,
+                            left: 10,
+                            right: 10
+                        }
                     }
                 }
             });

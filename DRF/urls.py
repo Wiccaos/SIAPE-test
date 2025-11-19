@@ -77,11 +77,11 @@ urlpatterns = [
     # path('dashboard/asesor/aprobar-solicitud/<int:solicitud_id>/', views.aprobar_solicitud_asesor, name='aprobar_solicitud_asesor'),
     # path('dashboard/asesor/rechazar-solicitud/<int:solicitud_id>/', views.rechazar_solicitud_asesor, name='rechazar_solicitud_asesor'),
 
-    # URLs de Coordinadora de Inclusión
-    path('dashboard/coordinador/', views.dashboard_coordinadora, name='dashboard_coordinadora'),
+    # URLs de Encargado de Inclusión
+    path('dashboard/coordinador/', views.dashboard_encargado_inclusion, name='dashboard_encargado_inclusion'),
     path('dashboard/casos-generales/', views.casos_generales, name='casos_generales'),
-    path('dashboard/coordinador/casos/<int:solicitud_id>/', views.detalle_casos_coordinadora, name='detalle_casos_coordinadora'),
-    path('dashboard/coordinador/panel-control/', views.panel_control_coordinadora, name='panel_control_coordinadora'),
+    path('dashboard/coordinador/casos/<int:solicitud_id>/', views.detalle_casos_encargado_inclusion, name='detalle_casos_encargado_inclusion'),
+    path('dashboard/coordinador/panel-control/', views.panel_control_encargado_inclusion, name='panel_control_encargado_inclusion'),
     path('dashboard/coordinador/horarios-bloqueados/', views.gestionar_horarios_bloqueados, name='gestionar_horarios_bloqueados'),
     path('dashboard/coordinador/horarios-bloqueados/<int:horario_id>/eliminar/', views.eliminar_horario_bloqueado, name='eliminar_horario_bloqueado'),
     path('dashboard/coordinador/citas/<int:entrevista_id>/cancelar/', views.cancelar_cita_dashboard, name='cancelar_cita_dashboard'),
@@ -101,8 +101,8 @@ urlpatterns = [
     # URLs de Director de Carrera
     path('dashboard/director/', views.dashboard_director, name='dashboard_director'),
 
-    # URLs de Asesora Técnica Pedagógica
-    path('dashboard/asesor-tecnico/', views.dashboard_asesor_técnico, name='dashboard_asesor_técnico'),
+    # URLs de Coordinador Técnico Pedagógico
+    path('dashboard/asesor-tecnico/', views.dashboard_coordinador_tecnico_pedagogico, name='dashboard_coordinador_tecnico_pedagogico'),
     path('dashboard/asesor-tecnico/casos/<int:solicitud_id>/', views.detalle_casos_asesor_tecnico, name='detalle_casos_asesor_tecnico'),
     path('dashboard/asesor-tecnico/casos/<int:solicitud_id>/formular-ajuste/', views.formular_ajuste_asesor_tecnico, name='formular_ajuste_asesor_tecnico'),
     path('dashboard/asesor-tecnico/ajustes/<int:ajuste_asignado_id>/editar/', views.editar_ajuste_asesor_tecnico, name='editar_ajuste_asesor_tecnico'),

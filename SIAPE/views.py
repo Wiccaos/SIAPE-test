@@ -49,8 +49,8 @@ ROL_ASESOR = 'Asesora Pedagógica'
 ROL_DIRECTOR = 'Director de Carrera'
 ROL_DOCENTE = 'Docente'
 ROL_ADMIN = 'Administrador'
-ROL_COORDINADORA = 'Coordinadora de Inclusión'
-ROL_ASESORA_TECNICA = 'Asesora Técnica Pedagógica'
+ROL_COORDINADORA = 'Encargado de Inclusión'
+ROL_ASESORA_TECNICA = 'Coordinador Técnico Pedagógico'
 
 
 # ----------------------------------------------
@@ -105,7 +105,7 @@ def vista_formulario_solicitud(request):
 def get_horarios_disponibles(request):
     """
     Endpoint público para obtener los slots de 1 hora disponibles
-    para una fecha específica, basado en las citas de la Coordinadora.
+    para una fecha específica, basado en las citas del Encargado de Inclusión.
     Recibe un parámetro GET: ?date=YYYY-MM-DD
     """
     
@@ -273,12 +273,12 @@ def get_calendario_disponible(request):
             horarios_bloqueados_por_coordinadora_dia[coord_id][dia_str] = set()
         horarios_bloqueados_por_coordinadora_dia[coord_id][dia_str].add(hora_str)
         
-        logger.debug(f"Horario bloqueado encontrado: Coordinadora {coord_id}, Día {dia_str}, Hora {hora_str}")
+        logger.debug(f"Horario bloqueado encontrado: Encargado de Inclusión {coord_id}, Día {dia_str}, Hora {hora_str}")
     
     # Debug: Log de citas encontradas por coordinadora
     for coord in coordinadoras:
         if coord.id in citas_por_coordinadora_dia:
-            logger.debug(f"Coordinadora {coord.id}: {sum(len(horas) for horas in citas_por_coordinadora_dia[coord.id].values())} horas ocupadas")
+            logger.debug(f"Encargado de Inclusión {coord.id}: {sum(len(horas) for horas in citas_por_coordinadora_dia[coord.id].values())} horas ocupadas")
             for dia, horas in citas_por_coordinadora_dia[coord.id].items():
                 logger.debug(f"  Día {dia}: horas ocupadas {sorted(horas)}")
 
@@ -393,21 +393,22 @@ def redireccionamiento_por_rol(request):
     """
     Redirecciona al dashboard correspondiente según el rol del usuario.
     """
-    rol = None
-    if hasattr(request.user, 'perfil') and request.user.perfil.rol:
+    # Primero verificar si el usuario tiene un perfil con rol
+    if hasattr(request.user, 'perfil') and request.user.perfil and request.user.perfil.rol:
         rol = request.user.perfil.rol.nombre_rol
 
-    if rol == ROL_COORDINADORA:
-        return redirect('dashboard_coordinadora')
-    elif rol == ROL_ASESORA_TECNICA:
-        return redirect('dashboard_asesor_técnico')
-    elif rol == ROL_ASESOR:
-        return redirect('dashboard_asesor')
-    elif rol == ROL_DIRECTOR:
-        return redirect('dashboard_director')
-    elif rol == ROL_ADMIN:
-        return redirect('dashboard_admin')
+        if rol == ROL_COORDINADORA:
+            return redirect('dashboard_encargado_inclusion')
+        elif rol == ROL_ASESORA_TECNICA:
+            return redirect('dashboard_coordinador_tecnico_pedagogico')
+        elif rol == ROL_ASESOR:
+            return redirect('dashboard_asesor')
+        elif rol == ROL_DIRECTOR:
+            return redirect('dashboard_director')
+        elif rol == ROL_ADMIN:
+            return redirect('dashboard_admin')
 
+    # Solo si no tiene rol o perfil, verificar si es superuser/staff para enviarlo al admin
     if request.user.is_superuser or request.user.is_staff:
         return redirect('admin:index')
 
@@ -429,8 +430,8 @@ def casos_generales(request):
     """
     Vista unificada para buscar y filtrar todos los casos del sistema.
     Filtra casos según el rol del usuario:
-    - Coordinadora: Casos pendientes de entrevista o asignados a ella
-    - Asesora Técnica: Casos pendientes de formulación (que debe formular)
+    - Encargado de Inclusión: Casos pendientes de entrevista o asignados a él
+    - Coordinador Técnico Pedagógico: Casos pendientes de formulación (que debe formular)
     - Asesor Pedagógico: Casos pendientes de preaprobación
     - Director: Casos pendientes de aprobación
     - Admin: Todos los casos
@@ -489,10 +490,10 @@ def casos_generales(request):
     
     if aplicar_filtro_por_rol:
         if rol_nombre == ROL_COORDINADORA:
-            # Coordinadora: Casos pendientes de entrevista o pendientes de formulación del caso
+            # Encargado de Inclusión: Casos pendientes de entrevista o pendientes de formulación del caso
             filtros = Q(estado='pendiente_entrevista') | Q(estado='pendiente_formulacion_caso')
         elif rol_nombre == ROL_ASESORA_TECNICA:
-            # Asesora Técnica: Casos pendientes de formulación de ajustes (que debe formular)
+            # Coordinador Técnico Pedagógico: Casos pendientes de formulación de ajustes (que debe formular)
             filtros = Q(estado='pendiente_formulacion_ajustes')
         elif rol_nombre == ROL_ASESOR:
             # Asesor Pedagógico: Casos pendientes de preaprobación
@@ -904,9 +905,9 @@ def editar_asignatura_admin(request, asignatura_id):
 logger = logging.getLogger(__name__)
 
 @login_required
-def dashboard_coordinadora(request):
+def dashboard_encargado_inclusion(request):
     """
-    Dashboard principal para la Coordinadora de Inclusión.
+    Dashboard principal para el Encargado de Inclusión.
     Muestra KPIs y la lista de citas para el día de hoy.
     """
     
@@ -966,7 +967,7 @@ def dashboard_coordinadora(request):
         estado='pendiente_formulacion_caso'
     ).count()
     
-    # KPI 4: Casos devueltos desde Asesora Técnica
+    # KPI 4: Casos devueltos desde Coordinador Técnico Pedagógico
     # Casos que están en 'pendiente_formulacion_caso' y que tienen ajustes asignados
     # (lo que indica que fueron formulados por la asesora técnica y luego devueltos)
     kpi_casos_devueltos_asesor_tecnico = Solicitudes.objects.filter(
@@ -987,19 +988,19 @@ def dashboard_coordinadora(request):
     }
 
     # 5. --- Renderizar Template ---
-    return render(request, 'SIAPE/dashboard_coordinadora.html', context)
+    return render(request, 'SIAPE/dashboard_encargado_inclusion.html', context)
 
 @require_POST
 @login_required
 def cancelar_cita_dashboard(request, entrevista_id):
     """
-    Vista para que la Coordinadora cancele una cita desde el dashboard.
+    Vista para que el Encargado de Inclusión cancele una cita desde el dashboard.
     """
     # 1. Verificar Permiso
     try:
         if request.user.perfil.rol.nombre_rol != ROL_COORDINADORA:
             messages.error(request, 'No tienes permisos para realizar esta acción.')
-            return redirect('dashboard_coordinadora')
+            return redirect('dashboard_encargado_inclusion')
     except AttributeError:
         return redirect('home')
 
@@ -1022,7 +1023,7 @@ def cancelar_cita_dashboard(request, entrevista_id):
     return redirect('dashboard_coordinadora')
 
 @login_required
-def detalle_casos_coordinadora(request, solicitud_id):
+def detalle_casos_encargado_inclusion(request, solicitud_id):
     """
     Muestra el detalle de un caso específico.
     Accesible por todos los roles de asesoría.
@@ -1066,16 +1067,16 @@ def detalle_casos_coordinadora(request, solicitud_id):
 
     # 3. --- Determinar acciones permitidas según el rol ---
     rol_nombre = perfil.rol.nombre_rol if perfil else None
-    # Permisos de edición: Solo Coordinadora, Asesor Pedagógico y Admin pueden editar la descripción del caso
-    # La Asesora Técnica NO puede editar el caso formulado por la Coordinadora
+    # Permisos de edición: Solo Encargado de Inclusión, Asesor Pedagógico y Admin pueden editar la descripción del caso
+    # El Coordinador Técnico Pedagógico NO puede editar el caso formulado por el Encargado de Inclusión
     puede_editar_descripcion = rol_nombre in [ROL_COORDINADORA, ROL_ASESOR, ROL_ADMIN]
     puede_agendar_cita = rol_nombre == ROL_COORDINADORA
     
-    # Acciones de Coordinadora
+    # Acciones de Encargado de Inclusión
     puede_formular_caso = rol_nombre == ROL_COORDINADORA and solicitud.estado == 'pendiente_formulacion_caso'
     puede_enviar_asesor_tecnico = rol_nombre == ROL_COORDINADORA and solicitud.estado == 'pendiente_formulacion_caso'
     
-    # Acciones de Asesora Técnica Pedagógica
+    # Acciones de Coordinador Técnico Pedagógico
     puede_formular_ajustes = rol_nombre == ROL_ASESORA_TECNICA and solicitud.estado == 'pendiente_formulacion_ajustes'
     puede_enviar_asesor_pedagogico = rol_nombre == ROL_ASESORA_TECNICA and solicitud.estado == 'pendiente_formulacion_ajustes'
     puede_devolver_a_coordinadora = rol_nombre == ROL_ASESORA_TECNICA and solicitud.estado == 'pendiente_formulacion_ajustes'
@@ -1111,15 +1112,15 @@ def detalle_casos_coordinadora(request, solicitud_id):
         'puede_rechazar': puede_rechazar,
     }
     
-    return render(request, 'SIAPE/detalle_casos_coordinadora.html', context)
+    return render(request, 'SIAPE/detalle_casos_encargado_inclusion.html', context)
 
 @login_required
 def detalle_casos_asesor_tecnico(request, solicitud_id):
     """
-    Vista para mostrar el detalle de un caso para la Asesora Técnica Pedagógica.
+    Vista para mostrar el detalle de un caso para el Coordinador Técnico Pedagógico.
     Es un wrapper que redirige a la misma vista pero con un contexto diferente.
     """
-    # Verificar que el usuario es Asesora Técnica
+    # Verificar que el usuario es Coordinador Técnico Pedagógico
     try:
         perfil = request.user.perfil
         if perfil.rol.nombre_rol != ROL_ASESORA_TECNICA:
@@ -1131,13 +1132,13 @@ def detalle_casos_asesor_tecnico(request, solicitud_id):
         perfil = None
     
     # Llamar a la misma función pero con el contexto específico
-    return detalle_casos_coordinadora(request, solicitud_id)
+    return detalle_casos_encargado_inclusion(request, solicitud_id)
 
 @require_POST
 @login_required
 def formular_ajuste_asesor_tecnico(request, solicitud_id):
     """
-    Vista para que la Asesora Técnica Pedagógica pueda crear y asignar ajustes a un caso.
+    Vista para que el Coordinador Técnico Pedagógico pueda crear y asignar ajustes a un caso.
     """
     # 1. --- Verificación de Permisos ---
     try:
@@ -1212,7 +1213,7 @@ def formular_ajuste_asesor_tecnico(request, solicitud_id):
             solicitudes=solicitud
         )
 
-        # 8. --- Asignar Asesora Técnica al caso si no está asignada ---
+        # 8. --- Asignar Coordinador Técnico Pedagógico al caso si no está asignado ---
         if not solicitud.asesor_tecnico_asignado:
             solicitud.asesor_tecnico_asignado = perfil
             solicitud.save()
@@ -1230,7 +1231,7 @@ def formular_ajuste_asesor_tecnico(request, solicitud_id):
 @login_required
 def editar_ajuste_asesor_tecnico(request, ajuste_asignado_id):
     """
-    Vista para que la Asesora Técnica Pedagógica pueda editar un ajuste ya asignado.
+    Vista para que el Coordinador Técnico Pedagógico pueda editar un ajuste ya asignado.
     """
     # 1. --- Verificación de Permisos ---
     try:
@@ -1313,7 +1314,7 @@ def editar_ajuste_asesor_tecnico(request, ajuste_asignado_id):
 @login_required
 def eliminar_ajuste_asesor_tecnico(request, ajuste_asignado_id):
     """
-    Vista para que la Asesora Técnica Pedagógica pueda eliminar un ajuste asignado.
+    Vista para que el Coordinador Técnico Pedagógico pueda eliminar un ajuste asignado.
     """
     # 1. --- Verificación de Permisos ---
     try:
@@ -1357,7 +1358,7 @@ def eliminar_ajuste_asesor_tecnico(request, ajuste_asignado_id):
 @login_required
 def enviar_a_asesor_tecnico(request, solicitud_id):
     """
-    Vista para que la Coordinadora envíe el caso a la Asesora Técnica Pedagógica.
+    Vista para que el Encargado de Inclusión envíe el caso al Coordinador Técnico Pedagógico.
     Cambia el estado del caso de 'pendiente_formulacion_caso' a 'pendiente_formulacion_ajustes'.
     """
     # 1. --- Verificación de Permisos ---
@@ -1377,27 +1378,27 @@ def enviar_a_asesor_tecnico(request, solicitud_id):
     # 3. --- Verificar que el caso está en el estado correcto ---
     if solicitud.estado != 'pendiente_formulacion_caso':
         messages.error(request, 'Este caso no está en estado de formulación del caso. Solo se pueden enviar casos después de formular el caso.')
-        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
     
     try:
         # 4. --- Cambiar el estado del caso ---
         solicitud.estado = 'pendiente_formulacion_ajustes'
         solicitud.save()
         
-        messages.success(request, 'Caso enviado a la Asesora Técnica Pedagógica exitosamente. El caso ahora está pendiente de formulación de ajustes.')
+        messages.success(request, 'Caso enviado al Coordinador Técnico Pedagógico exitosamente. El caso ahora está pendiente de formulación de ajustes.')
         
     except Exception as e:
         logger.error(f"Error al enviar caso a asesora técnica: {str(e)}")
         messages.error(request, f'Error al enviar el caso: {str(e)}')
     
     # 5. --- Redirigir de vuelta al detalle ---
-    return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+    return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
 
 @require_POST
 @login_required
 def enviar_a_asesor_pedagogico(request, solicitud_id):
     """
-    Vista para que la Asesora Técnica Pedagógica envíe el caso al siguiente estado
+    Vista para que el Coordinador Técnico Pedagógico envíe el caso al siguiente estado
     (pendiente_preaprobacion) después de formular los ajustes.
     """
     # 1. --- Verificación de Permisos ---
@@ -1442,7 +1443,7 @@ def enviar_a_asesor_pedagogico(request, solicitud_id):
 @login_required
 def devolver_a_coordinadora(request, solicitud_id):
     """
-    Vista para que la Asesora Técnica Pedagógica devuelva el caso a la Coordinadora.
+    Vista para que el Coordinador Técnico Pedagógico devuelva el caso al Encargado de Inclusión.
     Cambia el estado del caso de 'pendiente_formulacion_ajustes' a 'pendiente_formulacion_caso'.
     """
     # 1. --- Verificación de Permisos ---
@@ -1469,7 +1470,7 @@ def devolver_a_coordinadora(request, solicitud_id):
         solicitud.estado = 'pendiente_formulacion_caso'
         solicitud.save()
         
-        messages.success(request, 'Caso devuelto a la Coordinadora exitosamente. El caso ahora está pendiente de formulación del caso.')
+        messages.success(request, 'Caso devuelto al Encargado de Inclusión exitosamente. El caso ahora está pendiente de formulación del caso.')
         
     except Exception as e:
         logger.error(f"Error al devolver caso a coordinadora: {str(e)}")
@@ -1502,7 +1503,7 @@ def enviar_a_director(request, solicitud_id):
     # 3. --- Verificar que el caso está en el estado correcto ---
     if solicitud.estado != 'pendiente_preaprobacion':
         messages.error(request, 'Este caso no está en estado de preaprobación. Solo se pueden enviar casos pendientes de preaprobación.')
-        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
     
     try:
         # 4. --- Cambiar el estado del caso ---
@@ -1516,7 +1517,7 @@ def enviar_a_director(request, solicitud_id):
         messages.error(request, f'Error al enviar el caso: {str(e)}')
     
     # 5. --- Redirigir de vuelta al detalle ---
-    return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+    return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
 
 @require_POST
 @login_required
@@ -1542,7 +1543,7 @@ def devolver_a_asesor_tecnico(request, solicitud_id):
     # 3. --- Verificar que el caso está en el estado correcto ---
     if solicitud.estado != 'pendiente_preaprobacion':
         messages.error(request, 'Este caso no está en estado de preaprobación. Solo se pueden devolver casos pendientes de preaprobación.')
-        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
     
     try:
         # 4. --- Cambiar el estado del caso ---
@@ -1556,7 +1557,7 @@ def devolver_a_asesor_tecnico(request, solicitud_id):
         messages.error(request, f'Error al devolver el caso: {str(e)}')
     
     # 5. --- Redirigir de vuelta al detalle ---
-    return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+    return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
 
 @require_POST
 @login_required
@@ -1583,7 +1584,7 @@ def editar_ajuste_asesor(request, ajuste_asignado_id):
     # Verificar que el caso está en el estado correcto
     if solicitud.estado != 'pendiente_preaprobacion':
         messages.error(request, 'Solo se pueden editar ajustes de casos en estado de preaprobación.')
-        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud.id)
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
 
     # 3. --- Obtener Datos del Formulario ---
     descripcion = request.POST.get('descripcion', '').strip()
@@ -1593,29 +1594,29 @@ def editar_ajuste_asesor(request, ajuste_asignado_id):
     # 4. --- Validaciones ---
     if not descripcion:
         messages.error(request, 'La descripción del ajuste es requerida.')
-        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud.id)
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
 
     # Verificar si se seleccionó "nueva" o si hay una categoría seleccionada
     crear_nueva_categoria = categoria_id == 'nueva' or (not categoria_id and nueva_categoria)
     
     if not categoria_id and not nueva_categoria:
         messages.error(request, 'Debe seleccionar una categoría o crear una nueva.')
-        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud.id)
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
 
     if categoria_id and categoria_id != 'nueva' and nueva_categoria:
         messages.error(request, 'No puede seleccionar una categoría existente y crear una nueva a la vez.')
-        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud.id)
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
 
     if crear_nueva_categoria and not nueva_categoria:
         messages.error(request, 'Debe proporcionar el nombre de la nueva categoría.')
-        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud.id)
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
 
     try:
         # 5. --- Obtener o Crear Categoría ---
         if crear_nueva_categoria:
             if not nueva_categoria:
                 messages.error(request, 'Debe proporcionar el nombre de la nueva categoría.')
-                return redirect('detalle_casos_coordinadora', solicitud_id=solicitud.id)
+                return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
             categoria, created = CategoriasAjustes.objects.get_or_create(
                 nombre_categoria=nueva_categoria.strip().capitalize()
             )
@@ -1624,7 +1625,7 @@ def editar_ajuste_asesor(request, ajuste_asignado_id):
         else:
             if not categoria_id or categoria_id == 'nueva':
                 messages.error(request, 'Debe seleccionar una categoría válida.')
-                return redirect('detalle_casos_coordinadora', solicitud_id=solicitud.id)
+                return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
             categoria = get_object_or_404(CategoriasAjustes, id=categoria_id)
 
         # 6. --- Actualizar Ajuste Razonable ---
@@ -1640,7 +1641,7 @@ def editar_ajuste_asesor(request, ajuste_asignado_id):
         messages.error(request, f'Error al editar el ajuste: {str(e)}')
 
     # 7. --- Redirigir de vuelta al detalle ---
-    return redirect('detalle_casos_coordinadora', solicitud_id=solicitud.id)
+    return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
 
 @require_POST
 @login_required
@@ -1667,7 +1668,7 @@ def eliminar_ajuste_asesor(request, ajuste_asignado_id):
     # Verificar que el caso está en el estado correcto
     if solicitud.estado != 'pendiente_preaprobacion':
         messages.error(request, 'Solo se pueden eliminar ajustes de casos en estado de preaprobación.')
-        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud.id)
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
 
     try:
         # 3. --- Eliminar el Ajuste Asignado y el Ajuste Razonable asociado ---
@@ -1685,7 +1686,7 @@ def eliminar_ajuste_asesor(request, ajuste_asignado_id):
         messages.error(request, f'Error al eliminar el ajuste: {str(e)}')
 
     # 4. --- Redirigir de vuelta al detalle ---
-    return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+    return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
 
 @require_POST
 @login_required
@@ -1711,7 +1712,7 @@ def aprobar_caso(request, solicitud_id):
     # 3. --- Verificar que el caso está en el estado correcto ---
     if solicitud.estado != 'pendiente_aprobacion':
         messages.error(request, 'Este caso no está en estado de aprobación. Solo se pueden aprobar casos pendientes de aprobación.')
-        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
     
     try:
         # 4. --- Cambiar el estado del caso ---
@@ -1725,7 +1726,7 @@ def aprobar_caso(request, solicitud_id):
         messages.error(request, f'Error al aprobar el caso: {str(e)}')
     
     # 5. --- Redirigir de vuelta al detalle ---
-    return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+    return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
 
 @require_POST
 @login_required
@@ -1752,7 +1753,7 @@ def rechazar_caso(request, solicitud_id):
     # 3. --- Verificar que el caso está en el estado correcto ---
     if solicitud.estado != 'pendiente_aprobacion':
         messages.error(request, 'Este caso no está en estado de aprobación. Solo se pueden rechazar casos pendientes de aprobación.')
-        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
     
     try:
         # 4. --- Cambiar el estado del caso (vuelve a Asesoría Pedagógica) ---
@@ -1766,7 +1767,7 @@ def rechazar_caso(request, solicitud_id):
         messages.error(request, f'Error al rechazar el caso: {str(e)}')
     
     # 5. --- Redirigir de vuelta al detalle ---
-    return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+    return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
 
 @require_POST # Solo permite esta vista vía POST
 @login_required
@@ -1778,8 +1779,8 @@ def actualizar_descripcion_caso(request, solicitud_id):
     # 1. --- Verificación de Permisos (Ampliado) ---
     try:
         perfil = request.user.perfil
-        # Solo Coordinadora, Asesor Pedagógico y Admin pueden editar la descripción del caso
-        # La Asesora Técnica NO puede editar el caso formulado por la Coordinadora
+        # Solo Encargado de Inclusión, Asesor Pedagógico y Admin pueden editar la descripción del caso
+        # El Coordinador Técnico Pedagógico NO puede editar el caso formulado por el Encargado de Inclusión
         ROLES_PERMITIDOS = [
             ROL_COORDINADORA,
             ROL_ASESOR,
@@ -1787,7 +1788,7 @@ def actualizar_descripcion_caso(request, solicitud_id):
         ]
         if perfil.rol.nombre_rol not in ROLES_PERMITIDOS:
             messages.error(request, 'No tienes permisos para esta acción.')
-            return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+            return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
     except AttributeError:
         if not request.user.is_superuser:
             return redirect('home')
@@ -1810,16 +1811,16 @@ def actualizar_descripcion_caso(request, solicitud_id):
         if rol_nombre == ROL_ASESORA_TECNICA:
             return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
         elif rol_nombre == ROL_COORDINADORA:
-            return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+            return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
         else:
-            return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+            return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
     except AttributeError:
-        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
 
 @login_required
-def panel_control_coordinadora(request):
+def panel_control_encargado_inclusion(request):
     """
-    Panel de control para la Coordinadora de Inclusión.
+    Panel de control para el Encargado de Inclusión.
     Muestra citas (hoy, semana), calendario interactivo y acciones de cita.
     """
     try:
@@ -1842,7 +1843,7 @@ def panel_control_coordinadora(request):
     start_of_week_dt = timezone.make_aware(datetime.combine(start_of_week, datetime.min.time()))
     end_of_week_dt = timezone.make_aware(datetime.combine(end_of_week, datetime.max.time()))
 
-    # 2. --- Obtener Citas para Todas las Coordinadoras (Rol Completo) ---
+    # 2. --- Obtener Citas para Todos los Encargados de Inclusión (Rol Completo) ---
     
     # Verificar que el perfil de la coordinadora existe
     if not perfil_coordinadora:
@@ -1928,19 +1929,19 @@ def panel_control_coordinadora(request):
         'citas_no_asistio': [], # Reemplazado por citas_pasadas_semana_list
     }
     
-    return render(request, 'SIAPE/panel_control_coordinadora.html', context)
+    return render(request, 'SIAPE/panel_control_encargado_inclusion.html', context)
 
 @login_required
 def confirmar_cita_coordinadora(request, entrevista_id):
     """
-    Permite a la Coordinadora confirmar la asistencia (realizada o no asistió) 
+    Permite al Encargado de Inclusión confirmar la asistencia (realizada o no asistió) 
     de una entrevista que ella gestiona.
     """
     # 1. Verificar Permiso
     try:
         if request.user.perfil.rol.nombre_rol != ROL_COORDINADORA:
             messages.error(request, 'No tienes permisos para realizar esta acción.')
-            return redirect('panel_control_coordinadora')
+            return redirect('panel_control_encargado_inclusion')
     except AttributeError:
         return redirect('home')
 
@@ -1977,12 +1978,12 @@ def confirmar_cita_coordinadora(request, entrevista_id):
             messages.error(request, f'Error al confirmar la cita: {str(e)}')
             
     # 3. Redirigir siempre al panel de control
-    return redirect('panel_control_coordinadora')
+    return redirect('panel_control_encargado_inclusion')
 
 @login_required
 def gestionar_horarios_bloqueados(request):
     """
-    Vista para que la Coordinadora gestione sus horarios bloqueados.
+    Vista para que el Encargado de Inclusión gestione sus horarios bloqueados.
     Permite ver, crear y eliminar horarios bloqueados.
     """
     # 1. Verificar Permiso
@@ -2071,7 +2072,7 @@ def gestionar_horarios_bloqueados(request):
 @login_required
 def eliminar_horario_bloqueado(request, horario_id):
     """
-    Vista para que la Coordinadora elimine un horario bloqueado.
+    Vista para que el Encargado de Inclusión elimine un horario bloqueado.
     """
     # 1. Verificar Permiso
     try:
@@ -2095,13 +2096,13 @@ def eliminar_horario_bloqueado(request, horario_id):
 @login_required
 def editar_notas_cita_coordinadora(request, entrevista_id):
     """
-    Permite a la Coordinadora editar las notas de una cita que ella gestiona.
+    Permite al Encargado de Inclusión editar las notas de una cita que él gestiona.
     """
     # 1. Verificar Permiso
     try:
         if request.user.perfil.rol.nombre_rol != ROL_COORDINADORA:
             messages.error(request, 'No tienes permisos para realizar esta acción.')
-            return redirect('panel_control_coordinadora')
+            return redirect('panel_control_encargado_inclusion')
     except AttributeError:
         return redirect('home')
 
@@ -2119,12 +2120,12 @@ def editar_notas_cita_coordinadora(request, entrevista_id):
             messages.error(request, f'Error al actualizar las notas: {str(e)}')
             
     # 3. Redirigir
-    return redirect('panel_control_coordinadora')
+    return redirect('panel_control_encargado_inclusion')
 
 @login_required
 def agendar_cita_coordinadora(request):
     """
-    Permite a la Coordinadora agendar una nueva cita para un caso.
+    Permite al Encargado de Inclusión agendar una nueva cita para un caso.
     """
     # 1. Verificar Permiso
     try:
@@ -2147,7 +2148,7 @@ def agendar_cita_coordinadora(request):
             
             if not fecha_str or not hora_str:
                 messages.error(request, 'Debe seleccionar una fecha y un horario.')
-                return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+                return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
             
             # Parsear fecha y hora por separado
             fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d').date()
@@ -2163,7 +2164,7 @@ def agendar_cita_coordinadora(request):
             now = timezone.localtime(timezone.now())
             if fecha_entrevista < now:
                 messages.error(request, 'No se pueden agendar citas en el pasado.')
-                return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+                return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
             
             # Buscar coordinadora disponible para el horario seleccionado
             todas_las_coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
@@ -2189,7 +2190,7 @@ def agendar_cita_coordinadora(request):
             
             if not coordinadora_asignada:
                 messages.error(request, 'No hay coordinadoras disponibles para agendar la cita.')
-                return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+                return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
             
             # Verificar que no haya una cita ya agendada para esta solicitud en este horario
             cita_existente = Entrevistas.objects.filter(
@@ -2199,7 +2200,7 @@ def agendar_cita_coordinadora(request):
             
             if cita_existente:
                 messages.error(request, 'Ya existe una cita agendada para este caso en ese horario.')
-                return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+                return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
             
             # Crear la nueva entrevista
             nueva_entrevista = Entrevistas.objects.create(
@@ -2223,20 +2224,20 @@ def agendar_cita_coordinadora(request):
     # 3. Redirigir al detalle del caso
     solicitud_id = request.POST.get('solicitud_id') if request.method == 'POST' else request.GET.get('solicitud_id')
     if solicitud_id:
-        return redirect('detalle_casos_coordinadora', solicitud_id=solicitud_id)
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
     return redirect('casos_generales')
 
 @login_required
 def reagendar_cita_coordinadora(request, entrevista_id):
     """
-    Permite a la Coordinadora reagendar una cita (usualmente una que 'no asistió').
+    Permite al Encargado de Inclusión reagendar una cita (usualmente una que 'no asistió').
     Crea una nueva entrevista y actualiza la antigua.
     """
     # 1. Verificar Permiso
     try:
         if request.user.perfil.rol.nombre_rol != ROL_COORDINADORA:
             messages.error(request, 'No tienes permisos para realizar esta acción.')
-            return redirect('panel_control_coordinadora')
+            return redirect('panel_control_encargado_inclusion')
     except AttributeError:
         return redirect('home')
 
@@ -2253,7 +2254,7 @@ def reagendar_cita_coordinadora(request, entrevista_id):
             
             if not fecha_str or not hora_str:
                 messages.error(request, 'Debe seleccionar una fecha y un horario.')
-                return redirect('panel_control_coordinadora')
+                return redirect('panel_control_encargado_inclusion')
             
             # Parsear fecha y hora por separado
             fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d').date()
@@ -2286,7 +2287,7 @@ def reagendar_cita_coordinadora(request, entrevista_id):
             messages.error(request, f'Error al reagendar la cita: {str(e)}')
             
     # 3. Redirigir
-    return redirect('panel_control_coordinadora')
+    return redirect('panel_control_encargado_inclusion')
 
 
 # --- VISTA ASESOR PEDAGÓGICO ---
@@ -2438,13 +2439,31 @@ def dashboard_director(request):
     # 1. Encontrar las carreras que este director gestiona
     carreras_del_director = Carreras.objects.filter(director=perfil_director)
     
-    # 2. Base de solicitudes de sus carreras
+    # Si no tiene carreras asignadas, mostrar mensaje y retornar lista vacía
+    if not carreras_del_director.exists():
+        messages.warning(request, 'No tienes carreras asignadas. Contacta a un administrador para que te asigne carreras.')
+        context = {
+            'nombre_usuario': request.user.first_name,
+            'solicitudes_pendientes': Solicitudes.objects.none(),
+            'solicitudes_historial': Solicitudes.objects.none(),
+            'kpis': {
+                'total_pendientes': 0,
+                'total_aprobados': 0,
+                'total_rechazados': 0,
+            },
+        }
+        return render(request, 'SIAPE/dashboard_director.html', context)
+    
+    # Obtener IDs de las carreras para hacer el filtro más eficiente
+    carreras_ids = carreras_del_director.values_list('id', flat=True)
+    
+    # 2. Base de solicitudes de sus carreras - usando IDs para mejor rendimiento
     solicitudes_base = Solicitudes.objects.filter(
-        estudiantes__carreras__in=carreras_del_director
+        estudiantes__carreras__id__in=carreras_ids
     ).select_related(
         'estudiantes', 
         'estudiantes__carreras'
-    )
+    ).distinct()
 
     # 3. Filtrar solicitudes PENDIENTES (estado 'pendiente_aprobacion')
     # Estos son los casos que el Asesor Pedagógico le envió.
@@ -2640,9 +2659,9 @@ def estadisticas_director(request):
 # ----------------------------------------------------
 
 @login_required
-def dashboard_asesor_técnico(request):
+def dashboard_coordinador_tecnico_pedagogico(request):
     """
-    Dashboard principal para la Asesora Técnica Pedagógica.
+    Dashboard principal para el Coordinador Técnico Pedagógico.
     Muestra KPIs de casos pendientes de formulación y estadísticas.
     """
     
@@ -2709,7 +2728,7 @@ def dashboard_asesor_técnico(request):
     }
     
     # 6. --- Renderizar Template ---
-    return render(request, 'SIAPE/dashboard_asesor_técnico.html', context)
+    return render(request, 'SIAPE/dashboard_coordinador_tecnico_pedagogico.html', context)
 
 
 # ----------- Vistas de los modelos (API) ------------

@@ -199,7 +199,7 @@ class Solicitudes(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        limit_choices_to={'rol__nombre_rol': 'Coordinadora de Inclusión'},
+        limit_choices_to={'rol__nombre_rol': 'Encargado de Inclusión'},
         related_name='solicitudes_como_coordinadora'
     )
     asesor_tecnico_asignado = models.ForeignKey(
@@ -207,7 +207,7 @@ class Solicitudes(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        limit_choices_to={'rol__nombre_rol': 'Asesora Técnica'},
+        limit_choices_to={'rol__nombre_rol': 'Coordinador Técnico Pedagógico'},
         related_name='solicitudes_como_asesor_tecnico'
     )
     asesor_pedagogico_asignado = models.ForeignKey(
@@ -220,9 +220,9 @@ class Solicitudes(models.Model):
     )
 
     ESTADO_CHOICES = (
-        ('pendiente_entrevista', 'Pendiente de Entrevista (Coordinadora)'),
-        ('pendiente_formulacion_caso', 'Pendiente de Formulación del Caso (Coordinadora)'),
-        ('pendiente_formulacion_ajustes', 'Pendiente de Formulación de Ajustes (Asesora Técnica)'),
+        ('pendiente_entrevista', 'Pendiente de Entrevista (Encargado de Inclusión)'),
+        ('pendiente_formulacion_caso', 'Pendiente de Formulación del Caso (Encargado de Inclusión)'),
+        ('pendiente_formulacion_ajustes', 'Pendiente de Formulación de Ajustes (Coordinador Técnico Pedagógico)'),
         ('pendiente_preaprobacion', 'Pendiente de Preaprobación (Asesor Pedagógico)'),
         ('pendiente_aprobacion', 'Pendiente de Aprobación (Director)'),
         ('aprobado', 'Aprobado e Informado'),
@@ -321,7 +321,7 @@ class Entrevistas(models.Model):
         null=True,
         blank=True,
         on_delete=models.CASCADE,
-        limit_choices_to={'rol__nombre_rol': 'Coordinadora de Inclusión'}
+        limit_choices_to={'rol__nombre_rol': 'Encargado de Inclusión'}
     )
 
     class Meta:
@@ -332,15 +332,15 @@ class Entrevistas(models.Model):
 
 class HorarioBloqueado(models.Model):
     """
-    Modelo para que la Coordinadora pueda bloquear horarios específicos
+    Modelo para que el Encargado de Inclusión pueda bloquear horarios específicos
     que no estarán disponibles para agendar citas (reuniones, etc.)
     """
     coordinadora = models.ForeignKey(
         PerfilUsuario,
         on_delete=models.CASCADE,
-        limit_choices_to={'rol__nombre_rol': 'Coordinadora de Inclusión'},
+        limit_choices_to={'rol__nombre_rol': 'Encargado de Inclusión'},
         related_name='horarios_bloqueados',
-        verbose_name="Coordinadora"
+        verbose_name="Encargado de Inclusión"
     )
     fecha_hora = models.DateTimeField(
         verbose_name="Fecha y Hora Bloqueada"

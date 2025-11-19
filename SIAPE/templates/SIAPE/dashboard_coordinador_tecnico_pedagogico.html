@@ -1,0 +1,112 @@
+{% extends "plantilla.html" %}
+{% load static %}
+
+{% block title %}
+    Panel Principal - Coordinador Técnico Pedagógico | SIAPE
+{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="main-content"> 
+    
+    <nav class="dashboard-nav">
+        <a href="{% url 'dashboard_coordinador_tecnico_pedagogico' %}" class="nav-item active">
+            <i class="fas fa-home"></i>
+            Panel Principal
+        </a>
+        <a href="{% url 'casos_generales' %}" class="nav-item">
+            <i class="fas fa-folder-open"></i>
+            Casos
+        </a>
+    </nav>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} custom-alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <section class="kpi-container">
+        <div class="kpi-card">
+            <div class="kpi-icon icon-proceso"> 
+                <i class="fas fa-plus-circle"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ kpis.casos_nuevos_semana|default:0 }}</span>
+                <span class="kpi-label">Casos Nuevos (Semana)</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-solicitudes"> 
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ kpis.casos_pendientes_total|default:0 }}</span>
+                <span class="kpi-label">Casos Pendientes de Formulación</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-proceso"> 
+                <i class="fas fa-undo-alt"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ kpis.casos_devueltos|default:0 }}</span>
+                <span class="kpi-label">Casos Devueltos</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="table-container">
+        <div class="table-header">
+            <h2><i class="fas fa-list"></i> Casos Pendientes de Formulación de Ajustes</h2>
+        </div>
+        
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Estudiante</th>
+                    <th>RUT</th>
+                    <th>Carrera</th>
+                    <th>Asunto</th>
+                    <th>Fecha Solicitud</th>
+                    <th style="width: 20%;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for caso in casos_pendientes_list %}
+                <tr>
+                    <td>{{ caso.estudiantes.nombres }} {{ caso.estudiantes.apellidos }}</td>
+                    <td>{{ caso.estudiantes.rut }}</td>
+                    <td>{{ caso.estudiantes.carreras.nombre }}</td>
+                    <td>{{ caso.asunto }}</td>
+                    <td>{{ caso.created_at|date:"d/m/Y" }}</td>
+                    <td class="acciones-container">
+                        <a href="{% url 'detalle_casos_asesor_tecnico' caso.id %}" class="btn-accion btn-agendar btn-accion-small">
+                            <i class="fas fa-eye"></i> Ver Detalles
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6">
+                        <div class="empty-state">
+                            <i class="fas fa-check-circle icono-check"></i>
+                            <p>¡Excelente! No tienes casos pendientes de formulación.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+</div>
+{% endblock %}
+
