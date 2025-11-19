@@ -397,6 +397,19 @@ def redireccionamiento_por_rol(request):
     if hasattr(request.user, 'perfil') and request.user.perfil and request.user.perfil.rol:
         rol = request.user.perfil.rol.nombre_rol
 
+    if rol == ROL_COORDINADORA:
+        return redirect('dashboard_coordinadora')
+    elif rol == ROL_ASESORA_TECNICA:
+        return redirect('panel_control_asesora_tecnica')
+    elif rol == ROL_ASESOR:
+        return redirect('dashboard_asesor')
+    elif rol == ROL_DIRECTOR:
+        return redirect('dashboard_director')
+    elif rol == ROL_ADMIN:
+        return redirect('dashboard_admin')
+    elif rol == ROL_DOCENTE:
+        return redirect('dashboard_docente')
+
         if rol == ROL_COORDINADORA:
             return redirect('dashboard_encargado_inclusion')
         elif rol == ROL_ASESORA_TECNICA:
@@ -2729,6 +2742,309 @@ def dashboard_coordinador_tecnico_pedagogico(request):
     
     # 6. --- Renderizar Template ---
     return render(request, 'SIAPE/dashboard_coordinador_tecnico_pedagogico.html', context)
+
+
+# ----------- Vistas para Docente ------------  
+
+
+@login_required
+def dashboard_docente(request):
+    """
+    Dashboard para los docentes.
+    Muestra sus asignaturas y alumnos asociados con ajustes aprobados.
+    """
+    try:
+        if request.user.perfil.rol.nombre_rol != ROL_DOCENTE:
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+
+    perfil_docente = request.user.perfil
+
+    # 1. Obtener las asignaturas del docente y contar el total de alumnos
+    mis_asignaturas = Asignaturas.objects.filter(
+        docente=perfil_docente
+    ).annotate(
+        total_alumnos=Count('asignaturasencurso', distinct=True) # Total de alumnos en la clase
+    )
+
+    # 2. Obtener todas las solicitudes relevantes (aprobadas y de mis asignaturas)
+    solicitudes_relevantes = Solicitudes.objects.filter(
+        estado='aprobado',
+        asignaturas_solicitadas__in=mis_asignaturas 
+    ).select_related(
+        'estudiantes'
+    ).prefetch_related(
+        'ajusteasignado_set__ajuste_razonable__categorias_ajustes',
+        'asignaturas_solicitadas' 
+    ).distinct()
+
+    # 3. Crear un mapa de { asignatura_id -> [lista de detalles de ajuste] }
+    mapa_ajustes_por_asignatura = {}
+    total_estudiantes_con_ajuste = set() 
+
+    for sol in solicitudes_relevantes:
+        detalle_para_tabla = {
+            'estudiante': sol.estudiantes,
+            'ajustes': sol.ajusteasignado_set.all(),
+            'solicitud_id': sol.id # ID de la solicitud original
+        }
+        
+        total_estudiantes_con_ajuste.add(sol.estudiantes.id)
+        
+        # Asignar este detalle a CADA asignatura del docente que esté en esta solicitud
+        for asig in sol.asignaturas_solicitadas.all():
+            if asig.docente == perfil_docente: 
+                if asig.id not in mapa_ajustes_por_asignatura:
+                    mapa_ajustes_por_asignatura[asig.id] = []
+                
+                # Evitar duplicados de estudiantes por asignatura
+                existe = False
+                for item in mapa_ajustes_por_asignatura[asig.id]:
+                    if item['estudiante'].id == sol.estudiantes.id:
+                        existe = True
+                        break
+                if not existe:
+                     mapa_ajustes_por_asignatura[asig.id].append(detalle_para_tabla)
+
+    # 4. Construir el contexto final 'casos_por_asignatura' que espera la plantilla
+    casos_por_asignatura = []
+    for asig in mis_asignaturas:
+        detalles = mapa_ajustes_por_asignatura.get(asig.id, [])
+        casos_por_asignatura.append({
+            'asignatura': asig,
+            'total_alumnos': asig.total_alumnos,
+            'total_ajustes_aprobados': len(detalles), # N° de estudiantes con ajuste
+            'ajustes_aprobados_detalle': detalles
+        })
+
+    context = {
+        'casos_por_asignatura': casos_por_asignatura,
+        'asignaturas_docente': mis_asignaturas, 
+        'total_estudiantes_con_ajuste': len(total_estudiantes_con_ajuste) 
+    }
+    
+    return render(request, 'SIAPE/dashboard_docente.html', context)
+
+@login_required
+def mis_asignaturas_docente(request):
+    """
+    Muestra al docente la lista de asignaturas que imparte.
+    """
+    try:
+        # Verificar que el usuario sea docente
+        if request.user.perfil.rol.nombre_rol != ROL_DOCENTE:
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+    
+    perfil_docente = request.user.perfil
+    
+    
+    asignaturas_docente = Asignaturas.objects.filter(
+        docente=perfil_docente
+    ).annotate(
+        total_estudiantes=Count('asignaturasencurso')
+    ).order_by('nombre') 
+
+    context = {
+        'asignaturas': asignaturas_docente
+    }
+    
+    return render(request, 'SIAPE/mis_asignaturas_docente.html', context)
+    
+
+
+
+@login_required
+def mis_alumnos_docente(request):
+    """
+    Muestra una lista de TODOS los alumnos únicos que el docente
+    tiene en todas sus asignaturas.
+    """
+    try:
+        # Verificar que el usuario sea docente
+        if request.user.perfil.rol.nombre_rol != ROL_DOCENTE:
+            return redirect('home')
+    except AttributeError:
+
+        return redirect('home')
+
+    perfil_docente = request.user.perfil
+    mis_asignaturas = Asignaturas.objects.filter(docente=perfil_docente)
+
+    # 1. Obtener IDs de estudiantes únicos en todas las clases del docente
+    estudiantes_ids = AsignaturasEnCurso.objects.filter(
+        asignaturas__in=mis_asignaturas
+    ).values_list('estudiantes_id', flat=True).distinct()
+    
+    # 2. Obtener los objetos de esos estudiantes
+    mis_estudiantes = Estudiantes.objects.filter(
+        id__in=estudiantes_ids
+    ).select_related('carreras').order_by('apellidos', 'nombres')
+
+    # 3. Obtener los IDs de estudiantes que tienen ajustes APROBADOS
+    #    en cualqueira de las clases del docente
+    estudiantes_con_ajuste_ids = set(Solicitudes.objects.filter(
+        estudiantes_id__in=estudiantes_ids,
+        estado='aprobado',
+        asignaturas_solicitadas__in=mis_asignaturas
+    ).values_list('estudiantes_id', flat=True).distinct())
+    
+    # 4. Preparar la lista final para la plantilla
+    lista_alumnos_final = []
+    for est in mis_estudiantes:
+        lista_alumnos_final.append({
+            'estudiante': est,
+            'tiene_ajuste': est.id in estudiantes_con_ajuste_ids
+        })
+
+    context = {
+        'lista_alumnos': lista_alumnos_final,
+        'total_alumnos': len(lista_alumnos_final)
+    }
+
+    return render(request, 'SIAPE/mis_alumnos_docente.html', context)
+
+
+
+@login_required
+def detalle_asignatura_docente(request, asignatura_id):
+    """
+    Muestra el listado de alumnos de una asignatura específica.
+    """
+    try:
+        # Verificar que el usuario sea docente
+        if request.user.perfil.rol.nombre_rol != ROL_DOCENTE:
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+
+    # 1. Obtener la asignatura (con chequeo de seguridad de que le pertenece)
+    asignatura = get_object_or_404(
+        Asignaturas, 
+        id=asignatura_id, 
+        docente=request.user.perfil
+    )
+
+    # 2. Obtener todos los estudiantes inscritos en esa asignatura
+    estudiantes_en_curso = AsignaturasEnCurso.objects.filter(
+        asignaturas=asignatura
+    ).select_related('estudiantes')
+
+    # 3. Obtener los IDs de estudiantes que tienen ajustes APROBADOS para esta asignatura
+    estudiantes_con_ajuste_ids = set(Solicitudes.objects.filter(
+        estado='aprobado',
+        asignaturas_solicitadas=asignatura
+    ).values_list('estudiantes_id', flat=True).distinct())
+
+    
+    # 4. Preparar la lista final de alumnos para la plantilla
+    lista_alumnos = []
+    for ec in estudiantes_en_curso:
+        lista_alumnos.append({
+            'estudiante': ec.estudiantes,
+            'tiene_ajuste': ec.estudiantes.id in estudiantes_con_ajuste_ids
+        })
+
+    context = {
+        'asignatura': asignatura,
+        'lista_alumnos': lista_alumnos,
+        'total_alumnos': len(lista_alumnos)
+    }
+    
+
+    return render(request, 'SIAPE/detalle_asignatura_docente.html', context)
+    
+
+
+@login_required
+def detalle_ajuste_docente(request, estudiante_id):
+    """
+    Muestra el detalle de los ajustes aprobados de un estudiante
+    especifico, relevante a las clases del docente."""
+
+    try:
+        if request.user.perfil.rol.nombre.rol_nombre != ROL_DOCENTE:
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+    
+    perfil_docente = request.user.perfil
+    estudiante = get_object_or_404(Estudiantes, id=estudiante_id)
+    mis_asignaturas = Asignaturas.objects.filter(docente=perfil_docente)
+
+    solicitudes_relevantes = Solicitudes.objects.filter(
+        estudiantes=estudiante,
+        estado='aprobado',
+        asignaturas_solicitadas__in=mis_asignaturas
+    ).prefetch_related(
+        'ajusteasignado_set__ajuste_razonable'
+    ).distinct()
+
+    ajustes = []
+    ajustes_ids = set()
+    for solicitud in solicitudes_relevantes:
+        for ajuste in solicitud.ajusteasignado_set.all():
+            if ajuste.id not in ajustes.ids:
+                ajustes.append(ajuste)
+                ajustes_ids.add(ajuste.id)
+
+                context = {
+                    'estudiante': estudiante,
+                    'ajustes': ajustes
+                }
+
+                return render(request, 'SIAPE/detalle_ajuste_docente.html', context)
+            
+
+@login_required
+def detalle_ajuste_docente(request, estudiante_id):
+    """
+    Muesta el detalle de los ajustes aporbados de un estudiante
+    especifico, pero solo los relevantes a las asignaturas
+    que imparte el docente logueado
+    """
+    try:
+        if request.user.perfil.rol.nombre_rol != ROL_DOCENTE:
+            return redirect('home')
+
+    except (AttributeError, PerfilUsuario.DoesNotExist):
+        return redirect('home')
+    
+    perfil_docente = request.user.perfil
+    estudiante = get_object_or_404(Estudiantes, id=estudiante_id)
+    
+    #1. Obtener las asignaturas que imparte este docente 
+    mis_asignaturas = Asignaturas.objects.filter(docente=perfil_docente)
+
+    # 2. Buscar solicitudes aprobadas de ese estudiante
+    # y que apliquen a cualquiera de las asignaturas del docente
+    solicitudes_relevantes = Solicitudes.objects.filter(
+        estudiantes=estudiante,
+        estado='aprobado',
+        asignaturas_solicitadas__in=mis_asignaturas
+    ).prefetch_related(
+        'ajusteasignado_set__ajuste_razonable'
+    ).distinct()
+
+    # 3. Juntar todos os ajustes en una sola lista 
+    # (un alumno puede tener varios ajustes de varias solicitudes)
+    ajustes = []
+    ajustes_ids = set() # para evitar suplicados
+    for solicitud in solicitudes_relevantes:
+        for ajuste in solicitud.ajusteasignado_set.all():
+            if ajuste.id not in ajustes_ids:
+                ajustes.append(ajuste)
+                ajustes_ids.add(ajuste.id)
+
+    context = {
+        'estudiante': estudiante,
+        'ajustes': ajustes
+    }
+
+    return render(request, 'SIAPE/detalle_ajustes_docente.html', context)
+
 
 
 # ----------- Vistas de los modelos (API) ------------

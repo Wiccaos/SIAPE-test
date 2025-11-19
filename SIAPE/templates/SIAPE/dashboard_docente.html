@@ -1,0 +1,107 @@
+{% extends "plantilla.html" %}
+{% load static %}
+{% block title %}Panel Docente | SIAPE{% endblock %}
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="main-content"> 
+    
+    <nav class="dashboard-nav">
+        <a href="{% url 'dashboard_docente' %}" class="nav-item active">
+            <i class="fas fa-home"></i>
+            Panel Principal
+        </a>
+        <a href="{% url 'mis_alumnos_docente' %}" class="nav-item">
+            <i class="fas fa-users"></i>
+            Mis Alumnos
+        </a>
+        <a href="{% url 'mis_asignaturas_docente' %}" class="nav-item">
+            <i class="fas fa-book-reader"></i>
+            Mis Asignaturas
+        </a>
+    </nav>
+
+    <section class="kpi-container">
+        <div class="kpi-card">
+            <div class="kpi-icon icon-solicitudes">
+                <i class="fas fa-book"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ asignaturas_docente|length|default:0 }}</span>
+                <span class="kpi-label">Asignaturas Asignadas</span>
+            </div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-icon icon-proceso">
+                <i class="fas fa-tools"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ total_estudiantes_con_ajuste|default:0 }}</span>
+                <span class="kpi-label">Alumnos con Ajuste Aprobado</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="table-container" style="margin-top: 30px;">
+        <div class="table-header">
+            <h2><i class="fas fa-list-alt"></i> Alumnos con Ajustes Aprobados</h2>
+        </div>
+        
+        {% if casos_por_asignatura %}
+            {% for caso_asignatura in casos_por_asignatura %}
+                
+                <h3 style="margin-top: 25px; margin-bottom: 10px; color: #cc0000;">
+                    {{ caso_asignatura.asignatura.nombre }} ({{ caso_asignatura.asignatura.seccion }})
+                </h3>
+                
+                <p style="font-size: 0.9rem; color: #666; margin-bottom: 15px;">
+                    Total de alumnos en curso: {{ caso_asignatura.total_alumnos }} | 
+                    Alumnos con ajustes aprobados: <strong>{{ caso_asignatura.total_ajustes_aprobados }}</strong>
+                </p>
+
+                <table class="custom-table">
+                    <thead>
+                        <tr>
+                            <th>Estudiante</th>
+                            <th>RUT</th>
+                            <th>Ajustes Aprobados (Categoría)</th>
+                            <th>Detalle</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for detalle in caso_asignatura.ajustes_aprobados_detalle %}
+                        <tr>
+                            <td>{{ detalle.estudiante.nombres }} {{ detalle.estudiante.apellidos }}</td>
+                            <td>{{ detalle.estudiante.rut }}</td>
+                            <td>
+                                {% for ajuste in detalle.ajustes %}
+                                    <span class="status status-aprobado" style="margin-right: 5px; display: inline-block; margin-bottom: 5px;">
+                                        {{ ajuste.ajuste_razonable.categorias_ajustes.nombre_categoria }}
+                                    </span>
+                                {% empty %}
+                                    N/A
+                                {% endfor %}
+                            </td>
+                            <td>
+                                <a href="{% url 'detalle_ajuste_docente' detalle.estudiante.id %}" class="link-rojo">Ver Ajustes »</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4">No hay estudiantes con ajustes aprobados en esta asignatura.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-chalkboard-teacher"></i>
+                <p>No tienes asignaturas asignadas.</p>
+            </div>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

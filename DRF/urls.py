@@ -77,6 +77,17 @@ urlpatterns = [
     # path('dashboard/asesor/aprobar-solicitud/<int:solicitud_id>/', views.aprobar_solicitud_asesor, name='aprobar_solicitud_asesor'),
     # path('dashboard/asesor/rechazar-solicitud/<int:solicitud_id>/', views.rechazar_solicitud_asesor, name='rechazar_solicitud_asesor'),
 
+
+    # URLs de Docente
+    path('dashboard/docente/', views.dashboard_docente, name='dashboard_docente'),
+    path('dashboard/docente/mis/asignaturas/', views.mis_asignaturas_docente, name='mis_asignaturas_docente'),
+    path('dashboard/docente/mis/alumnos/', views.mis_alumnos_docente, name='mis_alumnos_docente'),
+    path('dashboard/docente/asignatura/<int:asignatura_id>/', views.detalle_asignatura_docente, name='detalle_asignatura_docente'),
+    path('dashboard/docente/alumno/<int:estudiante_id>/', views.detalle_ajuste_docente, name='detalle_ajuste_docente'),
+    path('dashboard/docente/alumno/<int:estudiante_id>/', views.detalle_ajuste_docente, name='detalle_ajuste_docente'),
+
+    # URLs de Coordinadora de Inclusión
+    path('dashboard/coordinador/', views.dashboard_coordinadora, name='dashboard_coordinadora'),
     # URLs de Encargado de Inclusión
     path('dashboard/coordinador/', views.dashboard_encargado_inclusion, name='dashboard_encargado_inclusion'),
     path('dashboard/casos-generales/', views.casos_generales, name='casos_generales'),

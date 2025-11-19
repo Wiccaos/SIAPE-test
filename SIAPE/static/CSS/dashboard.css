@@ -62,6 +62,80 @@ body.dark-mode *::-webkit-scrollbar-thumb:hover {
     }
 }
 
+/* Mejor contraste para casos disponibles y asignados en modo oscuro */
+body.dark-mode .panel-section.casos-disponibles,
+body.dark-mode .panel-section.casos-asignados {
+    background-color: #232323 !important;
+    color: #f0f0f0 !important;
+}
+/* Mejoras modo oscuro: fondo calendario y tipografía más clara en casos/citas */
+body.dark-mode .cal-layout-container,
+body.dark-mode .cal-widget {
+    background-color: #181818 !important;
+    color: #e0e0e0 !important;
+}
+body.dark-mode .caso-item,
+body.dark-mode .cita-item,
+body.dark-mode .cita-detalle-item,
+body.dark-mode .panel-section,
+body.dark-mode .citas-detalle {
+    color: #f0f0f0 !important;
+}
+body.dark-mode .caso-header,
+body.dark-mode .cita-header,
+body.dark-mode .caso-asunto,
+body.dark-mode .cita-fecha,
+body.dark-mode .caso-estudiante,
+body.dark-mode .cita-estudiante {
+    color: #fff !important;
+}
+/* === MODO OSCURO: Panel, Casos, Citas y Calendario === */
+body.dark-mode .panel-section,
+body.dark-mode .cal-layout-container,
+body.dark-mode .cal-widget,
+body.dark-mode .cal-citas-list,
+body.dark-mode .cita-detalle-item,
+body.dark-mode .empty-state,
+body.dark-mode .citas-detalle {
+    background-color: #232323 !important;
+    color: #e0e0e0 !important;
+    border-color: #444 !important;
+}
+body.dark-mode .table-container,
+body.dark-mode .custom-table,
+body.dark-mode .modal-content {
+    background-color: #232323 !important;
+    color: #e0e0e0 !important;
+    border-color: #444 !important;
+}
+body.dark-mode .custom-table th,
+body.dark-mode .custom-table td {
+    color: #e0e0e0 !important;
+}
+body.dark-mode .cal-day,
+body.dark-mode .cal-day-header {
+    background-color: #232323 !important;
+    color: #e0e0e0 !important;
+    border-color: #444 !important;
+}
+
+
+/* 1. Esto oscurece el fondo de las tarjetas */
+body.dark-mode .detalle-card {
+    background-color: #232323 !important;
+    color: #e0e0e0 !important;
+    border-color: #444 !important;
+}
+
+/* 2. Esto aclara el texto dentro de las tarjetas */
+body.dark-mode .detalle-titulo {
+    color: #999;
+}
+body.dark-mode .detalle-card p,
+body.dark-mode .detalle-card li {
+    color: #e0e0e0;
+}
+/* Panel Control Asesor clases para reemplazar estilos en línea */
 /* Panel Control Asesor clases para reemplazar estilos en lÃ­nea */
 .ajustes-total {
     color: #666;
