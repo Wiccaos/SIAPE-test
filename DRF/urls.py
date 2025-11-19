@@ -56,6 +56,7 @@ urlpatterns = [
     path('dashboard/admin/gestion-usuarios/editar/<int:perfil_id>/', views.editar_usuario_admin, name='editar_usuario_admin'),
     # GESTIÓN INSTITUCIONAL - ADMIN
     path('dashboard/admin/gestion-institucional/', views.gestion_institucional_admin, name='gestion_institucional_admin'),
+    path('dashboard/admin/asignar-estudiantes-asignaturas/', views.asignar_estudiantes_asignaturas_admin, name='asignar_estudiantes_asignaturas_admin'),
     path('dashboard/admin/carreras/agregar/', views.agregar_carrera_admin, name='agregar_carrera_admin'),
     path('dashboard/admin/carreras/editar/<int:carrera_id>/', views.editar_carrera_admin, name='editar_carrera_admin'),
     path('dashboard/admin/asignaturas/agregar/', views.agregar_asignatura_admin, name='agregar_asignatura_admin'),
@@ -86,9 +87,7 @@ urlpatterns = [
     path('dashboard/docente/alumno/<int:estudiante_id>/', views.detalle_ajuste_docente, name='detalle_ajuste_docente'),
     path('dashboard/docente/alumno/<int:estudiante_id>/', views.detalle_ajuste_docente, name='detalle_ajuste_docente'),
 
-    # URLs de Coordinadora de Inclusión
-    path('dashboard/coordinador/', views.dashboard_coordinadora, name='dashboard_coordinadora'),
-    # URLs de Encargado de Inclusión
+    # URLs de Encargado de Inclusión (Coordinadora)
     path('dashboard/coordinador/', views.dashboard_encargado_inclusion, name='dashboard_encargado_inclusion'),
     path('dashboard/casos-generales/', views.casos_generales, name='casos_generales'),
     path('dashboard/coordinador/casos/<int:solicitud_id>/', views.detalle_casos_encargado_inclusion, name='detalle_casos_encargado_inclusion'),

@@ -398,9 +398,9 @@ def redireccionamiento_por_rol(request):
         rol = request.user.perfil.rol.nombre_rol
 
     if rol == ROL_COORDINADORA:
-        return redirect('dashboard_coordinadora')
+        return redirect('dashboard_encargado_inclusion')
     elif rol == ROL_ASESORA_TECNICA:
-        return redirect('panel_control_asesora_tecnica')
+        return redirect('dashboard_coordinador_tecnico_pedagogico')
     elif rol == ROL_ASESOR:
         return redirect('dashboard_asesor')
     elif rol == ROL_DIRECTOR:
@@ -802,6 +802,99 @@ def gestion_institucional_admin(request):
         'docentes_list': docentes,
     }
     return render(request, 'SIAPE/gestion_institucional_admin.html', context)
+
+@login_required
+def asignar_estudiantes_asignaturas_admin(request):
+    """
+    Vista para que el Administrador asigne estudiantes a asignaturas.
+    """
+    if not _check_admin_permission(request):
+        return redirect('home')
+    
+    # Obtener todos los estudiantes y asignaturas
+    estudiantes = Estudiantes.objects.select_related('carreras').all().order_by('nombres', 'apellidos')
+    asignaturas = Asignaturas.objects.select_related('carreras', 'docente__usuario').all().order_by('nombre', 'seccion')
+    carreras = Carreras.objects.all().order_by('nombre')
+    
+    # Filtrar por carrera si se proporciona
+    carrera_id = request.GET.get('carrera', '')
+    if carrera_id:
+        try:
+            carrera_seleccionada = Carreras.objects.get(id=carrera_id)
+            estudiantes = estudiantes.filter(carreras_id=carrera_id)
+            asignaturas = asignaturas.filter(carreras_id=carrera_id)
+        except Carreras.DoesNotExist:
+            carrera_seleccionada = None
+    else:
+        carrera_seleccionada = None
+    
+    # Procesar el formulario si es POST
+    if request.method == 'POST':
+        estudiante_id = request.POST.get('estudiante')
+        asignaturas_ids = request.POST.getlist('asignaturas')
+        estado = request.POST.get('estado', 'True') == 'True'
+        
+        if estudiante_id and asignaturas_ids:
+            try:
+                estudiante = Estudiantes.objects.get(id=estudiante_id)
+                asignaturas_seleccionadas = Asignaturas.objects.filter(id__in=asignaturas_ids)
+                
+                asignaciones_creadas = 0
+                asignaciones_actualizadas = 0
+                
+                for asignatura in asignaturas_seleccionadas:
+                    # Verificar si ya existe la asignación
+                    asignacion, created = AsignaturasEnCurso.objects.get_or_create(
+                        estudiantes=estudiante,
+                        asignaturas=asignatura,
+                        defaults={'estado': estado}
+                    )
+                    
+                    if not created:
+                        # Si ya existe, actualizar el estado
+                        asignacion.estado = estado
+                        asignacion.save()
+                        asignaciones_actualizadas += 1
+                    else:
+                        asignaciones_creadas += 1
+                
+                if asignaciones_creadas > 0 or asignaciones_actualizadas > 0:
+                    messages.success(
+                        request, 
+                        f'Se asignaron {asignaciones_creadas} asignatura(s) nueva(s) y se actualizaron {asignaciones_actualizadas} asignación(es) existente(s) para {estudiante.nombres} {estudiante.apellidos}.'
+                    )
+                else:
+                    messages.info(request, 'No se realizaron cambios.')
+                    
+            except Estudiantes.DoesNotExist:
+                messages.error(request, 'El estudiante seleccionado no existe.')
+            except Exception as e:
+                messages.error(request, f'Error al asignar: {str(e)}')
+        else:
+            messages.error(request, 'Debe seleccionar un estudiante y al menos una asignatura.')
+        
+        # Redirigir para evitar reenvío del formulario
+        return redirect('asignar_estudiantes_asignaturas_admin')
+    
+    # Obtener asignaciones existentes para mostrar en la tabla
+    asignaciones = AsignaturasEnCurso.objects.select_related(
+        'estudiantes', 
+        'estudiantes__carreras',
+        'asignaturas',
+        'asignaturas__carreras',
+        'asignaturas__docente__usuario'
+    ).all().order_by('-created_at')[:50]  # Últimas 50 asignaciones
+    
+    context = {
+        'estudiantes_list': estudiantes,
+        'asignaturas_list': asignaturas,
+        'carreras_list': carreras,
+        'carrera_seleccionada': carrera_seleccionada,
+        'asignaciones_list': asignaciones,
+    }
+    
+    return render(request, 'SIAPE/asignar_estudiantes_asignaturas_admin.html', context)
+
 @login_required
 def agregar_rol_admin(request):
     if not _check_admin_permission(request):
@@ -2784,28 +2877,33 @@ def dashboard_docente(request):
     total_estudiantes_con_ajuste = set() 
 
     for sol in solicitudes_relevantes:
-        detalle_para_tabla = {
-            'estudiante': sol.estudiantes,
-            'ajustes': sol.ajusteasignado_set.all(),
-            'solicitud_id': sol.id # ID de la solicitud original
-        }
+        # Filtrar solo los ajustes que están aprobados
+        ajustes_aprobados = sol.ajusteasignado_set.filter(estado_aprobacion='aprobado')
         
-        total_estudiantes_con_ajuste.add(sol.estudiantes.id)
-        
-        # Asignar este detalle a CADA asignatura del docente que esté en esta solicitud
-        for asig in sol.asignaturas_solicitadas.all():
-            if asig.docente == perfil_docente: 
-                if asig.id not in mapa_ajustes_por_asignatura:
-                    mapa_ajustes_por_asignatura[asig.id] = []
-                
-                # Evitar duplicados de estudiantes por asignatura
-                existe = False
-                for item in mapa_ajustes_por_asignatura[asig.id]:
-                    if item['estudiante'].id == sol.estudiantes.id:
-                        existe = True
-                        break
-                if not existe:
-                     mapa_ajustes_por_asignatura[asig.id].append(detalle_para_tabla)
+        # Solo agregar si hay al menos un ajuste aprobado
+        if ajustes_aprobados.exists():
+            detalle_para_tabla = {
+                'estudiante': sol.estudiantes,
+                'ajustes': ajustes_aprobados,
+                'solicitud_id': sol.id # ID de la solicitud original
+            }
+            
+            total_estudiantes_con_ajuste.add(sol.estudiantes.id)
+            
+            # Asignar este detalle a CADA asignatura del docente que esté en esta solicitud
+            for asig in sol.asignaturas_solicitadas.all():
+                if asig.docente == perfil_docente: 
+                    if asig.id not in mapa_ajustes_por_asignatura:
+                        mapa_ajustes_por_asignatura[asig.id] = []
+                    
+                    # Evitar duplicados de estudiantes por asignatura
+                    existe = False
+                    for item in mapa_ajustes_por_asignatura[asig.id]:
+                        if item['estudiante'].id == sol.estudiantes.id:
+                            existe = True
+                            break
+                    if not existe:
+                         mapa_ajustes_por_asignatura[asig.id].append(detalle_para_tabla)
 
     # 4. Construir el contexto final 'casos_por_asignatura' que espera la plantilla
     casos_por_asignatura = []
@@ -3028,12 +3126,13 @@ def detalle_ajuste_docente(request, estudiante_id):
         'ajusteasignado_set__ajuste_razonable'
     ).distinct()
 
-    # 3. Juntar todos os ajustes en una sola lista 
+    # 3. Juntar todos los ajustes aprobados en una sola lista 
     # (un alumno puede tener varios ajustes de varias solicitudes)
     ajustes = []
-    ajustes_ids = set() # para evitar suplicados
+    ajustes_ids = set() # para evitar duplicados
     for solicitud in solicitudes_relevantes:
-        for ajuste in solicitud.ajusteasignado_set.all():
+        # Filtrar solo los ajustes que están aprobados
+        for ajuste in solicitud.ajusteasignado_set.filter(estado_aprobacion='aprobado'):
             if ajuste.id not in ajustes_ids:
                 ajustes.append(ajuste)
                 ajustes_ids.add(ajuste.id)
