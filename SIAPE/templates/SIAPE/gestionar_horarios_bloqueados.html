@@ -1,0 +1,479 @@
+{% extends "plantilla.html" %}
+{% load static %}
+
+{% block title %}
+    Gestionar Horarios Bloqueados | SIAPE
+{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'css/formulario.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    
+    <nav class="dashboard-nav">
+        <a href="{% url 'dashboard_encargado_inclusion' %}" class="nav-item">
+            <i class="fas fa-home"></i>
+            Panel Principal
+        </a>
+        <a href="{% url 'casos_generales' %}" class="nav-item">
+            <i class="fas fa-folder-open"></i>
+            Casos
+        </a>
+        <a href="{% url 'panel_control_encargado_inclusion' %}" class="nav-item">
+            <i class="fas fa-calendar-alt"></i>
+            Gestión de Citas
+        </a>
+        <a href="{% url 'gestionar_horarios_bloqueados' %}" class="nav-item active">
+            <i class="fas fa-ban"></i>
+            Horarios Bloqueados
+        </a>
+    </nav>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} custom-alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <section class="support-grid-container">
+        <h2><i class="fas fa-ban"></i> Gestionar Horarios Bloqueados</h2>
+        <p class="text-muted" style="margin-bottom: 20px;">
+            <i class="fas fa-info-circle"></i> Puede bloquear horarios específicos para que no estén disponibles para agendar citas. 
+            Útil para reuniones, capacitaciones u otras actividades.
+        </p>
+
+        <div class="panel-section">
+            <h3><i class="fas fa-plus-circle"></i> Bloquear Nuevo Horario</h3>
+            <form method="POST" action="{% url 'gestionar_horarios_bloqueados' %}" class="form-descripcion-caso" id="form-bloquear-horario">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label>
+                        <strong>Seleccione Fecha y Hora a Bloquear:</strong>
+                    </label>
+                    <p class="form-hint">
+                        Seleccione un día del calendario y luego el horario que desea bloquear. Los horarios bloqueados no estarán disponibles para agendar citas.
+                    </p>
+
+                    <!-- Contenedor del calendario -->
+                    <div class="cal-layout-container">
+                        
+                        <!-- Columna 1: El Calendario -->
+                        <div class="cal-widget">
+                            <div class="detalle-card" id="card-calendario-bloqueo">
+                                <div class="calendario-header" id="cal-header-bloqueo">
+                                    <!-- El mes se inserta aquí por JS -->
+                                </div>
+                                <div class="cal-nav">
+                                    <button type="button" id="cal-prev-bloqueo" class="btn-accion btn-accion-gray btn-accion-small"><i class="fas fa-chevron-left"></i> Ant</button>
+                                    <button type="button" id="cal-today-bloqueo" class="btn-accion btn-accion-gray btn-accion-small">Hoy</button>
+                                    <button type="button" id="cal-next-bloqueo" class="btn-accion btn-accion-gray btn-accion-small">Sig <i class="fas fa-chevron-right"></i></button>
+                                </div>
+                                <div class="calendario-grid" id="cal-grid-body-bloqueo">
+                                    <!-- Los días se insertan aquí por JS -->
+                                </div>
+                                <div class="calendario-leyenda calendario-leyenda-mt">
+                                    <div><span class="dot dot-disponible"></span> Día Disponible</div>
+                                    <div><span class="dot dot-lleno"></span> Día Completo</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Columna 2: El Selector de Hora -->
+                        <div class="cal-citas-list">
+                            <h4 id="cal-citas-titulo-bloqueo">Horarios Disponibles</h4>
+                            <div id="cal-citas-dia-bloqueo">
+                                <div class="empty-state empty-state-10">
+                                    <i class="fas fa-calendar-day empty-state-icon"></i>
+                                    <p class="empty-state-text">Seleccione un día del calendario para ver los horarios disponibles.</p>
+                                </div>
+                                <div class="horarios-botones horarios-botones-hidden" id="horarios-botones-bloqueo"></div>
+                                <input type="hidden" id="hora_bloqueo" name="hora_bloqueo" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Input oculto para enviar la fecha seleccionada -->
+                    <input type="hidden" id="fecha_bloqueo" name="fecha_bloqueo" required>
+                </div>
+                <div class="form-group">
+                    <label for="motivo_bloqueo">
+                        <strong>Motivo (Opcional):</strong>
+                    </label>
+                    <input type="text" name="motivo" id="motivo_bloqueo" class="form-control" placeholder="Ej: Reunión de equipo, Capacitación, etc." maxlength="255">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-accion btn-accion-gray">
+                        <i class="fas fa-ban"></i> Bloquear Horario
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="panel-section" style="margin-top: 30px;">
+            <h3><i class="fas fa-list"></i> Horarios Bloqueados (Futuros)</h3>
+            {% if horarios_bloqueados %}
+                <div class="panel-control-container">
+                    <div class="panel-section panel-section-no-shadow">
+                        {% for horario in horarios_bloqueados %}
+                            <div class="caso-item">
+                                <div class="caso-header">
+                                    <div>
+                                        <div class="caso-estudiante">
+                                            <i class="fas fa-calendar-times"></i> 
+                                            {{ horario.fecha_hora|date:"d/m/Y H:i" }} hrs
+                                        </div>
+                                        {% if horario.motivo %}
+                                            <div class="caso-asunto caso-asunto-small">
+                                                <i class="fas fa-info-circle"></i> Motivo: {{ horario.motivo }}
+                                            </div>
+                                        {% endif %}
+                                        <div class="caso-asunto caso-asunto-small">
+                                            <i class="fas fa-calendar"></i> Bloqueado el {{ horario.created_at|date:"d/m/Y H:i" }}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <span class="status status-en_proceso">Bloqueado</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="acciones-casos acciones-casos-flex" style="margin-top: 15px;">
+                                    <form method="POST" action="{% url 'eliminar_horario_bloqueado' horario.id %}" style="display: inline;" onsubmit="return confirm('¿Está seguro de que desea desbloquear este horario? El horario volverá a estar disponible para agendar citas.');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn-accion btn-accion-green">
+                                            <i class="fas fa-unlock"></i> Desbloquear Horario
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-calendar-check empty-state-large"></i>
+                    <p class="empty-state-text-large">No hay horarios bloqueados en este momento.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="grid-column-full mt-15">
+            <a href="{% url 'dashboard_encargado_inclusion' %}" class="btn-volver">
+                <i class="fas fa-chevron-left"></i> Volver al Panel Principal
+            </a>
+        </div>
+    </section>
+
+</div>
+
+<script>
+    // --- LÓGICA DEL CALENDARIO PARA BLOQUEO DE HORARIOS ---
+    
+    // Variables globales del calendario
+    let navDateBloqueo = new Date();
+    const hoyBloqueo = new Date();
+    const hoyStrBloqueo = `${hoyBloqueo.getFullYear()}-${String(hoyBloqueo.getMonth() + 1).padStart(2, '0')}-${String(hoyBloqueo.getDate()).padStart(2, '0')}`;
+    let diaSeleccionadoBloqueo = null; 
+    let diaSeleccionadoStrBloqueo = null;
+    let calendarioDataBloqueo = {};
+
+    // Elementos del DOM del calendario
+    const calHeaderBloqueo = document.getElementById('cal-header-bloqueo');
+    const calGridBodyBloqueo = document.getElementById('cal-grid-body-bloqueo');
+    const btnPrevBloqueo = document.getElementById('cal-prev-bloqueo');
+    const btnNextBloqueo = document.getElementById('cal-next-bloqueo');
+    const btnTodayBloqueo = document.getElementById('cal-today-bloqueo');
+    const citasDiaContainerBloqueo = document.getElementById('cal-citas-dia-bloqueo');
+    const citasDiaTituloBloqueo = document.getElementById('cal-citas-titulo-bloqueo');
+    const horariosBotonesBloqueo = document.getElementById('horarios-botones-bloqueo');
+    const fechaHiddenInputBloqueo = document.getElementById('fecha_bloqueo');
+    const horaHiddenInputBloqueo = document.getElementById('hora_bloqueo');
+    
+    const meses = [
+        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ];
+
+    // Función para buscar datos del mes
+    async function fetchCalendarioDelMesBloqueo(year, month) {
+        if (!calHeaderBloqueo) return;
+        
+        calHeaderBloqueo.innerText = `Cargando ${meses[month]} ${year}...`;
+        
+        try {
+            const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+            const response = await fetch(`/api/calendario-disponible/?month=${monthStr}`);
+            
+            if (!response.ok) throw new Error('Error de red');
+            
+            calendarioDataBloqueo = await response.json();
+            renderCalendarBloqueo(year, month);
+
+        } catch (error) {
+            console.error('Error fetching calendario:', error);
+            if (calHeaderBloqueo) calHeaderBloqueo.innerText = "Error al cargar calendario";
+        }
+    }
+
+    // Función para mostrar los horarios de un día
+    function mostrarHorariosDelDiaBloqueo(fechaStr, diaEl) {
+        if (!calHeaderBloqueo || !horariosBotonesBloqueo) return;
+        
+        // Actualizar título
+        const [year, month, day] = fechaStr.split('-');
+        citasDiaTituloBloqueo.innerText = `Horarios para ${day}/${month}/${year}`;
+
+        // Resaltar día seleccionado
+        if (diaSeleccionadoBloqueo) {
+            diaSeleccionadoBloqueo.classList.remove('cal-day-selected');
+        }
+        
+        if(diaEl) {
+            diaEl.classList.add('cal-day-selected');
+            diaSeleccionadoBloqueo = diaEl;
+            diaSeleccionadoStrBloqueo = fechaStr;
+        } else {
+            diaSeleccionadoBloqueo = calGridBodyBloqueo.querySelector(`[data-fecha="${fechaStr}"]`);
+            if (diaSeleccionadoBloqueo) {
+                diaSeleccionadoBloqueo.classList.add('cal-day-selected');
+            }
+        }
+
+        // Guardar fecha en el input oculto
+        if (fechaHiddenInputBloqueo) {
+            fechaHiddenInputBloqueo.value = fechaStr;
+        }
+        if (horaHiddenInputBloqueo) {
+            horaHiddenInputBloqueo.value = '';
+        }
+
+        // Obtener los slots disponibles y no disponibles del calendario
+        const slotsDisponibles = (calendarioDataBloqueo && calendarioDataBloqueo.slotsDetallados && calendarioDataBloqueo.slotsDetallados[fechaStr]) ? calendarioDataBloqueo.slotsDetallados[fechaStr] : [];
+        const slotsNoDisponibles = (calendarioDataBloqueo && calendarioDataBloqueo.slotsNoDisponibles && calendarioDataBloqueo.slotsNoDisponibles[fechaStr]) ? calendarioDataBloqueo.slotsNoDisponibles[fechaStr] : [];
+        
+        // Limpiar contenido previo
+        const existingEmptyStates = citasDiaContainerBloqueo.querySelectorAll('.empty-state');
+        existingEmptyStates.forEach(el => el.remove());
+        
+        // Limpiar botones previos
+        horariosBotonesBloqueo.innerHTML = '';
+        horariosBotonesBloqueo.classList.remove('horarios-botones-hidden');
+        horariosBotonesBloqueo.style.display = 'flex';
+
+        // Generar todos los slots de 9:00 a 17:00
+        const allSlots = [];
+        for (let h = 9; h <= 17; h++) {
+            allSlots.push(`${h.toString().padStart(2, '0')}:00`);
+        }
+
+        // Crear botones para cada horario
+        for (const slot of allSlots) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn-horario';
+            const horaInicio = parseInt(slot.split(':')[0]);
+            const horaFin = horaInicio + 1;
+            btn.textContent = `${slot} - ${horaFin.toString().padStart(2, '0')}:00`;
+            btn.dataset.hora = slot;
+
+            // Verificar si el slot está disponible o no
+            const estaDisponible = slotsDisponibles.includes(slot);
+            const estaNoDisponible = slotsNoDisponibles.includes(slot);
+
+            // Para bloquear, permitimos seleccionar cualquier horario (disponible o no)
+            // ya que el objetivo es bloquearlo
+            if (estaNoDisponible) {
+                // Si ya está ocupado o bloqueado, lo marcamos pero aún se puede bloquear
+                btn.classList.add('no-disponible');
+                btn.title = 'Hora ya ocupada o bloqueada (se puede bloquear de todas formas)';
+            } else if (estaDisponible) {
+                btn.title = 'Hora disponible para bloquear';
+            } else {
+                btn.classList.add('no-disponible');
+                btn.title = 'Hora no disponible';
+            }
+
+            // Todos los botones son seleccionables para bloquear
+            btn.addEventListener('click', function() {
+                horariosBotonesBloqueo.querySelectorAll('.btn-horario').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                if (horaHiddenInputBloqueo) {
+                    horaHiddenInputBloqueo.value = slot;
+                }
+            });
+            
+            horariosBotonesBloqueo.appendChild(btn);
+        }
+        
+        // Si no hay slots disponibles, mostrar mensaje adicional
+        if (slotsDisponibles.length === 0 && slotsNoDisponibles.length === allSlots.length) {
+            horariosBotonesBloqueo.insertAdjacentHTML('afterend', `
+                <div class="empty-state empty-state-10" style="margin-top: 15px;">
+                    <i class="fas fa-info-circle"></i>
+                    <p class="empty-state-text">Todos los horarios están ocupados o bloqueados. Puede seleccionar uno para bloquearlo de todas formas.</p>
+                </div>
+            `);
+        }
+    }
+    
+    // Función principal para renderizar el calendario
+    function renderCalendarBloqueo(year, month) {
+        if (!calHeaderBloqueo) return;
+        
+        calHeaderBloqueo.innerText = `${meses[month]} ${year}`;
+        
+        calGridBodyBloqueo.innerHTML = `
+            <div class="cal-day-header">L</div>
+            <div class="cal-day-header">M</div>
+            <div class="cal-day-header">X</div>
+            <div class="cal-day-header">J</div>
+            <div class="cal-day-header">V</div>
+            <div class="cal-day-header">S</div>
+            <div class="cal-day-header">D</div>
+        `;
+        
+        const primerDiaDelMes = new Date(year, month, 1);
+        const ultimoDiaDelMes = new Date(year, month + 1, 0);
+        const ultimoDiaNum = ultimoDiaDelMes.getDate();
+        let diaInicioSemana = (primerDiaDelMes.getDay() + 6) % 7;
+        const ultimoDiaMesAnterior = new Date(year, month, 0).getDate();
+
+        // Días del mes anterior
+        for (let i = diaInicioSemana; i > 0; i--) {
+            const dia = ultimoDiaMesAnterior - i + 1;
+            const dayDiv = document.createElement('div');
+            dayDiv.classList.add('cal-day', 'other-month');
+            dayDiv.innerText = dia;
+            calGridBodyBloqueo.appendChild(dayDiv);
+        }
+
+        // Días del mes actual
+        for (let dia = 1; dia <= ultimoDiaNum; dia++) {
+            const dayDiv = document.createElement('div');
+            dayDiv.classList.add('cal-day');
+            dayDiv.innerText = dia;
+
+            const fechaStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+            dayDiv.dataset.fecha = fechaStr;
+
+            const fechaDate = new Date(year, month, dia);
+            const diaSemana = fechaDate.getDay();
+            const esFinDeSemana = diaSemana === 0 || diaSemana === 6;
+            const hoyDate = new Date(hoyBloqueo.getFullYear(), hoyBloqueo.getMonth(), hoyBloqueo.getDate());
+            const esDiaPasado = fechaDate < hoyDate;
+            const esSeleccionable = !esFinDeSemana && !esDiaPasado;
+
+            if (fechaStr === hoyStrBloqueo) {
+                dayDiv.classList.add('day-today');
+            }
+
+            // Colorear según disponibilidad
+            if (esSeleccionable) {
+                if (calendarioDataBloqueo.fechasConDisponibilidad?.includes(fechaStr)) {
+                    dayDiv.classList.add('day-disponible');
+                } else if (calendarioDataBloqueo.diasCompletos?.includes(fechaStr)) {
+                    dayDiv.classList.add('day-lleno');
+                }
+            } else if (esFinDeSemana) {
+                dayDiv.classList.add('day-inabil');
+            } else if (esDiaPasado) {
+                dayDiv.classList.add('day-inabil');
+            }
+
+            // Solo permitir seleccionar días hábiles futuros o hoy
+            if (esSeleccionable) {
+                dayDiv.addEventListener('click', () => {
+                    mostrarHorariosDelDiaBloqueo(fechaStr, dayDiv);
+                });
+            }
+            
+            calGridBodyBloqueo.appendChild(dayDiv);
+        }
+
+        // Días del mes siguiente
+        const totalDiasGrid = calGridBodyBloqueo.children.length;
+        const diasSiguientes = (7 - (totalDiasGrid % 7)) % 7;
+        for (let i = 1; i <= diasSiguientes; i++) {
+            const dayDiv = document.createElement('div');
+            dayDiv.classList.add('cal-day', 'other-month');
+            dayDiv.innerText = i;
+            calGridBodyBloqueo.appendChild(dayDiv);
+        }
+        
+        // Al re-renderizar, si un día estaba seleccionado, lo volvemos a mostrar
+        if (diaSeleccionadoStrBloqueo && calendarioDataBloqueo && calendarioDataBloqueo.slotsDetallados) {
+            const [selYear, selMonth] = diaSeleccionadoStrBloqueo.split('-');
+            if (parseInt(selYear) === year && parseInt(selMonth) === (month + 1)) {
+                mostrarHorariosDelDiaBloqueo(diaSeleccionadoStrBloqueo, null);
+            } else {
+                diaSeleccionadoBloqueo = null;
+                diaSeleccionadoStrBloqueo = null;
+                if (citasDiaTituloBloqueo) citasDiaTituloBloqueo.innerText = `Horarios Disponibles`;
+                if (citasDiaContainerBloqueo) {
+                    citasDiaContainerBloqueo.innerHTML = `
+                        <div class="empty-state empty-state-10">
+                            <i class="fas fa-calendar-day empty-state-icon"></i>
+                            <p class="empty-state-text">Seleccione un día del calendario para ver los horarios disponibles.</p>
+                        </div>
+                    `;
+                }
+                if (horariosBotonesBloqueo) {
+                    horariosBotonesBloqueo.classList.add('horarios-botones-hidden');
+                    horariosBotonesBloqueo.style.display = 'none';
+                }
+                if (horaHiddenInputBloqueo) horaHiddenInputBloqueo.value = '';
+                if (fechaHiddenInputBloqueo) fechaHiddenInputBloqueo.value = '';
+            }
+        }
+    }
+
+    // Event Listeners para navegación
+    if (btnPrevBloqueo) {
+        btnPrevBloqueo.addEventListener('click', () => {
+            navDateBloqueo.setMonth(navDateBloqueo.getMonth() - 1);
+            fetchCalendarioDelMesBloqueo(navDateBloqueo.getFullYear(), navDateBloqueo.getMonth());
+        });
+    }
+
+    if (btnNextBloqueo) {
+        btnNextBloqueo.addEventListener('click', () => {
+            navDateBloqueo.setMonth(navDateBloqueo.getMonth() + 1);
+            fetchCalendarioDelMesBloqueo(navDateBloqueo.getFullYear(), navDateBloqueo.getMonth());
+        });
+    }
+
+    if (btnTodayBloqueo) {
+        btnTodayBloqueo.addEventListener('click', () => {
+            navDateBloqueo = new Date();
+            fetchCalendarioDelMesBloqueo(navDateBloqueo.getFullYear(), navDateBloqueo.getMonth());
+        });
+    }
+
+    // Validación del formulario
+    const formBloquear = document.getElementById('form-bloquear-horario');
+    if (formBloquear) {
+        formBloquear.addEventListener('submit', function(e) {
+            if (!fechaHiddenInputBloqueo || !fechaHiddenInputBloqueo.value) {
+                e.preventDefault();
+                alert('Por favor, seleccione una fecha del calendario.');
+                return false;
+            }
+            if (!horaHiddenInputBloqueo || !horaHiddenInputBloqueo.value) {
+                e.preventDefault();
+                alert('Por favor, seleccione un horario disponible.');
+                return false;
+            }
+        });
+    }
+
+    // Carga inicial del calendario
+    if (calHeaderBloqueo) {
+        fetchCalendarioDelMesBloqueo(navDateBloqueo.getFullYear(), navDateBloqueo.getMonth());
+    }
+</script>
+{% endblock %}
+

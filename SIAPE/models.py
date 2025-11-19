@@ -199,7 +199,7 @@ class Solicitudes(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        limit_choices_to={'rol__nombre_rol': 'Coordinadora de Inclusión'},
+        limit_choices_to={'rol__nombre_rol': 'Encargado de Inclusión'},
         related_name='solicitudes_como_coordinadora'
     )
     asesor_tecnico_asignado = models.ForeignKey(
@@ -207,7 +207,7 @@ class Solicitudes(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        limit_choices_to={'rol__nombre_rol': 'Asesora Técnica'},
+        limit_choices_to={'rol__nombre_rol': 'Coordinador Técnico Pedagógico'},
         related_name='solicitudes_como_asesor_tecnico'
     )
     asesor_pedagogico_asignado = models.ForeignKey(
@@ -220,8 +220,9 @@ class Solicitudes(models.Model):
     )
 
     ESTADO_CHOICES = (
-        ('pendiente_entrevista', 'Pendiente de Entrevista (Coordinadora)'),
-        ('pendiente_formulacion', 'Pendiente de Formulación (Asesora Técnica)'),
+        ('pendiente_entrevista', 'Pendiente de Entrevista (Encargado de Inclusión)'),
+        ('pendiente_formulacion_caso', 'Pendiente de Formulación del Caso (Encargado de Inclusión)'),
+        ('pendiente_formulacion_ajustes', 'Pendiente de Formulación de Ajustes (Coordinador Técnico Pedagógico)'),
         ('pendiente_preaprobacion', 'Pendiente de Preaprobación (Asesor Pedagógico)'),
         ('pendiente_aprobacion', 'Pendiente de Aprobación (Director)'),
         ('aprobado', 'Aprobado e Informado'),
@@ -296,10 +297,23 @@ class AsignaturasEnCurso(models.Model):
         return f"{self.estudiantes} cursando {self.asignaturas} ({self.get_estado_display()})"
 
 class Entrevistas(models.Model):
+    ESTADO_ENTREVISTA_CHOICES = [
+        ("pendiente", "Pendiente"),
+        ("realizada", "Realizada"),
+        ("cancelada", "Cancelada"),
+        ("no_asistio", "No asistió"),
+    ]
+
     fecha_entrevista = models.DateTimeField()
     modalidad = models.CharField(max_length=100)
     notas = models.CharField(max_length=500, blank=True, default='')
     solicitudes = models.ForeignKey(Solicitudes, on_delete=models.CASCADE)
+    estado = models.CharField(
+        max_length=20,
+        choices=ESTADO_ENTREVISTA_CHOICES,
+        default="pendiente",
+        verbose_name="Estado de la Entrevista"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     coordinadora = models.ForeignKey(
@@ -307,7 +321,7 @@ class Entrevistas(models.Model):
         null=True,
         blank=True,
         on_delete=models.CASCADE,
-        limit_choices_to={'rol__nombre_rol': 'Coordinadora de Inclusión'}
+        limit_choices_to={'rol__nombre_rol': 'Encargado de Inclusión'}
     )
 
     class Meta:
@@ -315,6 +329,41 @@ class Entrevistas(models.Model):
 
     def __str__(self):
             return f"Entrevista sobre {self.solicitudes}"
+
+class HorarioBloqueado(models.Model):
+    """
+    Modelo para que el Encargado de Inclusión pueda bloquear horarios específicos
+    que no estarán disponibles para agendar citas (reuniones, etc.)
+    """
+    coordinadora = models.ForeignKey(
+        PerfilUsuario,
+        on_delete=models.CASCADE,
+        limit_choices_to={'rol__nombre_rol': 'Encargado de Inclusión'},
+        related_name='horarios_bloqueados',
+        verbose_name="Encargado de Inclusión"
+    )
+    fecha_hora = models.DateTimeField(
+        verbose_name="Fecha y Hora Bloqueada"
+    )
+    motivo = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name="Motivo del Bloqueo",
+        help_text="Ej: Reunión, Capacitación, etc."
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'horarios_bloqueados'
+        verbose_name = "Horario Bloqueado"
+        verbose_name_plural = "Horarios Bloqueados"
+        # Evitar duplicados: una coordinadora no puede bloquear el mismo horario dos veces
+        unique_together = [['coordinadora', 'fecha_hora']]
+
+    def __str__(self):
+        return f"Horario bloqueado: {self.fecha_hora.strftime('%d/%m/%Y %H:%M')} - {self.coordinadora}"
 
 class AjusteRazonable(models.Model):
     descripcion = models.TextField()
@@ -331,6 +380,39 @@ class AjusteRazonable(models.Model):
 class AjusteAsignado(models.Model):
     ajuste_razonable = models.ForeignKey(AjusteRazonable, on_delete=models.CASCADE)
     solicitudes = models.ForeignKey(Solicitudes, on_delete=models.CASCADE)
+    
+    # Campos para aprobación individual del Director
+    ESTADO_APROBACION_CHOICES = (
+        ('pendiente', 'Pendiente de Aprobación'),
+        ('aprobado', 'Aprobado'),
+        ('rechazado', 'Rechazado'),
+    )
+    estado_aprobacion = models.CharField(
+        max_length=20,
+        choices=ESTADO_APROBACION_CHOICES,
+        default='pendiente',
+        verbose_name="Estado de Aprobación"
+    )
+    director_aprobador = models.ForeignKey(
+        'PerfilUsuario',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        limit_choices_to={'rol__nombre_rol': 'Director de Carrera'},
+        related_name='ajustes_aprobados',
+        verbose_name="Director que Aprobó/Rechazó"
+    )
+    fecha_aprobacion = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Aprobación/Rechazo"
+    )
+    comentarios_director = models.TextField(
+        blank=True,
+        default='',
+        verbose_name="Comentarios del Director"
+    )
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

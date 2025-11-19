@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block title %}
-    Panel Principal - Asesor | SIAPE
+    Panel Principal - Asesora Pedagógica | SIAPE
 {% endblock %}
 
 {% block extra_head %}
@@ -17,93 +17,113 @@
             <i class="fas fa-home"></i>
             Panel Principal
         </a>
-        <a href="{% url 'casos_asesor' %}" class="nav-item">
+        <a href="{% url 'casos_generales' %}" class="nav-item">
             <i class="fas fa-folder-open"></i>
             Casos
-        </a>
-        <a href="{% url 'panel_control_asesor' %}" class="nav-item">
-            <i class="fas fa-tachometer-alt"></i>
-            Panel de Control
         </a>
     </nav>
 
     <section class="kpi-container">
+        <!-- KPI 1: Casos Nuevos -->
         <div class="kpi-card">
             <div class="kpi-icon icon-solicitudes">
-                <i class="fas fa-file-alt"></i>
+                <i class="fas fa-file-medical"></i>
             </div>
             <div class="kpi-info">
-                <span class="kpi-value">{{ total_solicitudes|default:0 }}</span>
-                <span class="kpi-label">Total Solicitudes</span>
-                </div>
-        </div>
-
-        <div class="kpi-card">
-            <div class="kpi-icon icon-resueltos">
-                <i class="fas fa-check-circle"></i>
+                <span class="kpi-value">{{ kpis.casos_nuevos_semana|default:0 }}</span>
+                <span class="kpi-label">Casos Nuevos (Esta Semana)</span>
             </div>
-            <div class="kpi-info">
-                <span class="kpi-value">{{ casos_resueltos|default:0 }}</span>
-                <span class="kpi-label">Casos resueltos</span>
-                </div>
         </div>
 
+        <!-- KPI 2: Casos Devueltos desde Director -->
         <div class="kpi-card">
             <div class="kpi-icon icon-proceso">
-                <i class="fas fa-clock"></i>
+                <i class="fas fa-undo"></i>
             </div>
             <div class="kpi-info">
-                <span class="kpi-value">{{ casos_en_proceso|default:0 }}</span>
-                <span class="kpi-label">En Proceso</span>
-                </div>
+                <span class="kpi-value">{{ kpis.casos_devueltos_director|default:0 }}</span>
+                <span class="kpi-label">Casos Devueltos (Desde Director)</span>
+            </div>
         </div>
 
+        <!-- KPIs por cada estado -->
+        {% for estado in estados_con_cantidad %}
         <div class="kpi-card">
-            <div class="kpi-icon icon-citas">
-                <i class="fas fa-calendar-check"></i>
+            <div class="kpi-icon {% if estado.valor == 'aprobado' %}icon-resueltos{% elif estado.valor == 'rechazado' %}kpi-icon-danger{% elif estado.valor == 'pendiente_preaprobacion' %}icon-proceso{% else %}icon-solicitudes{% endif %}">
+                {% if estado.valor == 'aprobado' %}
+                    <i class="fas fa-check-circle"></i>
+                {% elif estado.valor == 'rechazado' %}
+                    <i class="fas fa-times-circle"></i>
+                {% elif estado.valor == 'pendiente_entrevista' %}
+                    <i class="fas fa-calendar-day"></i>
+                {% elif estado.valor == 'pendiente_formulacion_caso' %}
+                    <i class="fas fa-file-alt"></i>
+                {% elif estado.valor == 'pendiente_formulacion_ajustes' %}
+                    <i class="fas fa-tools"></i>
+                {% elif estado.valor == 'pendiente_preaprobacion' %}
+                    <i class="fas fa-clipboard-check"></i>
+                {% elif estado.valor == 'pendiente_aprobacion' %}
+                    <i class="fas fa-user-check"></i>
+                {% else %}
+                    <i class="fas fa-file"></i>
+                {% endif %}
             </div>
             <div class="kpi-info">
-                <span class="kpi-value">{{ citas_semana|default:0 }}</span>
-                <span class="kpi-label">Citas esta semana</span>
-                </div>
+                <span class="kpi-value">{{ estado.cantidad|default:0 }}</span>
+                <span class="kpi-label">{{ estado.nombre }}</span>
+            </div>
         </div>
+        {% endfor %}
     </section>
 
     <section class="support-grid-container">
-        <h2>Distribución de apoyo personalizado</h2>
+        <h2><i class="fas fa-clipboard-check"></i> Casos Pendientes de Preaprobación</h2>
 
-        {% if distribucion_apoyos %}
-            {% for item in distribucion_apoyos %}
-                <div class="support-row">
-                    <div class="support-title">
-                        {{ item.categoria.nombre_categoria }}
-                    </div>
-                    <div class="support-stats">
-                        <div class="stat-box approved">
-                            <strong>{{ item.aprobados }}</strong>
-                            <span>aprobados</span>
+        {% if casos_pendientes_preaprobacion %}
+            <div class="panel-control-container">
+                <div class="panel-section panel-section-no-shadow">
+                    {% for caso in casos_pendientes_preaprobacion %}
+                        <div class="caso-item">
+                            <div class="caso-header">
+                                <div>
+                                    <div class="caso-estudiante">{{ caso.estudiantes.nombres }} {{ caso.estudiantes.apellidos }}</div>
+                                    <div class="caso-asunto caso-asunto-small">
+                                        RUT: {{ caso.estudiantes.rut }} | Carrera: {{ caso.estudiantes.carreras.nombre }}
+                                    </div>
+                                    <div class="caso-asunto caso-asunto-small">
+                                        <i class="fas fa-calendar"></i> Actualizado: {{ caso.updated_at|date:"d/m/Y H:i" }}
+                                    </div>
+                                </div>
+                                <div>
+                                    <span class="status status-en_proceso">{{ caso.get_estado_display }}</span>
+                                </div>
+                            </div>
+                            
+                            <hr class="border-top-light mt-15">
+                            
+                            <h4 class="section-title-small">Asunto de Solicitud:</h4>
+                            <p class="section-content">{{ caso.asunto }}</p>
+                            
+                            {% if caso.descripcion %}
+                                <h4 class="section-title-small">Descripción del Caso:</h4>
+                                <p class="section-content">{{ caso.descripcion|truncatewords:50 }}</p>
+                            {% endif %}
+
+                            <div class="acciones-casos acciones-casos-flex">
+                                <a href="{% url 'detalle_casos_encargado_inclusion' caso.id %}" class="btn-accion btn-agendar">
+                                    <i class="fas fa-edit"></i> Ver/Preaprobar Caso
+                                </a>
+                            </div>
                         </div>
-                        <div class="stat-box pending">
-                            <strong>{{ item.pendientes }}</strong>
-                            <span>Pendientes</span>
-                        </div>
-                        <div class="stat-box rejected">
-                            <strong>{{ item.rechazados }}</strong>
-                            <span>Rechazados</span>
-                        </div>
-                    </div>
-                    <div class="support-total">
-                        {{ item.total }} casos ({{ item.porcentaje }}%)
-                    </div>
+                    {% endfor %}
                 </div>
-            {% endfor %}
+            </div>
         {% else %}
             <div class="empty-state">
-                <i class="fas fa-inbox"></i>
-                <p>No hay datos de distribución de apoyos disponibles</p>
+                <i class="fas fa-check-circle empty-state-large"></i>
+                <p class="empty-state-text-large">No hay casos pendientes de preaprobación en este momento.</p>
             </div>
         {% endif %}
-
     </section>
 
 </div>

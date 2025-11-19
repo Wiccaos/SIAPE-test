@@ -1,0 +1,77 @@
+{% extends "plantilla.html" %}
+{% load static %}
+
+{% block title %}
+    Estudiantes de {{ carrera.nombre }} | SIAPE
+{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="main-content"> 
+    
+    <nav class="dashboard-nav">
+        <a href="{% url 'dashboard_director' %}" class="nav-item">
+            <i class="fas fa-user-tie"></i>
+            Panel Principal
+        </a>
+        <a href="{% url 'estadisticas_director' %}" class="nav-item">
+            <i class="fas fa-chart-bar"></i>
+            Estadísticas
+        </a>
+        <a href="{% url 'carreras_director' %}" class="nav-item active">
+            <i class="fas fa-graduation-cap"></i>
+            Mis Carreras
+        </a>
+    </nav>
+
+    <section class="table-container">
+        <div class="table-header">
+            <h2><i class="fas fa-users"></i> Estudiantes de: {{ carrera.nombre }}</h2>
+        </div>
+        
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Nombre Completo</th>
+                    <th>RUT</th>
+                    <th>Email</th>
+                    <th>Teléfono</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for estudiante in estudiantes_list %}
+                <tr>
+                    <td>{{ estudiante.nombres }} {{ estudiante.apellidos }}</td>
+                    <td>{{ estudiante.rut }}</td>
+                    <td>{{ estudiante.email }}</td>
+                    <td>{{ estudiante.numero|default:'N/A' }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4">
+                        <div class="empty-state">
+                            <i class="fas fa-user-graduate"></i>
+                            <p>No hay estudiantes registrados en esta carrera.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="table-footer">
+            <span>Mostrando {{ total_estudiantes|default:0 }} estudiantes</span>
+        </div>
+
+        <div class="grid-column-full mt-15" style="margin-top: 25px;">
+            <a href="{% url 'carreras_director' %}" class="btn-volver">
+                <i class="fas fa-chevron-left"></i> Volver a Mis Carreras
+            </a>
+        </div>
+    </section>
+
+</div>
+{% endblock %}

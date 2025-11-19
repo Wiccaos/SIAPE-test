@@ -51,10 +51,18 @@
                             <i class="fas fa-user-circle"></i>
                             <span>Opciones de usuario</span>
                         </a>
-                        <a href="#" class_A"dropdown-item" id="btn-accesibilidad">
-                            <i class="fas fa-universal-access"></i>
-                            <span>Accesibilidad</span>
-                        </a>
+                        <div class="dropdown-item accessibility-item" id="accessibility-item">
+                            <i class="fas fa-text-height"></i>
+                            <span>Tamaño Letra</span>
+                            <div class="accessibility-controls-inline">
+                                <button type="button" class="accessibility-btn" id="font-decrease" title="Disminuir tamaño de fuente">
+                                    <i class="fas fa-minus"></i>
+                                </button>
+                                <button type="button" class="accessibility-btn" id="font-increase" title="Aumentar tamaño de fuente">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
                         <!-- Item especial para el toggle -->
                         <div class="dropdown-item toggle-item">
                             <label for="dark-mode-toggle">
@@ -76,6 +84,41 @@
                 
             {% else %}
                 <span>Plataforma de Apoyo Estudiantil</span>
+                
+                <!-- Contenedor del Dropdown de Accesibilidad para usuarios no autenticados -->
+                <div class="header-dropdown">
+                    <!-- Este es el botón que se ve siempre -->
+                    <button type="button" class="header-config-link">
+                        <i class="fas fa-universal-access"></i>
+                        <span class="btn-text">Accesibilidad</span>
+                    </button>
+                    <!-- Este es el menú que se despliega -->
+                    <div class="dropdown-menu">
+                        <div class="dropdown-item accessibility-item" id="accessibility-item">
+                            <i class="fas fa-text-height"></i>
+                            <span>Tamaño Letra</span>
+                            <div class="accessibility-controls-inline">
+                                <button type="button" class="accessibility-btn" id="font-decrease" title="Disminuir tamaño de fuente">
+                                    <i class="fas fa-minus"></i>
+                                </button>
+                                <button type="button" class="accessibility-btn" id="font-increase" title="Aumentar tamaño de fuente">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Item especial para el toggle -->
+                        <div class="dropdown-item toggle-item">
+                            <label for="dark-mode-toggle">
+                                <i class="fas fa-moon"></i>
+                                <span>Modo oscuro</span>
+                            </label>
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="dark-mode-toggle">
+                                <span class="slider"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             {% endif %}
         </div>
     </header>
@@ -98,45 +141,93 @@
             
             // --- Lógica de Modo Oscuro ---
             const darkModeToggle = document.getElementById('dark-mode-toggle');
-            const currentTheme = localStorage.getItem('theme');
+            
+            // Solo ejecutar si el elemento existe (no todas las páginas tienen el toggle)
+            if (darkModeToggle) {
+                const currentTheme = localStorage.getItem('theme');
 
-            // Aplicar tema al cargar la página
-            if (currentTheme === 'dark') {
-                body.classList.add('dark-mode');
-                darkModeToggle.checked = true;
-            }
-
-            // Listener para el botón
-            darkModeToggle.addEventListener('change', () => {
-                if (darkModeToggle.checked) {
+                // Aplicar tema al cargar la página
+                if (currentTheme === 'dark') {
                     body.classList.add('dark-mode');
-                    localStorage.setItem('theme', 'dark');
-                } else {
-                    body.classList.remove('dark-mode');
-                    localStorage.setItem('theme', 'light');
+                    darkModeToggle.checked = true;
                 }
-            });
+
+                // Listener para el botón
+                darkModeToggle.addEventListener('change', () => {
+                    if (darkModeToggle.checked) {
+                        body.classList.add('dark-mode');
+                        localStorage.setItem('theme', 'dark');
+                    } else {
+                        body.classList.remove('dark-mode');
+                        localStorage.setItem('theme', 'light');
+                    }
+                });
+            }
 
             // --- Lógica de Accesibilidad ---
-            const accessibilityToggle = document.getElementById('btn-accesibilidad');
-            const currentAccessibility = localStorage.getItem('accessibility');
-
-            // Aplicar modo accesibilidad al cargar
-            if (currentAccessibility === 'enabled') {
-                body.classList.add('accessibility-mode');
-            }
-
-            // Listener para el botón
-            accessibilityToggle.addEventListener('click', (e) => {
-                e.preventDefault(); // Evita que el enlace '#' navegue
-                body.classList.toggle('accessibility-mode');
+            const fontIncreaseBtn = document.getElementById('font-increase');
+            const fontDecreaseBtn = document.getElementById('font-decrease');
+            const accessibilityItem = document.getElementById('accessibility-item');
+            const html = document.documentElement;
+            
+            // Obtener nivel de fuente guardado o usar 1x por defecto
+            let currentFontLevel = parseFloat(localStorage.getItem('fontSizeLevel')) || 1.0;
+            const minFontLevel = 1.0;
+            const maxFontLevel = 3.0; // Máximo 3 veces el tamaño base
+            const fontStep = 0.25; // Incremento de 0.25x cada vez
+            const baseFontSize = 1.1; // Tamaño base en rem (debe coincidir con CSS)
+            
+            // Función para aplicar el tamaño de fuente
+            function applyFontSize(level) {
+                const fontSize = baseFontSize * level;
+                // Cambiar el tamaño del html para que todos los rem escalen
+                html.style.fontSize = `${fontSize}rem`;
+                // También cambiar el body para mantener consistencia
+                body.style.fontSize = `${fontSize}rem`;
+                localStorage.setItem('fontSizeLevel', level);
                 
-                if (body.classList.contains('accessibility-mode')) {
-                    localStorage.setItem('accessibility', 'enabled');
-                } else {
-                    localStorage.setItem('accessibility', 'disabled');
+                // Habilitar/deshabilitar botones según límites
+                if (fontIncreaseBtn) {
+                    fontIncreaseBtn.disabled = level >= maxFontLevel;
                 }
-            });
+                if (fontDecreaseBtn) {
+                    fontDecreaseBtn.disabled = level <= minFontLevel;
+                }
+            }
+            
+            // Aplicar tamaño de fuente guardado al cargar
+            applyFontSize(currentFontLevel);
+            
+            // Prevenir que el item de accesibilidad cierre el dropdown
+            if (accessibilityItem) {
+                accessibilityItem.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Evita que se cierre el dropdown
+                });
+            }
+            
+            // Botón aumentar fuente
+            if (fontIncreaseBtn) {
+                fontIncreaseBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (currentFontLevel < maxFontLevel) {
+                        currentFontLevel = Math.min(currentFontLevel + fontStep, maxFontLevel);
+                        applyFontSize(currentFontLevel);
+                    }
+                });
+            }
+            
+            // Botón disminuir fuente
+            if (fontDecreaseBtn) {
+                fontDecreaseBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (currentFontLevel > minFontLevel) {
+                        currentFontLevel = Math.max(currentFontLevel - fontStep, minFontLevel);
+                        applyFontSize(currentFontLevel);
+                    }
+                });
+            }
 
                         const dropdown = document.querySelector('.header-dropdown');
             if (dropdown) {
@@ -153,6 +244,14 @@
                 window.addEventListener('click', (e) => {
                     if (dropdownMenu.classList.contains('show') && !dropdown.contains(e.target)) {
                         dropdownMenu.classList.remove('show');
+                        // También cerrar el submenú de accesibilidad
+                        if (accessibilitySubmenu) {
+                            accessibilitySubmenu.classList.remove('show');
+                            const chevron = accessibilityToggle?.querySelector('.accessibility-chevron');
+                            if (chevron) {
+                                chevron.classList.remove('rotated');
+                            }
+                        }
                     }
                 });
             }
