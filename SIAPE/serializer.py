@@ -200,9 +200,53 @@ class SolicitudesSerializer(serializers.ModelSerializer):
         ]
 
 class EvidenciasSerializer(serializers.ModelSerializer):
+    # Validación de archivos para prevenir ataques
+    archivo = serializers.FileField(
+        max_length=100,
+        allow_empty_file=False,
+        use_url=False
+    )
+    
     class Meta:
         model = Evidencias
         fields = '__all__'
+    
+    def validate_archivo(self, value):
+        """
+        Validación de seguridad para archivos subidos.
+        Previene ataques de inyección de archivos maliciosos.
+        """
+        import os
+        from django.core.exceptions import ValidationError
+        
+        # Tamaño máximo: 10MB
+        MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB en bytes
+        
+        # Extensiones permitidas (solo documentos)
+        ALLOWED_EXTENSIONS = [
+            '.pdf', '.doc', '.docx', '.xls', '.xlsx', 
+            '.jpg', '.jpeg', '.png', '.gif', '.txt'
+        ]
+        
+        # Verificar tamaño
+        if value.size > MAX_FILE_SIZE:
+            raise serializers.ValidationError(
+                f"El archivo es demasiado grande. Tamaño máximo: {MAX_FILE_SIZE / (1024*1024):.1f}MB"
+            )
+        
+        # Verificar extensión
+        ext = os.path.splitext(value.name)[1].lower()
+        if ext not in ALLOWED_EXTENSIONS:
+            raise serializers.ValidationError(
+                f"Tipo de archivo no permitido. Extensiones permitidas: {', '.join(ALLOWED_EXTENSIONS)}"
+            )
+        
+        # Verificar nombre del archivo (prevenir path traversal)
+        filename = os.path.basename(value.name)
+        if '..' in filename or '/' in filename or '\\' in filename:
+            raise serializers.ValidationError("Nombre de archivo inválido.")
+        
+        return value
 
 class AsignaturasSerializer(serializers.ModelSerializer):
     # --- Lectura ---
@@ -413,10 +457,54 @@ class AjusteAsignadoSerializer(serializers.ModelSerializer):
 
 class PublicaSolicitudSerializer(serializers.Serializer):
     # --- Campos para el modelo Estudiantes ---
-    nombres = serializers.CharField(max_length=191)
-    apellidos = serializers.CharField(max_length=191)
-    rut = serializers.CharField(max_length=20)
-    email = serializers.EmailField(max_length=191)
+    nombres = serializers.CharField(
+        max_length=191,
+        min_length=2,
+        trim_whitespace=True
+    )
+    apellidos = serializers.CharField(
+        max_length=191,
+        min_length=2,
+        trim_whitespace=True
+    )
+    rut = serializers.CharField(
+        max_length=20,
+        min_length=8,
+        trim_whitespace=True
+    )
+    email = serializers.EmailField(
+        max_length=191,
+        trim_whitespace=True
+    )
+    
+    def validate_rut(self, value):
+        """
+        Validación básica de RUT chileno (formato simple).
+        """
+        import re
+        # Remover puntos y guiones para validación
+        rut_limpio = re.sub(r'[.\-]', '', value)
+        if not re.match(r'^\d{7,8}[0-9kK]?$', rut_limpio):
+            raise serializers.ValidationError("Formato de RUT inválido.")
+        return value
+    
+    def validate_nombres(self, value):
+        """
+        Validar que el nombre solo contenga letras y espacios.
+        """
+        import re
+        if not re.match(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$', value):
+            raise serializers.ValidationError("El nombre solo puede contener letras y espacios.")
+        return value
+    
+    def validate_apellidos(self, value):
+        """
+        Validar que el apellido solo contenga letras y espacios.
+        """
+        import re
+        if not re.match(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$', value):
+            raise serializers.ValidationError("El apellido solo puede contener letras y espacios.")
+        return value
     numero = serializers.IntegerField(required=False, allow_null=True, label="Teléfono (opcional)")
     carrera_id = serializers.PrimaryKeyRelatedField(
         queryset=Carreras.objects.all(),
@@ -424,7 +512,11 @@ class PublicaSolicitudSerializer(serializers.Serializer):
     )
     
     # --- Campos para el modelo Solicitudes (simplificado) ---
-    asunto = serializers.CharField(max_length=191)
+    asunto = serializers.CharField(
+        max_length=191,
+        min_length=5,
+        trim_whitespace=True
+    )
     # 'descripcion' se elimina, ahora la llena la coordinadora
     autorizacion_datos = serializers.BooleanField(
         label="Autorizo el tratamiento de mis datos personales"
@@ -433,7 +525,11 @@ class PublicaSolicitudSerializer(serializers.Serializer):
     # --- Campos NUEVOS para la Cita (no van al modelo Solicitud) ---
     fecha_cita = serializers.DateField(write_only=True)
     hora_cita = serializers.CharField(write_only=True)
-    modalidad = serializers.CharField(write_only=True, max_length=100)
+    modalidad = serializers.CharField(
+        write_only=True, 
+        max_length=100,
+        trim_whitespace=True
+    )
 
     # --- Campos para las relaciones (Evidencias) ---
     documentos_adjuntos = serializers.ListField(
@@ -441,8 +537,45 @@ class PublicaSolicitudSerializer(serializers.Serializer):
         label="Documentos adjuntos (evidencia)",
         write_only=True,
         required=False,
-        allow_empty=True
+        allow_empty=True,
+        max_length=10  # Máximo 10 archivos
     )
+    
+    def validate_documentos_adjuntos(self, value):
+        """
+        Validación de seguridad para múltiples archivos.
+        """
+        import os
+        
+        MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+        ALLOWED_EXTENSIONS = [
+            '.pdf', '.doc', '.docx', '.xls', '.xlsx', 
+            '.jpg', '.jpeg', '.png', '.gif', '.txt'
+        ]
+        
+        if len(value) > 10:
+            raise serializers.ValidationError("Máximo 10 archivos permitidos.")
+        
+        for archivo in value:
+            # Verificar tamaño
+            if archivo.size > MAX_FILE_SIZE:
+                raise serializers.ValidationError(
+                    f"El archivo {archivo.name} es demasiado grande. Tamaño máximo: {MAX_FILE_SIZE / (1024*1024):.1f}MB"
+                )
+            
+            # Verificar extensión
+            ext = os.path.splitext(archivo.name)[1].lower()
+            if ext not in ALLOWED_EXTENSIONS:
+                raise serializers.ValidationError(
+                    f"Tipo de archivo no permitido para {archivo.name}. Extensiones permitidas: {', '.join(ALLOWED_EXTENSIONS)}"
+                )
+            
+            # Prevenir path traversal
+            filename = os.path.basename(archivo.name)
+            if '..' in filename or '/' in filename or '\\' in filename:
+                raise serializers.ValidationError(f"Nombre de archivo inválido: {archivo.name}")
+        
+        return value
 
     def validate_autorizacion_datos(self, value):
         """ Valida que el checkbox de autorización esté marcado. """

@@ -59,10 +59,16 @@ urlpatterns = [
     path('dashboard/admin/asignar-estudiantes-asignaturas/', views.asignar_estudiantes_asignaturas_admin, name='asignar_estudiantes_asignaturas_admin'),
     path('dashboard/admin/carreras/agregar/', views.agregar_carrera_admin, name='agregar_carrera_admin'),
     path('dashboard/admin/carreras/editar/<int:carrera_id>/', views.editar_carrera_admin, name='editar_carrera_admin'),
+    path('dashboard/admin/carreras/eliminar/<int:carrera_id>/', views.eliminar_carrera_admin, name='eliminar_carrera_admin'),
     path('dashboard/admin/asignaturas/agregar/', views.agregar_asignatura_admin, name='agregar_asignatura_admin'),
     path('dashboard/admin/asignaturas/editar/<int:asignatura_id>/', views.editar_asignatura_admin, name='editar_asignatura_admin'),
+    path('dashboard/admin/asignaturas/eliminar/<int:asignatura_id>/', views.eliminar_asignatura_admin, name='eliminar_asignatura_admin'),
     path('dashboard/admin/roles/agregar/', views.agregar_rol_admin, name='agregar_rol_admin'),
     path('dashboard/admin/roles/editar/<int:rol_id>/', views.editar_rol_admin, name='editar_rol_admin'),
+    path('dashboard/admin/roles/eliminar/<int:rol_id>/', views.eliminar_rol_admin, name='eliminar_rol_admin'),
+    path('dashboard/admin/areas/agregar/', views.agregar_area_admin, name='agregar_area_admin'),
+    path('dashboard/admin/areas/editar/<int:area_id>/', views.editar_area_admin, name='editar_area_admin'),
+    path('dashboard/admin/areas/eliminar/<int:area_id>/', views.eliminar_area_admin, name='eliminar_area_admin'),
 
     # # URLs de Asesor Pedagógico
     path('dashboard/asesor/', views.dashboard_asesor, name='dashboard_asesor'),

@@ -1,5 +1,3 @@
-from django.shortcuts import get_object_or_404
-from django.contrib.auth.decorators import login_required
 # Django
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -9,21 +7,20 @@ from django.contrib.auth import logout, login
 from django.utils import timezone
 from datetime import timedelta, datetime, time, date
 from django.db.models import Count, Q
-import json
-import calendar # Importar para el calendario mensual
-import logging
 from django.views.decorators.http import require_POST
-
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 import json
-from django.db.models import Count # Para el modelo de estadisticas.
+import calendar  # Importar para el calendario mensual
+import logging
 
-from rest_framework import (
-    viewsets, mixins, status
-)
-# --- Imports para las nuevas API de horarios ---
+# Django REST Framework
+from rest_framework import viewsets, mixins, status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
-# --- Fin imports API ---
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser
 
 # APP
 from .serializer import (
@@ -36,13 +33,11 @@ from .models import(
     Asignaturas, AsignaturasEnCurso, Entrevistas, AjusteRazonable, AjusteAsignado, HorarioBloqueado
 )  
 
-# Django-restframework
-from rest_framework.authentication import SessionAuthentication 
-from rest_framework .permissions import IsAuthenticated, AllowAny, IsAdminUser
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.parsers import MultiPartParser, FormParser
-from .permissions import IsAsesorPedagogico
+# Permisos personalizados
+from .permissions import (
+    IsAsesorPedagogico, IsDocente, IsDirectorCarrera, 
+    IsCoordinadora, IsAsesorTecnico, IsAdminOrReadOnly
+)
 
 # ------------ CONSTANTES ------------
 ROL_ASESOR = 'Asesora Pedagógica'
@@ -109,13 +104,22 @@ def get_horarios_disponibles(request):
     Recibe un parámetro GET: ?date=YYYY-MM-DD
     """
     
-    # 1. Obtener la fecha de la consulta
+    # 1. Obtener la fecha de la consulta con validación de seguridad
     selected_date_str = request.GET.get('date')
     if not selected_date_str:
         return Response({"error": "Debe proporcionar una fecha (date=YYYY-MM-DD)."}, status=status.HTTP_400_BAD_REQUEST)
     
+    # Validar longitud para prevenir ataques
+    if len(selected_date_str) > 20:
+        return Response({"error": "Formato de fecha inválido."}, status=status.HTTP_400_BAD_REQUEST)
+    
     try:
         selected_date = datetime.strptime(selected_date_str, '%Y-%m-%d').date()
+        # Validar que la fecha no sea demasiado lejana en el futuro (máximo 1 año)
+        from datetime import date as date_class
+        max_future_date = date_class.today() + timedelta(days=365)
+        if selected_date > max_future_date:
+            return Response({"error": "No se pueden agendar citas más de un año en el futuro."}, status=status.HTTP_400_BAD_REQUEST)
     except ValueError:
         return Response({"error": "Formato de fecha inválido. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -179,14 +183,22 @@ def get_calendario_disponible(request):
     Recibe un parámetro GET: ?month=YYYY-MM
     """
     
-    # 1. Obtener el mes y año de la consulta
+    # 1. Obtener el mes y año de la consulta con validación de seguridad
     month_str = request.GET.get('month')
     try:
         # Si no se provee mes, usa el mes actual (en zona horaria de Chile)
         if not month_str:
             target_date = timezone.localtime(timezone.now()).date()
         else:
+            # Validar longitud para prevenir ataques
+            if len(month_str) > 10:
+                return Response({"error": "Formato de mes inválido."}, status=status.HTTP_400_BAD_REQUEST)
             target_date = datetime.strptime(month_str, '%Y-%m').date()
+            # Validar que el mes no sea demasiado lejano (máximo 1 año)
+            from datetime import date as date_class
+            max_future_date = date_class.today() + timedelta(days=365)
+            if target_date > max_future_date:
+                return Response({"error": "No se pueden consultar meses más de un año en el futuro."}, status=status.HTTP_400_BAD_REQUEST)
     except ValueError:
         return Response({"error": "Formato de mes inválido. Use YYYY-MM."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -669,25 +681,99 @@ def _check_admin_permission(request):
 def gestion_usuarios_admin(request):
     """
     Página para que el Admin vea y gestione usuarios y roles.
+    Incluye búsqueda y filtros.
     """
     if not _check_admin_permission(request):
         return redirect('home')
 
+    # Obtener todos los perfiles base
     perfiles = PerfilUsuario.objects.select_related(
         'usuario', 
         'rol', 
         'area'
-    ).all().order_by('usuario__first_name')
+    ).all()
     
-    roles_disponibles = Roles.objects.all()
-    areas_disponibles = Areas.objects.all()
+    # Obtener parámetros de búsqueda y filtros
+    q_busqueda = request.GET.get('q', '').strip()
+    q_rol = request.GET.get('rol', '')
+    q_area = request.GET.get('area', '')
+    
+    # Construir filtros con Q objects
+    filtros = Q()
+    
+    # Búsqueda general (nombre, email, RUT)
+    if q_busqueda:
+        # Validar longitud para prevenir ataques
+        if len(q_busqueda) > 100:
+            messages.error(request, 'El término de búsqueda es demasiado largo.')
+        else:
+            filtros &= (
+                Q(usuario__first_name__icontains=q_busqueda) |
+                Q(usuario__last_name__icontains=q_busqueda) |
+                Q(usuario__email__icontains=q_busqueda) |
+                Q(usuario__rut__icontains=q_busqueda)
+            )
+    
+    # Filtro por rol
+    if q_rol:
+        try:
+            rol_id = int(q_rol)
+            if rol_id > 0:
+                filtros &= Q(rol_id=rol_id)
+        except ValueError:
+            pass  # Ignorar valores inválidos
+    
+    # Filtro por área
+    if q_area:
+        try:
+            area_id = int(q_area)
+            if area_id > 0:
+                filtros &= Q(area_id=area_id)
+        except ValueError:
+            pass  # Ignorar valores inválidos
+    
+    # Aplicar filtros
+    if filtros:
+        perfiles = perfiles.filter(filtros)
+    
+    # Ordenar resultados
+    perfiles = perfiles.order_by('usuario__first_name', 'usuario__last_name')
+    
+    # Paginación para perfiles (10 por página)
+    page_perfiles = request.GET.get('page_usuarios', 1)
+    paginator_perfiles = Paginator(perfiles, 10)
+    try:
+        perfiles_paginados = paginator_perfiles.page(page_perfiles)
+    except PageNotAnInteger:
+        perfiles_paginados = paginator_perfiles.page(1)
+    except EmptyPage:
+        perfiles_paginados = paginator_perfiles.page(paginator_perfiles.num_pages)
+    
+    # Obtener datos para los selectores
+    roles_disponibles = Roles.objects.all().order_by('nombre_rol')
+    areas_disponibles = Areas.objects.all().order_by('nombre')
     roles_list = Roles.objects.all().order_by('nombre_rol')
+    
+    # Paginación para roles (10 por página)
+    page_roles = request.GET.get('page_roles', 1)
+    paginator_roles = Paginator(roles_list, 10)
+    try:
+        roles_paginados = paginator_roles.page(page_roles)
+    except PageNotAnInteger:
+        roles_paginados = paginator_roles.page(1)
+    except EmptyPage:
+        roles_paginados = paginator_roles.page(paginator_roles.num_pages)
 
     context = {
-        'perfiles': perfiles,
+        'perfiles': perfiles_paginados,
         'roles_disponibles': roles_disponibles,
         'areas_disponibles': areas_disponibles,
-        'roles_list': roles_list, 
+        'roles_list': roles_paginados,
+        'filtros_aplicados': {
+            'q': q_busqueda,
+            'rol': q_rol,
+            'area': q_area,
+        },
     }
     
     return render(request, 'SIAPE/gestion_usuarios_admin.html', context)
@@ -789,15 +875,52 @@ def editar_usuario_admin(request, perfil_id):
 def gestion_institucional_admin(request):
     if not _check_admin_permission(request):
         return redirect('home')
+    
+    # Obtener querysets base
     carreras = Carreras.objects.select_related('director__usuario', 'area').all().order_by('nombre')
     asignaturas = Asignaturas.objects.select_related('carreras', 'docente__usuario').all().order_by('nombre')
     areas = Areas.objects.all().order_by('nombre')
     directores = PerfilUsuario.objects.select_related('usuario').filter(rol__nombre_rol=ROL_DIRECTOR).order_by('usuario__first_name')
     docentes = PerfilUsuario.objects.select_related('usuario').filter(rol__nombre_rol=ROL_DOCENTE).order_by('usuario__first_name')
+    
+    # Paginación para áreas (10 por página)
+    page_areas = request.GET.get('page_areas', 1)
+    paginator_areas = Paginator(areas, 10)
+    try:
+        areas_paginados = paginator_areas.page(page_areas)
+    except PageNotAnInteger:
+        areas_paginados = paginator_areas.page(1)
+    except EmptyPage:
+        areas_paginados = paginator_areas.page(paginator_areas.num_pages)
+    
+    # Paginación para carreras (10 por página)
+    page_carreras = request.GET.get('page_carreras', 1)
+    paginator_carreras = Paginator(carreras, 10)
+    try:
+        carreras_paginados = paginator_carreras.page(page_carreras)
+    except PageNotAnInteger:
+        carreras_paginados = paginator_carreras.page(1)
+    except EmptyPage:
+        carreras_paginados = paginator_carreras.page(paginator_carreras.num_pages)
+    
+    # Paginación para asignaturas (10 por página)
+    page_asignaturas = request.GET.get('page_asignaturas', 1)
+    paginator_asignaturas = Paginator(asignaturas, 10)
+    try:
+        asignaturas_paginados = paginator_asignaturas.page(page_asignaturas)
+    except PageNotAnInteger:
+        asignaturas_paginados = paginator_asignaturas.page(1)
+    except EmptyPage:
+        asignaturas_paginados = paginator_asignaturas.page(paginator_asignaturas.num_pages)
+    
+    # Para los selectores, necesitamos todas las áreas y carreras (sin paginar)
+    areas_todas = Areas.objects.all().order_by('nombre')
+    
     context = {
-        'carreras_list': carreras,
-        'asignaturas_list': asignaturas,
-        'areas_list': areas,
+        'carreras_list': carreras_paginados,
+        'asignaturas_list': asignaturas_paginados,
+        'areas_list': areas_paginados,
+        'areas_todas': areas_todas,  # Para los selectores de carreras
         'directores_list': directores,
         'docentes_list': docentes,
     }
@@ -816,15 +939,20 @@ def asignar_estudiantes_asignaturas_admin(request):
     asignaturas = Asignaturas.objects.select_related('carreras', 'docente__usuario').all().order_by('nombre', 'seccion')
     carreras = Carreras.objects.all().order_by('nombre')
     
-    # Filtrar por carrera si se proporciona
+    # Filtrar por carrera si se proporciona (con validación)
     carrera_id = request.GET.get('carrera', '')
     if carrera_id:
+        # Validar que carrera_id sea un número entero
         try:
-            carrera_seleccionada = Carreras.objects.get(id=carrera_id)
-            estudiantes = estudiantes.filter(carreras_id=carrera_id)
-            asignaturas = asignaturas.filter(carreras_id=carrera_id)
-        except Carreras.DoesNotExist:
+            carrera_id_int = int(carrera_id)
+            if carrera_id_int <= 0:
+                raise ValueError("ID inválido")
+            carrera_seleccionada = Carreras.objects.get(id=carrera_id_int)
+            estudiantes = estudiantes.filter(carreras_id=carrera_id_int)
+            asignaturas = asignaturas.filter(carreras_id=carrera_id_int)
+        except (ValueError, Carreras.DoesNotExist):
             carrera_seleccionada = None
+            messages.error(request, 'Carrera no válida.')
     else:
         carrera_seleccionada = None
     
@@ -836,8 +964,34 @@ def asignar_estudiantes_asignaturas_admin(request):
         
         if estudiante_id and asignaturas_ids:
             try:
-                estudiante = Estudiantes.objects.get(id=estudiante_id)
-                asignaturas_seleccionadas = Asignaturas.objects.filter(id__in=asignaturas_ids)
+                # Validar que estudiante_id sea un número entero válido
+                estudiante_id_int = int(estudiante_id)
+                if estudiante_id_int <= 0:
+                    raise ValueError("ID de estudiante inválido")
+                
+                estudiante = Estudiantes.objects.get(id=estudiante_id_int)
+                
+                # Validar que todos los IDs de asignaturas sean enteros válidos
+                asignaturas_ids_int = []
+                for asign_id in asignaturas_ids:
+                    try:
+                        asign_id_int = int(asign_id)
+                        if asign_id_int <= 0:
+                            continue
+                        asignaturas_ids_int.append(asign_id_int)
+                    except ValueError:
+                        continue
+                
+                if not asignaturas_ids_int:
+                    messages.error(request, 'Debe seleccionar al menos una asignatura válida.')
+                    return redirect('asignar_estudiantes_asignaturas_admin')
+                
+                # Limitar el número de asignaturas para prevenir abuso
+                if len(asignaturas_ids_int) > 50:
+                    messages.error(request, 'No se pueden asignar más de 50 asignaturas a la vez.')
+                    return redirect('asignar_estudiantes_asignaturas_admin')
+                
+                asignaturas_seleccionadas = Asignaturas.objects.filter(id__in=asignaturas_ids_int)
                 
                 asignaciones_creadas = 0
                 asignaciones_actualizadas = 0
@@ -923,6 +1077,156 @@ def editar_rol_admin(request, rol_id):
         else:
             messages.error(request, 'El nombre del rol no puede estar vacío o ya existe.')
     return redirect('gestion_usuarios_admin')
+
+@require_POST
+@login_required
+def eliminar_rol_admin(request, rol_id):
+    """
+    Vista para eliminar un rol.
+    Verifica que no haya usuarios con ese rol antes de eliminar.
+    """
+    if not _check_admin_permission(request):
+        messages.error(request, 'No tienes permisos.')
+        return redirect('gestion_usuarios_admin')
+    
+    try:
+        rol_id_int = int(rol_id)
+        if rol_id_int <= 0:
+            raise ValueError("ID inválido")
+        
+        rol = get_object_or_404(Roles, id=rol_id_int)
+        nombre_rol = rol.nombre_rol
+        
+        # Verificar si hay usuarios con este rol
+        usuarios_con_rol = PerfilUsuario.objects.filter(rol=rol).count()
+        
+        if usuarios_con_rol > 0:
+            messages.error(
+                request, 
+                f'No se puede eliminar el rol "{nombre_rol}" porque hay {usuarios_con_rol} usuario(s) asignado(s) a este rol. '
+                'Primero debe cambiar el rol de estos usuarios.'
+            )
+        else:
+            rol.delete()
+            messages.success(request, f'Rol "{nombre_rol}" eliminado exitosamente.')
+    
+    except ValueError:
+        messages.error(request, 'ID de rol inválido.')
+    except Exception as e:
+        messages.error(request, f'Error al eliminar el rol: {str(e)}')
+    
+    return redirect('gestion_usuarios_admin')
+@login_required
+def agregar_area_admin(request):
+    """
+    Vista para agregar un nuevo área.
+    """
+    if not _check_admin_permission(request):
+        messages.error(request, 'No tienes permisos.')
+        return redirect('gestion_institucional_admin')
+    
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre', '').strip()
+        
+        # Validación de entrada
+        if not nombre:
+            messages.error(request, 'El nombre del área no puede estar vacío.')
+        elif len(nombre) > 191:
+            messages.error(request, 'El nombre del área es demasiado largo (máximo 191 caracteres).')
+        elif Areas.objects.filter(nombre=nombre).exists():
+            messages.error(request, f'El área "{nombre}" ya existe.')
+        else:
+            try:
+                Areas.objects.create(nombre=nombre)
+                messages.success(request, f'Área "{nombre}" creada exitosamente.')
+            except Exception as e:
+                messages.error(request, f'Error al crear el área: {str(e)}')
+    
+    return redirect('gestion_institucional_admin')
+
+@login_required
+def editar_area_admin(request, area_id):
+    """
+    Vista para editar un área existente.
+    """
+    if not _check_admin_permission(request):
+        messages.error(request, 'No tienes permisos.')
+        return redirect('gestion_institucional_admin')
+    
+    try:
+        # Validar que area_id sea un entero válido
+        area_id_int = int(area_id)
+        if area_id_int <= 0:
+            raise ValueError("ID inválido")
+        
+        area = get_object_or_404(Areas, id=area_id_int)
+        
+        if request.method == 'POST':
+            nombre = request.POST.get('nombre', '').strip()
+            
+            # Validación de entrada
+            if not nombre:
+                messages.error(request, 'El nombre del área no puede estar vacío.')
+            elif len(nombre) > 191:
+                messages.error(request, 'El nombre del área es demasiado largo (máximo 191 caracteres).')
+            elif Areas.objects.filter(nombre=nombre).exclude(id=area_id_int).exists():
+                messages.error(request, f'El área "{nombre}" ya existe.')
+            else:
+                try:
+                    area.nombre = nombre
+                    area.save()
+                    messages.success(request, f'Área actualizada a "{nombre}".')
+                except Exception as e:
+                    messages.error(request, f'Error al actualizar el área: {str(e)}')
+    except ValueError:
+        messages.error(request, 'ID de área inválido.')
+    except Exception as e:
+        messages.error(request, f'Error: {str(e)}')
+    
+    return redirect('gestion_institucional_admin')
+
+@require_POST
+@login_required
+def eliminar_area_admin(request, area_id):
+    """
+    Vista para eliminar un área.
+    Verifica que no haya carreras o usuarios asociados antes de eliminar.
+    """
+    if not _check_admin_permission(request):
+        messages.error(request, 'No tienes permisos.')
+        return redirect('gestion_institucional_admin')
+    
+    try:
+        area_id_int = int(area_id)
+        if area_id_int <= 0:
+            raise ValueError("ID inválido")
+        
+        area = get_object_or_404(Areas, id=area_id_int)
+        nombre_area = area.nombre
+        
+        # Verificar si hay carreras asociadas
+        carreras_asociadas = Carreras.objects.filter(area=area).count()
+        usuarios_asociados = PerfilUsuario.objects.filter(area=area).count()
+        
+        if carreras_asociadas > 0 or usuarios_asociados > 0:
+            mensaje = f'No se puede eliminar el área "{nombre_area}" porque está asociada a: '
+            problemas = []
+            if carreras_asociadas > 0:
+                problemas.append(f'{carreras_asociadas} carrera(s)')
+            if usuarios_asociados > 0:
+                problemas.append(f'{usuarios_asociados} usuario(s)')
+            messages.error(request, mensaje + ', '.join(problemas) + '.')
+        else:
+            area.delete()
+            messages.success(request, f'Área "{nombre_area}" eliminada exitosamente.')
+    
+    except ValueError:
+        messages.error(request, 'ID de área inválido.')
+    except Exception as e:
+        messages.error(request, f'Error al eliminar el área: {str(e)}')
+    
+    return redirect('gestion_institucional_admin')
+
 @login_required
 def agregar_carrera_admin(request):
     if not _check_admin_permission(request):
@@ -965,6 +1269,49 @@ def editar_carrera_admin(request, carrera_id):
         except Exception as e:
             messages.error(request, f'Error al actualizar la carrera: {str(e)}')
     return redirect('gestion_institucional_admin')
+
+@require_POST
+@login_required
+def eliminar_carrera_admin(request, carrera_id):
+    """
+    Vista para eliminar una carrera.
+    Verifica que no haya estudiantes o asignaturas asociadas antes de eliminar.
+    """
+    if not _check_admin_permission(request):
+        messages.error(request, 'No tienes permisos.')
+        return redirect('gestion_institucional_admin')
+    
+    try:
+        carrera_id_int = int(carrera_id)
+        if carrera_id_int <= 0:
+            raise ValueError("ID inválido")
+        
+        carrera = get_object_or_404(Carreras, id=carrera_id_int)
+        nombre_carrera = carrera.nombre
+        
+        # Verificar si hay estudiantes o asignaturas asociadas
+        estudiantes_asociados = Estudiantes.objects.filter(carreras=carrera).count()
+        asignaturas_asociadas = Asignaturas.objects.filter(carreras=carrera).count()
+        
+        if estudiantes_asociados > 0 or asignaturas_asociadas > 0:
+            mensaje = f'No se puede eliminar la carrera "{nombre_carrera}" porque está asociada a: '
+            problemas = []
+            if estudiantes_asociados > 0:
+                problemas.append(f'{estudiantes_asociados} estudiante(s)')
+            if asignaturas_asociadas > 0:
+                problemas.append(f'{asignaturas_asociadas} asignatura(s)')
+            messages.error(request, mensaje + ', '.join(problemas) + '.')
+        else:
+            carrera.delete()
+            messages.success(request, f'Carrera "{nombre_carrera}" eliminada exitosamente.')
+    
+    except ValueError:
+        messages.error(request, 'ID de carrera inválido.')
+    except Exception as e:
+        messages.error(request, f'Error al eliminar la carrera: {str(e)}')
+    
+    return redirect('gestion_institucional_admin')
+
 @login_required
 def agregar_asignatura_admin(request):
     if not _check_admin_permission(request):
@@ -1005,6 +1352,50 @@ def editar_asignatura_admin(request, asignatura_id):
             messages.success(request, f'Asignatura "{nombre} - {seccion}" actualizada.')
         except Exception as e:
             messages.error(request, f'Error al actualizar la asignatura: {str(e)}')
+    return redirect('gestion_institucional_admin')
+
+@require_POST
+@login_required
+def eliminar_asignatura_admin(request, asignatura_id):
+    """
+    Vista para eliminar una asignatura.
+    Verifica que no haya estudiantes cursando la asignatura o solicitudes asociadas antes de eliminar.
+    """
+    if not _check_admin_permission(request):
+        messages.error(request, 'No tienes permisos.')
+        return redirect('gestion_institucional_admin')
+    
+    try:
+        asignatura_id_int = int(asignatura_id)
+        if asignatura_id_int <= 0:
+            raise ValueError("ID inválido")
+        
+        asignatura = get_object_or_404(Asignaturas, id=asignatura_id_int)
+        nombre_asignatura = f"{asignatura.nombre} - {asignatura.seccion}"
+        
+        # Verificar si hay estudiantes cursando esta asignatura
+        estudiantes_cursando = AsignaturasEnCurso.objects.filter(asignaturas=asignatura).count()
+        
+        # Verificar si hay solicitudes que referencien esta asignatura
+        solicitudes_asociadas = Solicitudes.objects.filter(asignaturas_solicitadas=asignatura).count()
+        
+        if estudiantes_cursando > 0 or solicitudes_asociadas > 0:
+            mensaje = f'No se puede eliminar la asignatura "{nombre_asignatura}" porque está asociada a: '
+            problemas = []
+            if estudiantes_cursando > 0:
+                problemas.append(f'{estudiantes_cursando} estudiante(s) cursándola')
+            if solicitudes_asociadas > 0:
+                problemas.append(f'{solicitudes_asociadas} solicitud(es)')
+            messages.error(request, mensaje + ', '.join(problemas) + '.')
+        else:
+            asignatura.delete()
+            messages.success(request, f'Asignatura "{nombre_asignatura}" eliminada exitosamente.')
+    
+    except ValueError:
+        messages.error(request, 'ID de asignatura inválido.')
+    except Exception as e:
+        messages.error(request, f'Error al eliminar la asignatura: {str(e)}')
+    
     return redirect('gestion_institucional_admin')
 
 # --- VISTA COORDINADORA DE INCLUSIÓN ---
@@ -1152,8 +1543,37 @@ def detalle_casos_encargado_inclusion(request, solicitud_id):
         if not request.user.is_superuser:
             return redirect('home')
 
-    # 2. --- Obtener Datos del Caso ---
+    # 2. --- Obtener Datos del Caso y Validar Acceso ---
     solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
+    
+    # Validar que el usuario tiene acceso a esta solicitud específica
+    tiene_acceso = False
+    if request.user.is_superuser or request.user.is_staff:
+        tiene_acceso = True
+    else:
+        try:
+            perfil = request.user.perfil
+            rol = perfil.rol.nombre_rol if perfil.rol else None
+            
+            if rol == 'Encargado de Inclusión':
+                tiene_acceso = solicitud.coordinadora_asignada == perfil
+            elif rol == 'Coordinador Técnico Pedagógico':
+                tiene_acceso = solicitud.asesor_tecnico_asignado == perfil
+            elif rol == 'Asesor Pedagógico':
+                tiene_acceso = solicitud.asesor_pedagogico_asignado == perfil
+            elif rol == 'Director de Carrera':
+                # Director puede ver solicitudes de estudiantes de sus carreras
+                carreras_dirigidas = Carreras.objects.filter(director=perfil)
+                tiene_acceso = solicitud.estudiantes.carreras in carreras_dirigidas
+            elif rol == 'Administrador':
+                tiene_acceso = True
+        except AttributeError:
+            tiene_acceso = False
+    
+    if not tiene_acceso:
+        messages.error(request, 'No tienes permisos para ver esta solicitud.')
+        return redirect('home')
+    
     estudiante = solicitud.estudiantes
     
     # Obtenemos todos los ajustes asignados
@@ -3147,74 +3567,329 @@ def detalle_ajuste_docente(request, estudiante_id):
 
 
 # ----------- Vistas de los modelos (API) ------------
-# (Sin cambios)
+# ViewSets con controles de acceso mejorados
 class UsuarioViewSet(viewsets.ModelViewSet):
     queryset = Usuario.objects.all()
     serializer_class = UsuarioSerializer
     authentication_classes = [SessionAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminUser]  # Solo administradores pueden gestionar usuarios
+    
+    def get_queryset(self):
+        """
+        Los usuarios solo pueden ver su propio perfil, excepto administradores.
+        """
+        queryset = Usuario.objects.all()
+        if self.request.user.is_superuser or self.request.user.is_staff:
+            return queryset
+        # Usuario normal solo ve su propio perfil
+        return queryset.filter(id=self.request.user.id)
 class RolesViewSet(viewsets.ModelViewSet):
     queryset = Roles.objects.all()
     serializer_class = RolesSerializer
     authentication_classes = [SessionAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminOrReadOnly]  # Lectura para autenticados, escritura solo admin
 class AreasViewSet(viewsets.ModelViewSet):
     queryset = Areas.objects.all()
     serializer_class = AreasSerializer
     authentication_classes = [SessionAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminOrReadOnly]  # Lectura para autenticados, escritura solo admin
 class CategoriasAjustesViewSet(viewsets.ModelViewSet):
     queryset = CategoriasAjustes.objects.all()
     serializer_class = CategoriasAjustesSerializer
     authentication_classes = [SessionAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminOrReadOnly]  # Lectura para autenticados, escritura solo admin
 class CarrerasViewSet(viewsets.ModelViewSet):
     queryset = Carreras.objects.all()
     serializer_class = CarrerasSerializer
     authentication_classes = [SessionAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminOrReadOnly]  # Lectura para autenticados, escritura solo admin
 class EstudiantesViewSet(viewsets.ModelViewSet):
     queryset = Estudiantes.objects.all()
     serializer_class = EstudiantesSerializer
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """
+        Filtrar estudiantes según el rol del usuario:
+        - Admin: ve todos
+        - Director: ve estudiantes de sus carreras
+        - Docente: ve estudiantes de sus asignaturas
+        - Otros: acceso limitado
+        """
+        queryset = Estudiantes.objects.all()
+        user = self.request.user
+        
+        if user.is_superuser or user.is_staff:
+            return queryset
+        
+        try:
+            perfil = user.perfil
+            rol = perfil.rol.nombre_rol if perfil.rol else None
+            
+            if rol == 'Director de Carrera':
+                # Director ve estudiantes de sus carreras
+                carreras_dirigidas = Carreras.objects.filter(director=perfil)
+                return queryset.filter(carreras__in=carreras_dirigidas).distinct()
+            
+            elif rol == 'Docente':
+                # Docente ve estudiantes de sus asignaturas
+                asignaturas_docente = Asignaturas.objects.filter(docente=perfil)
+                return queryset.filter(
+                    asignaturasencurso__asignaturas__in=asignaturas_docente
+                ).distinct()
+            
+            # Otros roles (Coordinadora, Asesores) pueden ver todos los estudiantes
+            # pero solo en lectura
+            return queryset
+        except AttributeError:
+            # Si no tiene perfil, no puede ver nada
+            return Estudiantes.objects.none()
 class SolicitudesViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.UpdateModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
     queryset = Solicitudes.objects.all().order_by('-created_at')
     serializer_class = SolicitudesSerializer
-    permission_classes = [IsAsesorPedagogico | IsAdminUser]
+    permission_classes = [IsAsesorPedagogico | IsAdminUser | IsCoordinadora | IsAsesorTecnico | IsDirectorCarrera]
+    
+    def get_queryset(self):
+        """
+        Filtrar solicitudes según el rol del usuario.
+        """
+        queryset = Solicitudes.objects.all().order_by('-created_at')
+        user = self.request.user
+        
+        if user.is_superuser or user.is_staff:
+            return queryset
+        
+        try:
+            perfil = user.perfil
+            rol = perfil.rol.nombre_rol if perfil.rol else None
+            
+            if rol == 'Encargado de Inclusión':
+                # Ve solicitudes asignadas a ella
+                return queryset.filter(coordinadora_asignada=perfil)
+            
+            elif rol == 'Coordinador Técnico Pedagógico':
+                # Ve solicitudes asignadas a él
+                return queryset.filter(asesor_tecnico_asignado=perfil)
+            
+            elif rol == 'Asesor Pedagógico':
+                # Ve solicitudes asignadas a él
+                return queryset.filter(asesor_pedagogico_asignado=perfil)
+            
+            elif rol == 'Director de Carrera':
+                # Ve solicitudes de estudiantes de sus carreras
+                carreras_dirigidas = Carreras.objects.filter(director=perfil)
+                return queryset.filter(estudiantes__carreras__in=carreras_dirigidas).distinct()
+            
+            # Si no tiene un rol válido, no puede ver nada
+            return Solicitudes.objects.none()
+        except AttributeError:
+            return Solicitudes.objects.none()
 class EvidenciasViewSet(viewsets.ModelViewSet):
     queryset = Evidencias.objects.all()
     serializer_class = EvidenciasSerializer
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """
+        Filtrar evidencias según el rol del usuario.
+        Solo pueden ver evidencias de solicitudes a las que tienen acceso.
+        """
+        queryset = Evidencias.objects.all()
+        user = self.request.user
+        
+        if user.is_superuser or user.is_staff:
+            return queryset
+        
+        try:
+            perfil = user.perfil
+            rol = perfil.rol.nombre_rol if perfil.rol else None
+            
+            # Obtener solicitudes accesibles según el rol
+            solicitudes_accesibles = Solicitudes.objects.none()
+            
+            if rol == 'Encargado de Inclusión':
+                solicitudes_accesibles = Solicitudes.objects.filter(coordinadora_asignada=perfil)
+            elif rol == 'Coordinador Técnico Pedagógico':
+                solicitudes_accesibles = Solicitudes.objects.filter(asesor_tecnico_asignado=perfil)
+            elif rol == 'Asesor Pedagógico':
+                solicitudes_accesibles = Solicitudes.objects.filter(asesor_pedagogico_asignado=perfil)
+            elif rol == 'Director de Carrera':
+                carreras_dirigidas = Carreras.objects.filter(director=perfil)
+                solicitudes_accesibles = Solicitudes.objects.filter(estudiantes__carreras__in=carreras_dirigidas).distinct()
+            elif rol == 'Docente':
+                asignaturas_docente = Asignaturas.objects.filter(docente=perfil)
+                estudiantes_docente = Estudiantes.objects.filter(
+                    asignaturasencurso__asignaturas__in=asignaturas_docente
+                ).distinct()
+                solicitudes_accesibles = Solicitudes.objects.filter(estudiantes__in=estudiantes_docente)
+            
+            return queryset.filter(solicitudes__in=solicitudes_accesibles)
+        except AttributeError:
+            return Evidencias.objects.none()
 class AsignaturasViewSet(viewsets.ModelViewSet):
     queryset = Asignaturas.objects.all()
     serializer_class = AsignaturasSerializer
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """
+        Filtrar asignaturas según el rol del usuario.
+        """
+        queryset = Asignaturas.objects.all()
+        user = self.request.user
+        
+        if user.is_superuser or user.is_staff:
+            return queryset
+        
+        try:
+            perfil = user.perfil
+            rol = perfil.rol.nombre_rol if perfil.rol else None
+            
+            if rol == 'Docente':
+                # Docente solo ve sus propias asignaturas
+                return queryset.filter(docente=perfil)
+            
+            elif rol == 'Director de Carrera':
+                # Director ve asignaturas de sus carreras
+                carreras_dirigidas = Carreras.objects.filter(director=perfil)
+                return queryset.filter(carreras__in=carreras_dirigidas).distinct()
+            
+            # Otros roles pueden ver todas las asignaturas (solo lectura)
+            return queryset
+        except AttributeError:
+            return Asignaturas.objects.none()
 class AsignaturasEnCursoViewSet(viewsets.ModelViewSet):
     queryset = AsignaturasEnCurso.objects.all()
     serializer_class = AsignaturasEnCursoSerializer
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """
+        Filtrar asignaturas en curso según el rol del usuario.
+        """
+        queryset = AsignaturasEnCurso.objects.all()
+        user = self.request.user
+        
+        if user.is_superuser or user.is_staff:
+            return queryset
+        
+        try:
+            perfil = user.perfil
+            rol = perfil.rol.nombre_rol if perfil.rol else None
+            
+            if rol == 'Docente':
+                # Docente ve asignaturas en curso de sus asignaturas
+                asignaturas_docente = Asignaturas.objects.filter(docente=perfil)
+                return queryset.filter(asignaturas__in=asignaturas_docente)
+            
+            elif rol == 'Director de Carrera':
+                # Director ve asignaturas en curso de estudiantes de sus carreras
+                carreras_dirigidas = Carreras.objects.filter(director=perfil)
+                return queryset.filter(estudiantes__carreras__in=carreras_dirigidas).distinct()
+            
+            # Otros roles pueden ver todas (solo lectura)
+            return queryset
+        except AttributeError:
+            return AsignaturasEnCurso.objects.none()
 class EntrevistasViewSet(viewsets.ModelViewSet):
     queryset = Entrevistas.objects.all()
     serializer_class = EntrevistasSerializer
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """
+        Filtrar entrevistas según el rol del usuario.
+        """
+        queryset = Entrevistas.objects.all()
+        user = self.request.user
+        
+        if user.is_superuser or user.is_staff:
+            return queryset
+        
+        try:
+            perfil = user.perfil
+            rol = perfil.rol.nombre_rol if perfil.rol else None
+            
+            if rol == 'Encargado de Inclusión':
+                # Ve entrevistas donde es coordinadora
+                return queryset.filter(coordinadora=perfil)
+            
+            # Otros roles ven entrevistas de solicitudes a las que tienen acceso
+            solicitudes_accesibles = Solicitudes.objects.none()
+            
+            if rol == 'Coordinador Técnico Pedagógico':
+                solicitudes_accesibles = Solicitudes.objects.filter(asesor_tecnico_asignado=perfil)
+            elif rol == 'Asesor Pedagógico':
+                solicitudes_accesibles = Solicitudes.objects.filter(asesor_pedagogico_asignado=perfil)
+            elif rol == 'Director de Carrera':
+                carreras_dirigidas = Carreras.objects.filter(director=perfil)
+                solicitudes_accesibles = Solicitudes.objects.filter(estudiantes__carreras__in=carreras_dirigidas).distinct()
+            
+            return queryset.filter(solicitudes__in=solicitudes_accesibles)
+        except AttributeError:
+            return Entrevistas.objects.none()
 class AjusteRazonableViewSet(viewsets.ModelViewSet):
     queryset = AjusteRazonable.objects.all()
     serializer_class = AjusteRazonableSerializer
     authentication_classes = [SessionAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminOrReadOnly]  # Lectura para autenticados, escritura solo admin
 class AjusteAsignadoViewSet(viewsets.ModelViewSet):
     queryset = AjusteAsignado.objects.all()
     serializer_class = AjusteAsignadoSerializer
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """
+        Filtrar ajustes asignados según el rol del usuario.
+        """
+        queryset = AjusteAsignado.objects.all()
+        user = self.request.user
+        
+        if user.is_superuser or user.is_staff:
+            return queryset
+        
+        try:
+            perfil = user.perfil
+            rol = perfil.rol.nombre_rol if perfil.rol else None
+            
+            # Obtener solicitudes accesibles según el rol
+            solicitudes_accesibles = Solicitudes.objects.none()
+            
+            if rol == 'Encargado de Inclusión':
+                solicitudes_accesibles = Solicitudes.objects.filter(coordinadora_asignada=perfil)
+            elif rol == 'Coordinador Técnico Pedagógico':
+                solicitudes_accesibles = Solicitudes.objects.filter(asesor_tecnico_asignado=perfil)
+            elif rol == 'Asesor Pedagógico':
+                solicitudes_accesibles = Solicitudes.objects.filter(asesor_pedagogico_asignado=perfil)
+            elif rol == 'Director de Carrera':
+                carreras_dirigidas = Carreras.objects.filter(director=perfil)
+                solicitudes_accesibles = Solicitudes.objects.filter(estudiantes__carreras__in=carreras_dirigidas).distinct()
+            
+            return queryset.filter(solicitudes__in=solicitudes_accesibles)
+        except AttributeError:
+            return AjusteAsignado.objects.none()
 class PerfilUsuarioViewSet(viewsets.ModelViewSet):
     queryset = PerfilUsuario.objects.all()
     serializer_class = PerfilUsuarioSerializer
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """
+        Los usuarios solo pueden ver su propio perfil, excepto administradores.
+        """
+        queryset = PerfilUsuario.objects.all()
+        if self.request.user.is_superuser or self.request.user.is_staff:
+            return queryset
+        # Usuario normal solo ve su propio perfil
+        try:
+            return queryset.filter(usuario=self.request.user)
+        except AttributeError:
+            return PerfilUsuario.objects.none()
 

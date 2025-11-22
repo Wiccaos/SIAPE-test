@@ -25,9 +25,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# IMPORTANTE: DEBUG debe ser False en producción
+# Usar variable de entorno para controlar esto
+# Default True para desarrollo local
+DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = []
+# Lista de hosts permitidos - CRÍTICO para seguridad
+# En producción, especificar los dominios exactos
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=lambda v: [s.strip() for s in v.split(',')])
 
 
 # Application definition
@@ -159,6 +164,94 @@ SESSION_COOKIE_AGE = 3600
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 # Usamos la DB para SESSION
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+
+# ============================================
+# CONFIGURACIONES DE SEGURIDAD OWASP
+# ============================================
+
+# Cookies seguras - Solo enviar cookies sobre HTTPS en producción
+SESSION_COOKIE_SECURE = not DEBUG  # True en producción (requiere HTTPS)
+SESSION_COOKIE_HTTPONLY = True  # Prevenir acceso JavaScript a cookies
+SESSION_COOKIE_SAMESITE = 'Lax'  # Protección CSRF
+
+# Cookies CSRF seguras
+CSRF_COOKIE_SECURE = not DEBUG  # True en producción (requiere HTTPS)
+CSRF_COOKIE_HTTPONLY = True
+CSRF_USE_SESSIONS = True  # Usar sesión para almacenar token CSRF
+
+# Headers de seguridad
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'  # Prevenir clickjacking
+
+# HTTPS en producción
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True  # Redirigir HTTP a HTTPS
+    SECURE_HSTS_SECONDS = 31536000  # 1 año
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+else:
+    # En desarrollo, asegurar que no haya redirecciones HTTPS
+    SECURE_SSL_REDIRECT = False
+    SECURE_HSTS_SECONDS = 0
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SECURE_HSTS_PRELOAD = False
+    # Deshabilitar completamente HSTS en desarrollo
+    SECURE_PROXY_SSL_HEADER = None
+
+# Protección contra ataques de fuerza bruta
+# Configurar rate limiting en el servidor web o usar django-ratelimit
+# Para instalar: pip install django-ratelimit
+# Luego agregar 'django_ratelimit' a INSTALLED_APPS
+
+# Configuración de REST Framework para seguridad
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    # Protección contra enumeración de usuarios
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+    ],
+    # Deshabilitar navegable API en producción
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+    ] if not DEBUG else [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ],
+}
+
+# Configuración de logging para seguridad
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'WARNING',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, 'security.log'),
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django.security': {
+            'handlers': ['file'],
+            'level': 'WARNING',
+            'propagate': True,
+        },
+    },
+}
 
 
 

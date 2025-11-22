@@ -37,6 +37,73 @@
 
     <div class="panel-control-container">
 
+        <!-- ======================= TABLA DE ÁREAS ======================= -->
+        <section class="table-container">
+            <div class="table-header">
+                <h2 class="titulo-areas"><i class="fas fa-building"></i> Gestión de Áreas</h2>
+                <button type="button" class="btn-accion btn-asignar" onclick="abrirModalAgregarArea()">
+                    <i class="fas fa-plus"></i> Agregar Área
+                </button>
+            </div>
+            
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>Nombre del Área</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for area in areas_list %}
+                    <tr>
+                        <td>{{ area.nombre }}</td>
+                        <td>
+                            <button type="button" class="btn-accion btn-accion-gray btn-accion-small" 
+                                    onclick="abrirModalEditarArea({{ area.id }}, '{{ area.nombre|escapejs }}')">
+                                <i class="fas fa-edit"></i> Editar
+                            </button>
+                            <button type="button" class="btn-accion btn-accion-red btn-accion-small" 
+                                    onclick="abrirModalEliminarArea({{ area.id }}, '{{ area.nombre|escapejs }}')">
+                                <i class="fas fa-trash"></i> Eliminar
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="2">No hay áreas registradas.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            
+            <div class="table-footer">
+                <span>Mostrando {{ areas_list.start_index }} - {{ areas_list.end_index }} de {{ areas_list.paginator.count }} área{{ areas_list.paginator.count|pluralize:"s" }}</span>
+            </div>
+            
+            <!-- Paginación de Áreas -->
+            {% if areas_list.has_other_pages %}
+            <div class="pagination-container" style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 10px;">
+                {% if areas_list.has_previous %}
+                    <a href="?page_areas=1{% if request.GET.page_carreras %}&page_carreras={{ request.GET.page_carreras }}{% endif %}{% if request.GET.page_asignaturas %}&page_asignaturas={{ request.GET.page_asignaturas }}{% endif %}" class="btn-accion btn-accion-gray btn-accion-small">
+                        <i class="fas fa-angle-double-left"></i>
+                    </a>
+                    <a href="?page_areas={{ areas_list.previous_page_number }}{% if request.GET.page_carreras %}&page_carreras={{ request.GET.page_carreras }}{% endif %}{% if request.GET.page_asignaturas %}&page_asignaturas={{ request.GET.page_asignaturas }}{% endif %}" class="btn-accion btn-accion-gray btn-accion-small">
+                        <i class="fas fa-angle-left"></i> Anterior
+                    </a>
+                {% endif %}
+                <span style="padding: 8px 15px; background: #f8f9fa; border-radius: 4px;">
+                    Página {{ areas_list.number }} de {{ areas_list.paginator.num_pages }}
+                </span>
+                {% if areas_list.has_next %}
+                    <a href="?page_areas={{ areas_list.next_page_number }}{% if request.GET.page_carreras %}&page_carreras={{ request.GET.page_carreras }}{% endif %}{% if request.GET.page_asignaturas %}&page_asignaturas={{ request.GET.page_asignaturas }}{% endif %}" class="btn-accion btn-accion-gray btn-accion-small">
+                        Siguiente <i class="fas fa-angle-right"></i>
+                    </a>
+                    <a href="?page_areas={{ areas_list.paginator.num_pages }}{% if request.GET.page_carreras %}&page_carreras={{ request.GET.page_carreras }}{% endif %}{% if request.GET.page_asignaturas %}&page_asignaturas={{ request.GET.page_asignaturas }}{% endif %}" class="btn-accion btn-accion-gray btn-accion-small">
+                        <i class="fas fa-angle-double-right"></i>
+                    </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </section>
+
         <!-- ======================= TABLA DE CARRERAS ======================= -->
     <section class="table-container">
             <div class="table-header">
@@ -66,6 +133,10 @@
                                     onclick="abrirModalEditarCarrera({{ carrera.id }}, '{{ carrera.nombre|escapejs }}', '{{ carrera.area.id|default:'' }}', '{{ carrera.director.id|default:'' }}')">
                                 <i class="fas fa-edit"></i> Editar
                             </button>
+                            <button type="button" class="btn-accion btn-accion-red btn-accion-small" 
+                                    onclick="abrirModalEliminarCarrera({{ carrera.id }}, '{{ carrera.nombre|escapejs }}')">
+                                <i class="fas fa-trash"></i> Eliminar
+                            </button>
                         </td>
                     </tr>
                     {% empty %}
@@ -73,6 +144,35 @@
                     {% endfor %}
                 </tbody>
             </table>
+            
+            <div class="table-footer">
+                <span>Mostrando {{ carreras_list.start_index }} - {{ carreras_list.end_index }} de {{ carreras_list.paginator.count }} carrera{{ carreras_list.paginator.count|pluralize:"s" }}</span>
+            </div>
+            
+            <!-- Paginación de Carreras -->
+            {% if carreras_list.has_other_pages %}
+            <div class="pagination-container" style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 10px;">
+                {% if carreras_list.has_previous %}
+                    <a href="?{% if request.GET.page_areas %}page_areas={{ request.GET.page_areas }}&{% endif %}page_carreras=1{% if request.GET.page_asignaturas %}&page_asignaturas={{ request.GET.page_asignaturas }}{% endif %}" class="btn-accion btn-accion-gray btn-accion-small">
+                        <i class="fas fa-angle-double-left"></i>
+                    </a>
+                    <a href="?{% if request.GET.page_areas %}page_areas={{ request.GET.page_areas }}&{% endif %}page_carreras={{ carreras_list.previous_page_number }}{% if request.GET.page_asignaturas %}&page_asignaturas={{ request.GET.page_asignaturas }}{% endif %}" class="btn-accion btn-accion-gray btn-accion-small">
+                        <i class="fas fa-angle-left"></i> Anterior
+                    </a>
+                {% endif %}
+                <span style="padding: 8px 15px; background: #f8f9fa; border-radius: 4px;">
+                    Página {{ carreras_list.number }} de {{ carreras_list.paginator.num_pages }}
+                </span>
+                {% if carreras_list.has_next %}
+                    <a href="?{% if request.GET.page_areas %}page_areas={{ request.GET.page_areas }}&{% endif %}page_carreras={{ carreras_list.next_page_number }}{% if request.GET.page_asignaturas %}&page_asignaturas={{ request.GET.page_asignaturas }}{% endif %}" class="btn-accion btn-accion-gray btn-accion-small">
+                        Siguiente <i class="fas fa-angle-right"></i>
+                    </a>
+                    <a href="?{% if request.GET.page_areas %}page_areas={{ request.GET.page_areas }}&{% endif %}page_carreras={{ carreras_list.paginator.num_pages }}{% if request.GET.page_asignaturas %}&page_asignaturas={{ request.GET.page_asignaturas }}{% endif %}" class="btn-accion btn-accion-gray btn-accion-small">
+                        <i class="fas fa-angle-double-right"></i>
+                    </a>
+                {% endif %}
+            </div>
+            {% endif %}
         </section>
 
         <!-- ======================= TABLA DE ASIGNATURAS ======================= -->
@@ -106,6 +206,10 @@
                                     onclick="abrirModalEditarAsignatura({{ asignatura.id }}, '{{ asignatura.nombre|escapejs }}', '{{ asignatura.seccion|escapejs }}', '{{ asignatura.carreras.id|default:'' }}', '{{ asignatura.docente.id|default:'' }}')">
                                 <i class="fas fa-edit"></i> Editar
                             </button>
+                            <button type="button" class="btn-accion btn-accion-red btn-accion-small" 
+                                    onclick="abrirModalEliminarAsignatura({{ asignatura.id }}, '{{ asignatura.nombre|escapejs }}', '{{ asignatura.seccion|escapejs }}')">
+                                <i class="fas fa-trash"></i> Eliminar
+                            </button>
                         </td>
                     </tr>
                     {% empty %}
@@ -113,6 +217,35 @@
                     {% endfor %}
                 </tbody>
             </table>
+            
+            <div class="table-footer">
+                <span>Mostrando {{ asignaturas_list.start_index }} - {{ asignaturas_list.end_index }} de {{ asignaturas_list.paginator.count }} asignatura{{ asignaturas_list.paginator.count|pluralize:"s" }}</span>
+            </div>
+            
+            <!-- Paginación de Asignaturas -->
+            {% if asignaturas_list.has_other_pages %}
+            <div class="pagination-container" style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 10px;">
+                {% if asignaturas_list.has_previous %}
+                    <a href="?{% if request.GET.page_areas %}page_areas={{ request.GET.page_areas }}&{% endif %}{% if request.GET.page_carreras %}page_carreras={{ request.GET.page_carreras }}&{% endif %}page_asignaturas=1" class="btn-accion btn-accion-gray btn-accion-small">
+                        <i class="fas fa-angle-double-left"></i>
+                    </a>
+                    <a href="?{% if request.GET.page_areas %}page_areas={{ request.GET.page_areas }}&{% endif %}{% if request.GET.page_carreras %}page_carreras={{ request.GET.page_carreras }}&{% endif %}page_asignaturas={{ asignaturas_list.previous_page_number }}" class="btn-accion btn-accion-gray btn-accion-small">
+                        <i class="fas fa-angle-left"></i> Anterior
+                    </a>
+                {% endif %}
+                <span style="padding: 8px 15px; background: #f8f9fa; border-radius: 4px;">
+                    Página {{ asignaturas_list.number }} de {{ asignaturas_list.paginator.num_pages }}
+                </span>
+                {% if asignaturas_list.has_next %}
+                    <a href="?{% if request.GET.page_areas %}page_areas={{ request.GET.page_areas }}&{% endif %}{% if request.GET.page_carreras %}page_carreras={{ request.GET.page_carreras }}&{% endif %}page_asignaturas={{ asignaturas_list.next_page_number }}" class="btn-accion btn-accion-gray btn-accion-small">
+                        Siguiente <i class="fas fa-angle-right"></i>
+                    </a>
+                    <a href="?{% if request.GET.page_areas %}page_areas={{ request.GET.page_areas }}&{% endif %}{% if request.GET.page_carreras %}page_carreras={{ request.GET.page_carreras }}&{% endif %}page_asignaturas={{ asignaturas_list.paginator.num_pages }}" class="btn-accion btn-accion-gray btn-accion-small">
+                        <i class="fas fa-angle-double-right"></i>
+                    </a>
+                {% endif %}
+            </div>
+            {% endif %}
         </section>
 
     </div> <!-- Fin .panel-control-container -->
@@ -123,6 +256,75 @@
 <!-- =================================================================
      MODALES
 ================================================================== -->
+
+<!-- Modal Agregar Área -->
+<div id="modalAgregarArea" class="modal">
+    <div class="modal-content modal-500">
+        <div class="modal-header">
+            <h4><i class="fas fa-building"></i> Agregar Nueva Área</h4>
+            <button class="close" onclick="cerrarModalAgregarArea()">&times;</button>
+        </div>
+        <form method="post" action="{% url 'agregar_area_admin' %}">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="nombre">Nombre del Área:</label>
+                <input type="text" name="nombre" required maxlength="191">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalAgregarArea()">Cancelar</button>
+                <button type="submit" class="btn-accion btn-asignar">Guardar Área</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Editar Área -->
+<div id="modalEditarArea" class="modal">
+    <div class="modal-content modal-500">
+        <div class="modal-header">
+            <h4><i class="fas fa-edit"></i> Editar Área</h4>
+            <button class="close" onclick="cerrarModalEditarArea()">&times;</button>
+        </div>
+        <form method="post" action="" id="formEditarArea">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="nombre">Nombre del Área:</label>
+                <input type="text" name="nombre" id="editar_area_nombre" required maxlength="191">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalEditarArea()">Cancelar</button>
+                <button type="submit" class="btn-accion btn-agendar">Actualizar Área</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Eliminar Área -->
+<div id="modalEliminarArea" class="modal">
+    <div class="modal-content modal-500">
+        <div class="modal-header">
+            <h4><i class="fas fa-trash"></i> Eliminar Área</h4>
+            <button class="close" onclick="cerrarModalEliminarArea()">&times;</button>
+        </div>
+        <form method="post" action="" id="formEliminarArea">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>Área a eliminar:</label>
+                <input type="text" id="eliminar_area_nombre" class="input-readonly" readonly>
+            </div>
+            <div class="form-group">
+                <p class="text-danger font-weight-500">¿Está seguro de que desea eliminar esta área?</p>
+                <p class="text-muted">Nota: No se puede eliminar un área si tiene carreras o usuarios asociados.</p>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalEliminarArea()">Cancelar</button>
+                <button type="submit" class="btn-accion btn-accion-red">
+                    <i class="fas fa-trash"></i> Eliminar Área
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <!-- Modal Agregar Carrera -->
 <div id="modalAgregarCarrera" class="modal">
@@ -141,7 +343,7 @@
                 <label for="area_id">Área:</label>
                 <select name="area_id" required>
                     <option value="">-- Seleccione un área --</option>
-                    {% for area in areas_list %}
+                    {% for area in areas_todas %}
                         <option value="{{ area.id }}">{{ area.nombre }}</option>
                     {% endfor %}
                 </select>
@@ -180,7 +382,7 @@
                 <label for="area_id">Área:</label>
                 <select name="area_id" id="editar_carrera_area" required>
                     <option value="">-- Seleccione un área --</option>
-                    {% for area in areas_list %}
+                    {% for area in areas_todas %}
                         <option value="{{ area.id }}">{{ area.nombre }}</option>
                     {% endfor %}
                 </select>
@@ -197,6 +399,33 @@
             <div class="form-actions">
                 <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalEditarCarrera()">Cancelar</button>
                 <button type="submit" class="btn-accion btn-agendar">Actualizar Carrera</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Eliminar Carrera -->
+<div id="modalEliminarCarrera" class="modal">
+    <div class="modal-content modal-500">
+        <div class="modal-header">
+            <h4><i class="fas fa-trash"></i> Eliminar Carrera</h4>
+            <button class="close" onclick="cerrarModalEliminarCarrera()">&times;</button>
+        </div>
+        <form method="post" action="" id="formEliminarCarrera">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>Carrera a eliminar:</label>
+                <input type="text" id="eliminar_carrera_nombre" class="input-readonly" readonly>
+            </div>
+            <div class="form-group">
+                <p class="text-danger font-weight-500">¿Está seguro de que desea eliminar esta carrera?</p>
+                <p class="text-muted">Nota: No se puede eliminar una carrera si tiene estudiantes o asignaturas asociadas.</p>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalEliminarCarrera()">Cancelar</button>
+                <button type="submit" class="btn-accion btn-accion-red">
+                    <i class="fas fa-trash"></i> Eliminar Carrera
+                </button>
             </div>
         </form>
     </div>
@@ -288,6 +517,33 @@
     </div>
 </div>
 
+<!-- Modal Eliminar Asignatura -->
+<div id="modalEliminarAsignatura" class="modal">
+    <div class="modal-content modal-500">
+        <div class="modal-header">
+            <h4><i class="fas fa-trash"></i> Eliminar Asignatura</h4>
+            <button class="close" onclick="cerrarModalEliminarAsignatura()">&times;</button>
+        </div>
+        <form method="post" action="" id="formEliminarAsignatura">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>Asignatura a eliminar:</label>
+                <input type="text" id="eliminar_asignatura_nombre" class="input-readonly" readonly>
+            </div>
+            <div class="form-group">
+                <p class="text-danger font-weight-500">¿Está seguro de que desea eliminar esta asignatura?</p>
+                <p class="text-muted">Nota: No se puede eliminar una asignatura si tiene estudiantes cursándola o está asociada a solicitudes.</p>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalEliminarAsignatura()">Cancelar</button>
+                <button type="submit" class="btn-accion btn-accion-red">
+                    <i class="fas fa-trash"></i> Eliminar Asignatura
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
     // --- JavaScript para los Modales ---
     const modals = document.querySelectorAll('.modal');
@@ -300,6 +556,24 @@
         }
     }
     
+    // --- Áreas ---
+    function abrirModalAgregarArea() { document.getElementById('modalAgregarArea').style.display = 'block'; }
+    function cerrarModalAgregarArea() { closeModal('modalAgregarArea'); }
+
+    function abrirModalEditarArea(areaId, nombre) {
+        document.getElementById('formEditarArea').action = `/dashboard/admin/areas/editar/${areaId}/`;
+        document.getElementById('editar_area_nombre').value = nombre;
+        document.getElementById('modalEditarArea').style.display = 'block';
+    }
+    function cerrarModalEditarArea() { closeModal('modalEditarArea'); }
+
+    function abrirModalEliminarArea(areaId, nombre) {
+        document.getElementById('formEliminarArea').action = `/dashboard/admin/areas/eliminar/${areaId}/`;
+        document.getElementById('eliminar_area_nombre').value = nombre;
+        document.getElementById('modalEliminarArea').style.display = 'block';
+    }
+    function cerrarModalEliminarArea() { closeModal('modalEliminarArea'); }
+
     // --- Carreras ---
     function abrirModalAgregarCarrera() { document.getElementById('modalAgregarCarrera').style.display = 'block'; }
     function cerrarModalAgregarCarrera() { closeModal('modalAgregarCarrera'); }
@@ -312,6 +586,13 @@
         document.getElementById('modalEditarCarrera').style.display = 'block';
     }
     function cerrarModalEditarCarrera() { closeModal('modalEditarCarrera'); }
+
+    function abrirModalEliminarCarrera(carreraId, nombre) {
+        document.getElementById('formEliminarCarrera').action = `/dashboard/admin/carreras/eliminar/${carreraId}/`;
+        document.getElementById('eliminar_carrera_nombre').value = nombre;
+        document.getElementById('modalEliminarCarrera').style.display = 'block';
+    }
+    function cerrarModalEliminarCarrera() { closeModal('modalEliminarCarrera'); }
 
     // --- Asignaturas ---
     function abrirModalAgregarAsignatura() { document.getElementById('modalAgregarAsignatura').style.display = 'block'; }
@@ -326,6 +607,13 @@
         document.getElementById('modalEditarAsignatura').style.display = 'block';
     }
     function cerrarModalEditarAsignatura() { closeModal('modalEditarAsignatura'); }
+
+    function abrirModalEliminarAsignatura(asignaturaId, nombre, seccion) {
+        document.getElementById('formEliminarAsignatura').action = `/dashboard/admin/asignaturas/eliminar/${asignaturaId}/`;
+        document.getElementById('eliminar_asignatura_nombre').value = `${nombre} - ${seccion}`;
+        document.getElementById('modalEliminarAsignatura').style.display = 'block';
+    }
+    function cerrarModalEliminarAsignatura() { closeModal('modalEliminarAsignatura'); }
 
 
     // Cerrar modales si se hace clic fuera de ellos

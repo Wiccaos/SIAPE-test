@@ -49,6 +49,79 @@
                 </button>
             </div>
             
+            <!-- Barra de búsqueda y filtros -->
+            <div class="search-filters-container" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                <form method="get" action="{% url 'gestion_usuarios_admin' %}" id="formBusqueda">
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 15px; align-items: end;">
+                        <!-- Campo de búsqueda -->
+                        <div class="form-group" style="margin: 0;">
+                            <label for="q" style="margin-bottom: 5px; display: block; font-weight: 500;">
+                                <i class="fas fa-search"></i> Buscar:
+                            </label>
+                            <input 
+                                type="text" 
+                                name="q" 
+                                id="q" 
+                                value="{{ filtros_aplicados.q }}"
+                                placeholder="Nombre, Email o RUT..."
+                                style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;"
+                                maxlength="100"
+                            >
+                        </div>
+                        
+                        <!-- Filtro por Rol -->
+                        <div class="form-group" style="margin: 0;">
+                            <label for="rol" style="margin-bottom: 5px; display: block; font-weight: 500;">
+                                <i class="fas fa-user-tag"></i> Rol:
+                            </label>
+                            <select 
+                                name="rol" 
+                                id="rol" 
+                                style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;"
+                            >
+                                <option value="">Todos los roles</option>
+                                {% for rol in roles_disponibles %}
+                                    <option value="{{ rol.id }}" {% if filtros_aplicados.rol == rol.id|stringformat:"s" %}selected{% endif %}>
+                                        {{ rol.nombre_rol }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- Filtro por Área -->
+                        <div class="form-group" style="margin: 0;">
+                            <label for="area" style="margin-bottom: 5px; display: block; font-weight: 500;">
+                                <i class="fas fa-building"></i> Área:
+                            </label>
+                            <select 
+                                name="area" 
+                                id="area" 
+                                style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;"
+                            >
+                                <option value="">Todas las áreas</option>
+                                {% for area in areas_disponibles %}
+                                    <option value="{{ area.id }}" {% if filtros_aplicados.area == area.id|stringformat:"s" %}selected{% endif %}>
+                                        {{ area.nombre }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- Botones de acción -->
+                        <div style="display: flex; gap: 10px;">
+                            <button type="submit" class="btn-accion btn-asignar" style="white-space: nowrap;">
+                                <i class="fas fa-search"></i> Buscar
+                            </button>
+                            {% if filtros_aplicados.q or filtros_aplicados.rol or filtros_aplicados.area %}
+                                <a href="{% url 'gestion_usuarios_admin' %}" class="btn-accion btn-accion-gray" style="white-space: nowrap; text-decoration: none; display: inline-flex; align-items: center;">
+                                    <i class="fas fa-times"></i> Limpiar
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </form>
+            </div>
+            
             <table class="custom-table">
                 <thead>
                     <tr>
@@ -103,8 +176,42 @@
             </table>
             
             <div class="table-footer">
-                <span>Mostrando {{ perfiles|length }} usuarios</span>
+                <span>
+                    Mostrando {{ perfiles.start_index }} - {{ perfiles.end_index }} de {{ perfiles.paginator.count }} usuario{{ perfiles.paginator.count|pluralize }}
+                    {% if filtros_aplicados.q or filtros_aplicados.rol or filtros_aplicados.area %}
+                        <span style="color: #666; font-size: 0.9em;">
+                            (filtros aplicados)
+                        </span>
+                    {% endif %}
+                </span>
             </div>
+            
+            <!-- Paginación de Usuarios -->
+            {% if perfiles.has_other_pages %}
+            <div class="pagination-container" style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 10px;">
+                {% if perfiles.has_previous %}
+                    <a href="?{% if filtros_aplicados.q %}q={{ filtros_aplicados.q }}&{% endif %}{% if filtros_aplicados.rol %}rol={{ filtros_aplicados.rol }}&{% endif %}{% if filtros_aplicados.area %}area={{ filtros_aplicados.area }}&{% endif %}page_usuarios=1" class="btn-accion btn-accion-gray btn-accion-small">
+                        <i class="fas fa-angle-double-left"></i>
+                    </a>
+                    <a href="?{% if filtros_aplicados.q %}q={{ filtros_aplicados.q }}&{% endif %}{% if filtros_aplicados.rol %}rol={{ filtros_aplicados.rol }}&{% endif %}{% if filtros_aplicados.area %}area={{ filtros_aplicados.area }}&{% endif %}page_usuarios={{ perfiles.previous_page_number }}" class="btn-accion btn-accion-gray btn-accion-small">
+                        <i class="fas fa-angle-left"></i> Anterior
+                    </a>
+                {% endif %}
+                
+                <span style="padding: 8px 15px; background: #f8f9fa; border-radius: 4px;">
+                    Página {{ perfiles.number }} de {{ perfiles.paginator.num_pages }}
+                </span>
+                
+                {% if perfiles.has_next %}
+                    <a href="?{% if filtros_aplicados.q %}q={{ filtros_aplicados.q }}&{% endif %}{% if filtros_aplicados.rol %}rol={{ filtros_aplicados.rol }}&{% endif %}{% if filtros_aplicados.area %}area={{ filtros_aplicados.area }}&{% endif %}page_usuarios={{ perfiles.next_page_number }}" class="btn-accion btn-accion-gray btn-accion-small">
+                        Siguiente <i class="fas fa-angle-right"></i>
+                    </a>
+                    <a href="?{% if filtros_aplicados.q %}q={{ filtros_aplicados.q }}&{% endif %}{% if filtros_aplicados.rol %}rol={{ filtros_aplicados.rol }}&{% endif %}{% if filtros_aplicados.area %}area={{ filtros_aplicados.area }}&{% endif %}page_usuarios={{ perfiles.paginator.num_pages }}" class="btn-accion btn-accion-gray btn-accion-small">
+                        <i class="fas fa-angle-double-right"></i>
+                    </a>
+                {% endif %}
+            </div>
+            {% endif %}
         </section>
 
         <!-- Tabla de Roles (Abajo) -->
@@ -133,6 +240,10 @@
                                     onclick="abrirModalEditarRol({{ rol.id }}, '{{ rol.nombre_rol|escapejs }}')">
                                 <i class="fas fa-edit"></i> Editar
                             </button>
+                            <button type="button" class="btn-accion btn-accion-red btn-accion-small" 
+                                    onclick="abrirModalEliminarRol({{ rol.id }}, '{{ rol.nombre_rol|escapejs }}')">
+                                <i class="fas fa-trash"></i> Eliminar
+                            </button>
                         </td>
                     </tr>
                     {% empty %}
@@ -140,6 +251,39 @@
                     {% endfor %}
                 </tbody>
             </table>
+            
+            <div class="table-footer">
+                <span>
+                    Mostrando {{ roles_list.start_index }} - {{ roles_list.end_index }} de {{ roles_list.paginator.count }} rol{{ roles_list.paginator.count|pluralize:"es" }}
+                </span>
+            </div>
+            
+            <!-- Paginación de Roles -->
+            {% if roles_list.has_other_pages %}
+            <div class="pagination-container" style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 10px;">
+                {% if roles_list.has_previous %}
+                    <a href="?{% if filtros_aplicados.q %}q={{ filtros_aplicados.q }}&{% endif %}{% if filtros_aplicados.rol %}rol={{ filtros_aplicados.rol }}&{% endif %}{% if filtros_aplicados.area %}area={{ filtros_aplicados.area }}&{% endif %}page_roles=1" class="btn-accion btn-accion-gray btn-accion-small">
+                        <i class="fas fa-angle-double-left"></i>
+                    </a>
+                    <a href="?{% if filtros_aplicados.q %}q={{ filtros_aplicados.q }}&{% endif %}{% if filtros_aplicados.rol %}rol={{ filtros_aplicados.rol }}&{% endif %}{% if filtros_aplicados.area %}area={{ filtros_aplicados.area }}&{% endif %}page_roles={{ roles_list.previous_page_number }}" class="btn-accion btn-accion-gray btn-accion-small">
+                        <i class="fas fa-angle-left"></i> Anterior
+                    </a>
+                {% endif %}
+                
+                <span style="padding: 8px 15px; background: #f8f9fa; border-radius: 4px;">
+                    Página {{ roles_list.number }} de {{ roles_list.paginator.num_pages }}
+                </span>
+                
+                {% if roles_list.has_next %}
+                    <a href="?{% if filtros_aplicados.q %}q={{ filtros_aplicados.q }}&{% endif %}{% if filtros_aplicados.rol %}rol={{ filtros_aplicados.rol }}&{% endif %}{% if filtros_aplicados.area %}area={{ filtros_aplicados.area }}&{% endif %}page_roles={{ roles_list.next_page_number }}" class="btn-accion btn-accion-gray btn-accion-small">
+                        Siguiente <i class="fas fa-angle-right"></i>
+                    </a>
+                    <a href="?{% if filtros_aplicados.q %}q={{ filtros_aplicados.q }}&{% endif %}{% if filtros_aplicados.rol %}rol={{ filtros_aplicados.rol }}&{% endif %}{% if filtros_aplicados.area %}area={{ filtros_aplicados.area }}&{% endif %}page_roles={{ roles_list.paginator.num_pages }}" class="btn-accion btn-accion-gray btn-accion-small">
+                        <i class="fas fa-angle-double-right"></i>
+                    </a>
+                {% endif %}
+            </div>
+            {% endif %}
         </section>
 
     </div> <!-- Fin del .panel-control-container -->
@@ -327,6 +471,33 @@
     </div>
 </div>
 
+<!-- Modal Eliminar Rol -->
+<div id="modalEliminarRol" class="modal">
+    <div class="modal-content modal-500">
+        <div class="modal-header">
+            <h4><i class="fas fa-trash"></i> Eliminar Rol</h4>
+            <button class="close" onclick="cerrarModalEliminarRol()">&times;</button>
+        </div>
+        <form method="post" action="" id="formEliminarRol">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>Rol a eliminar:</label>
+                <input type="text" id="eliminar_rol_nombre" class="input-readonly" readonly>
+            </div>
+            <div class="form-group">
+                <p class="text-danger font-weight-500">¿Está seguro de que desea eliminar este rol?</p>
+                <p class="text-muted">Nota: No se puede eliminar un rol si hay usuarios asignados a él.</p>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalEliminarRol()">Cancelar</button>
+                <button type="submit" class="btn-accion btn-accion-red">
+                    <i class="fas fa-trash"></i> Eliminar Rol
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 
 <script>
     // --- JavaScript para Modales de USUARIOS ---
@@ -354,6 +525,7 @@
     // --- JavaScript para Modales de ROLES ---
     const modalAgregarRol = document.getElementById('modalAgregarRol');
     const modalEditarRol = document.getElementById('modalEditarRol');
+    const modalEliminarRol = document.getElementById('modalEliminarRol');
 
     function abrirModalAgregarRol() { modalAgregarRol.style.display = 'block'; }
     function cerrarModalAgregarRol() { closeModal('modalAgregarRol'); }
@@ -365,6 +537,13 @@
     }
     function cerrarModalEditarRol() { closeModal('modalEditarRol'); }
 
+    function abrirModalEliminarRol(rolId, nombre) {
+        document.getElementById('formEliminarRol').action = `/dashboard/admin/roles/eliminar/${rolId}/`;
+        document.getElementById('eliminar_rol_nombre').value = nombre;
+        modalEliminarRol.style.display = 'block';
+    }
+    function cerrarModalEliminarRol() { closeModal('modalEliminarRol'); }
+
 
     // Cerrar modales si se hace clic fuera de ellos
     window.onclick = function(event) {
@@ -372,6 +551,7 @@
         if (event.target == modalEditar) { cerrarModalEditar(); }
         if (event.target == modalAgregarRol) { cerrarModalAgregarRol(); }
         if (event.target == modalEditarRol) { cerrarModalEditarRol(); }
+        if (event.target == modalEliminarRol) { cerrarModalEliminarRol(); }
     }
 
     // Helper para cerrar modales (usado por JS de Roles)
