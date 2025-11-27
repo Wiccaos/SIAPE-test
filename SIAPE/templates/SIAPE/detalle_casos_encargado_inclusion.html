@@ -38,6 +38,28 @@
             </a>
             <a href="{% url 'casos_generales' %}" class="nav-item active"> <i class="fas fa-folder-open"></i> Casos
             </a>
+        {% elif user.perfil.rol.nombre_rol == "Director de Carrera" %}
+            <a href="{% url 'dashboard_director' %}" class="nav-item">
+                <i class="fas fa-user-tie"></i> Panel Principal
+            </a>
+            <a href="{% url 'casos_generales' %}" class="nav-item active"> <i class="fas fa-folder-open"></i> Casos
+            </a>
+            <a href="{% url 'estadisticas_director' %}" class="nav-item">
+                <i class="fas fa-chart-bar"></i> Estadísticas
+            </a>
+            <a href="{% url 'carreras_director' %}" class="nav-item">
+                <i class="fas fa-graduation-cap"></i> Mis Carreras
+            </a>
+        {% elif user.perfil.rol.nombre_rol == "Docente" %}
+            <a href="{% url 'dashboard_docente' %}" class="nav-item">
+                <i class="fas fa-home"></i> Panel Principal
+            </a>
+            <a href="{% url 'mis_alumnos_docente' %}" class="nav-item">
+                <i class="fas fa-users"></i> Mis Alumnos
+            </a>
+            <a href="{% url 'mis_asignaturas_docente' %}" class="nav-item">
+                <i class="fas fa-book-reader"></i> Mis Asignaturas
+            </a>
         {% else %}
             <a href="{% url 'home' %}" class="nav-item">
                 <i class="fas fa-home"></i> Panel Principal
@@ -152,7 +174,7 @@
                             <p class="text-small text-muted">
                                 <i class="fas fa-calendar"></i> Formulado el {{ item.created_at|date:"d/m/Y H:i" }}
                             </p>
-                            {% if puede_formular_ajustes %}
+                            {% if puede_formular_ajustes and not es_docente %}
                             <div style="margin-top: 10px; display: flex; gap: 10px;">
                                 <button type="button" class="btn-accion btn-accion-small" onclick="abrirModalEditarAjuste({{ item.id }}, event)" style="padding: 5px 10px; font-size: 0.85em;" data-descripcion="{{ item.ajuste_razonable.descripcion|escapejs }}" data-categoria-id="{{ item.ajuste_razonable.categorias_ajustes.id }}" data-categoria-nombre="{{ item.ajuste_razonable.categorias_ajustes.nombre_categoria|escapejs }}">
                                     <i class="fas fa-edit"></i> Editar
@@ -164,7 +186,7 @@
                                     </button>
                                 </form>
                             </div>
-                            {% elif puede_editar_ajustes_asesor %}
+                            {% elif puede_editar_ajustes_asesor and not es_docente %}
                             <div style="margin-top: 10px; display: flex; gap: 10px;">
                                 <button type="button" class="btn-accion btn-accion-small" onclick="abrirModalEditarAjusteAsesor({{ item.id }}, event)" style="padding: 5px 10px; font-size: 0.85em;" data-descripcion="{{ item.ajuste_razonable.descripcion|escapejs }}" data-categoria-id="{{ item.ajuste_razonable.categorias_ajustes.id }}" data-categoria-nombre="{{ item.ajuste_razonable.categorias_ajustes.nombre_categoria|escapejs }}">
                                     <i class="fas fa-edit"></i> Editar
@@ -220,7 +242,7 @@
                             <i class="fas fa-info-circle"></i> La entrevista ha sido realizada. Ahora debe formular el caso basándose en la información recopilada durante la entrevista. 
                             Complete la descripción del caso a continuación y luego envíelo a la Coordinador Técnico Pedagógico.
                         </p>
-                        {% if puede_editar_descripcion %}
+                        {% if puede_editar_descripcion and not es_docente %}
                             <form method="POST" action="{% url 'actualizar_descripcion_caso' solicitud.id %}" class="form-descripcion-caso">
                                 {% csrf_token %}
                                 <div class="form-group">
@@ -242,7 +264,7 @@
                     <h3>
                         <i class="fas fa-file-medical-alt"></i> Descripción del Caso (Formulación Profesional)
                     </h3>
-                    {% if puede_editar_descripcion %}
+                    {% if puede_editar_descripcion and not es_docente %}
                         <form method="POST" action="{% url 'actualizar_descripcion_caso' solicitud.id %}" class="form-descripcion-caso">
                             {% csrf_token %}
                             <div class="form-group">
@@ -268,7 +290,7 @@
                     {% endif %}
                 {% endif %}
                 
-                {% if puede_agendar_cita or puede_formular_ajustes or puede_enviar_asesor_tecnico or puede_enviar_asesor_pedagogico or puede_devolver_a_coordinadora or puede_enviar_a_director or puede_devolver_a_asesor_tecnico or puede_aprobar or puede_rechazar %}
+                {% if not es_docente and (puede_agendar_cita or puede_formular_ajustes or puede_enviar_asesor_tecnico or puede_enviar_asesor_pedagogico or puede_devolver_a_coordinadora or puede_enviar_a_director or puede_devolver_a_asesor_tecnico or puede_aprobar or puede_rechazar) %}
                     <hr class="border-top-light margin-25-0">
                     
                     <h3 class="mb-15">Acciones del Caso</h3>
@@ -383,7 +405,7 @@
     </div>
 
     <!-- Modal para Formular Ajuste (Coordinador Técnico Pedagógico) -->
-    {% if puede_formular_ajustes %}
+    {% if puede_formular_ajustes and not es_docente %}
     <div id="modalFormularAjuste" class="modal">
         <div class="modal-content">
             <div class="modal-header">

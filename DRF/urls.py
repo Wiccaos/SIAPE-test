@@ -48,6 +48,7 @@ urlpatterns = [
     path('formulario-solicitud/', views.vista_formulario_solicitud, name='formulario-solicitud'),
     path('api/horarios-disponibles/', views.get_horarios_disponibles, name='api-horarios-disponibles'),
     path('api/calendario-disponible/', views.get_calendario_disponible, name='api-calendario-disponible'),
+    path('api/docente/caso/<int:solicitud_id>/', views.obtener_datos_caso_docente, name='api-datos-caso-docente'),
 
     # URLs del Administrador
     path('dashboard/admin/', views.dashboard_admin, name='dashboard_admin'),

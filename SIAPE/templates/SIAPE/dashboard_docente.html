@@ -39,14 +39,14 @@
             </div>
             <div class="kpi-info">
                 <span class="kpi-value">{{ total_estudiantes_con_ajuste|default:0 }}</span>
-                <span class="kpi-label">Alumnos con Ajuste Aprobado</span>
+                <span class="kpi-label">Alumnos con Caso Aprobado</span>
             </div>
         </div>
     </section>
 
     <section class="table-container" style="margin-top: 30px;">
         <div class="table-header">
-            <h2><i class="fas fa-list-alt"></i> Alumnos con Ajustes Aprobados</h2>
+            <h2><i class="fas fa-list-alt"></i> Alumnos con Casos Aprobados</h2>
         </div>
         
         {% if casos_por_asignatura %}
@@ -58,7 +58,7 @@
                 
                 <p style="font-size: 0.9rem; color: #666; margin-bottom: 15px;">
                     Total de alumnos en curso: {{ caso_asignatura.total_alumnos }} | 
-                    Alumnos con ajustes aprobados: <strong>{{ caso_asignatura.total_ajustes_aprobados }}</strong>
+                    Alumnos con casos aprobados: <strong>{{ caso_asignatura.total_ajustes_aprobados }}</strong>
                 </p>
 
                 <table class="custom-table">
@@ -66,7 +66,7 @@
                         <tr>
                             <th>Estudiante</th>
                             <th>RUT</th>
-                            <th>Ajustes Aprobados (Categoría)</th>
+                            <th>Estado del Caso</th>
                             <th>Detalle</th>
                         </tr>
                     </thead>
@@ -76,21 +76,29 @@
                             <td>{{ detalle.estudiante.nombres }} {{ detalle.estudiante.apellidos }}</td>
                             <td>{{ detalle.estudiante.rut }}</td>
                             <td>
-                                {% for ajuste in detalle.ajustes %}
-                                    <span class="status status-aprobado" style="margin-right: 5px; display: inline-block; margin-bottom: 5px;">
-                                        {{ ajuste.ajuste_razonable.categorias_ajustes.nombre_categoria }}
+                                {% if detalle.ajustes %}
+                                    {% for ajuste in detalle.ajustes %}
+                                        <span class="status status-aprobado" style="margin-right: 5px; display: inline-block; margin-bottom: 5px;">
+                                            {{ ajuste.ajuste_razonable.categorias_ajustes.nombre_categoria }}
+                                        </span>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="status status-aprobado" style="background-color: #eaf6ec; color: #28a745;">
+                                        <i class="fas fa-check-circle"></i> Caso Aprobado (Sin ajustes asignados aún)
                                     </span>
-                                {% empty %}
-                                    N/A
-                                {% endfor %}
+                                {% endif %}
                             </td>
                             <td>
-                                <a href="{% url 'detalle_ajuste_docente' detalle.estudiante.id %}" class="link-rojo">Ver Ajustes »</a>
+                                {% if detalle.solicitud_id %}
+                                <button type="button" class="btn-accion btn-accion-gray btn-accion-small" onclick="abrirModalCasoDocente({{ detalle.solicitud_id }})">
+                                    <i class="fas fa-eye"></i> Ver Caso
+                                </button>
+                                {% endif %}
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="4">No hay estudiantes con ajustes aprobados en esta asignatura.</td>
+                            <td colspan="4">No hay estudiantes con casos aprobados en esta asignatura.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -104,4 +112,260 @@
         {% endif %}
     </section>
 </div>
+
+<!-- Modal para Ver Caso (Docente) -->
+<div id="modalCasoDocente" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 700px; max-height: 90vh; overflow-y: auto;">
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #eee;">
+            <h2 style="margin: 0; color: #cc0000;">
+                <i class="fas fa-user-graduate"></i> Detalle del Caso
+            </h2>
+            <span class="close-modal" onclick="cerrarModalCasoDocente()" style="cursor: pointer; font-size: 28px; font-weight: bold; color: #999;">&times;</span>
+        </div>
+        
+        <div class="modal-body" id="modalCasoDocenteBody">
+            <div style="text-align: center; padding: 20px;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: #cc0000;"></i>
+                <p>Cargando información del caso...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 30px;
+    border: 1px solid #888;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.close-modal {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close-modal:hover,
+.close-modal:focus {
+    color: #000;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.modal-estudiante-info {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.modal-estudiante-foto {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background-color: #cc0000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 2.5rem;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.modal-estudiante-datos h3 {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 1.3rem;
+}
+
+.modal-estudiante-datos p {
+    margin: 5px 0;
+    color: #666;
+}
+
+.modal-seccion {
+    margin-bottom: 25px;
+}
+
+.modal-seccion h4 {
+    color: #cc0000;
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 8px;
+}
+
+.modal-ajuste-item {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    border-left: 4px solid #28a745;
+}
+
+.modal-ajuste-categoria {
+    font-weight: bold;
+    color: #28a745;
+    margin-bottom: 8px;
+    font-size: 1rem;
+}
+
+.modal-ajuste-descripcion {
+    color: #555;
+    line-height: 1.6;
+}
+</style>
+
+<script>
+function abrirModalCasoDocente(solicitudId) {
+    const modal = document.getElementById('modalCasoDocente');
+    const modalBody = document.getElementById('modalCasoDocenteBody');
+    
+    // Mostrar modal con loading
+    modal.style.display = 'block';
+    modalBody.innerHTML = `
+        <div style="text-align: center; padding: 20px;">
+            <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: #cc0000;"></i>
+            <p>Cargando información del caso...</p>
+        </div>
+    `;
+    
+    // Cargar datos del caso
+    fetch(`/api/docente/caso/${solicitudId}/`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Error al cargar los datos del caso');
+        }
+        return response.json();
+    })
+    .then(data => {
+        // Debug: ver qué datos recibimos
+        console.log('Datos recibidos:', data);
+        console.log('Tiene ajustes:', data.tiene_ajustes);
+        console.log('Ajustes:', data.ajustes);
+        
+        // Generar iniciales del estudiante para la foto
+        const nombres = data.estudiante.nombres.split(' ');
+        const apellidos = data.estudiante.apellidos.split(' ');
+        const iniciales = (nombres[0] ? nombres[0][0] : '') + (apellidos[0] ? apellidos[0][0] : '');
+        
+        let ajustesHTML = '';
+        if (data.tiene_ajustes && data.ajustes && data.ajustes.length > 0) {
+            ajustesHTML = data.ajustes.map(ajuste => {
+                // Escapar HTML para seguridad
+                const categoria = ajuste.categoria || 'Sin categoría';
+                const descripcion = ajuste.descripcion || 'Sin descripción';
+                return `
+                <div class="modal-ajuste-item">
+                    <div class="modal-ajuste-categoria">
+                        <i class="fas fa-tag"></i> ${categoria}
+                    </div>
+                    <div class="modal-ajuste-descripcion">
+                        ${descripcion}
+                    </div>
+                </div>
+            `;
+            }).join('');
+        } else {
+            ajustesHTML = `
+                <div class="modal-ajuste-item" style="border-left-color: #ffc107;">
+                    <div class="modal-ajuste-descripcion" style="color: #666; font-style: italic;">
+                        <i class="fas fa-info-circle"></i> Este caso está aprobado pero aún no tiene ajustes asignados.
+                    </div>
+                </div>
+            `;
+        }
+        
+        modalBody.innerHTML = `
+            <div class="modal-estudiante-info">
+                <div class="modal-estudiante-foto">
+                    ${iniciales}
+                </div>
+                <div class="modal-estudiante-datos">
+                    <h3>${data.estudiante.nombres} ${data.estudiante.apellidos}</h3>
+                    <p><strong>RUT:</strong> ${data.estudiante.rut}</p>
+                </div>
+            </div>
+            
+            <div class="modal-seccion">
+                <h4><i class="fas fa-file-alt"></i> Descripción del Caso</h4>
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 6px; white-space: pre-wrap; line-height: 1.6;">
+                    ${data.descripcion_caso}
+                </div>
+            </div>
+            
+            <div class="modal-seccion">
+                <h4><i class="fas fa-tools"></i> Ajustes Asignados</h4>
+                ${ajustesHTML}
+            </div>
+        `;
+    })
+    .catch(error => {
+        modalBody.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: #cc0000;">
+                <i class="fas fa-exclamation-triangle" style="font-size: 2rem;"></i>
+                <p>Error al cargar los datos del caso: ${error.message}</p>
+                <button onclick="cerrarModalCasoDocente()" class="btn-accion btn-accion-gray" style="margin-top: 15px;">
+                    Cerrar
+                </button>
+            </div>
+        `;
+    });
+}
+
+function cerrarModalCasoDocente() {
+    document.getElementById('modalCasoDocente').style.display = 'none';
+}
+
+// Cerrar modal al hacer clic fuera de él
+window.onclick = function(event) {
+    const modal = document.getElementById('modalCasoDocente');
+    if (event.target == modal) {
+        cerrarModalCasoDocente();
+    }
+}
+
+// Función helper para obtener cookie CSRF
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+
 {% endblock %}
