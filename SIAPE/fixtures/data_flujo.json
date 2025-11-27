@@ -2,199 +2,271 @@
   {
     "model": "SIAPE.Roles",
     "pk": 1,
-    "fields": { "nombre_rol": "Administrador" }
+    "fields": {
+      "nombre_rol": "Administrador",
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
+    }
   },
   {
     "model": "SIAPE.Roles",
     "pk": 2,
-    "fields": { "nombre_rol": "Encargado de Inclusión" }
+    "fields": {
+      "nombre_rol": "Encargado de Inclusión",
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
+    }
   },
   {
     "model": "SIAPE.Roles",
     "pk": 3,
-    "fields": { "nombre_rol": "Coordinador Técnico Pedagógico" }
+    "fields": {
+      "nombre_rol": "Coordinador Técnico Pedagógico",
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
+    }
   },
   {
     "model": "SIAPE.Roles",
     "pk": 4,
-    "fields": { "nombre_rol": "Asesor Pedagógico" }
+    "fields": {
+      "nombre_rol": "Asesor Pedagógico",
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
+    }
   },
   {
     "model": "SIAPE.Roles",
     "pk": 5,
-    "fields": { "nombre_rol": "Director de Carrera" }
+    "fields": {
+      "nombre_rol": "Director de Carrera",
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
+    }
   },
   {
     "model": "SIAPE.Roles",
     "pk": 6,
-    "fields": { "nombre_rol": "Docente" }
+    "fields": {
+      "nombre_rol": "Docente",
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
+    }
   },
   {
     "model": "SIAPE.Areas",
     "pk": 1,
-    "fields": { "nombre": "Tecnología e Informática" }
+    "fields": {
+      "nombre": "Tecnología e Informática",
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
+    }
   },
   {
     "model": "SIAPE.Areas",
     "pk": 2,
-    "fields": { "nombre": "Salud" }
-  },
-  {
-    "model": "SIAPE.Areas",
-    "pk": 3,
-    "fields": { "nombre": "Administración y Negocios" }
+    "fields": {
+      "nombre": "Salud",
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
+    }
   },
   {
     "model": "SIAPE.CategoriasAjustes",
     "pk": 1,
-    "fields": { "nombre_categoria": "Acceso a la Información" }
+    "fields": {
+      "nombre_categoria": "Acceso a la Información",
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
+    }
   },
   {
     "model": "SIAPE.CategoriasAjustes",
     "pk": 2,
-    "fields": { "nombre_categoria": "Evaluación Diferenciada" }
+    "fields": {
+      "nombre_categoria": "Evaluación Diferenciada",
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
+    }
   },
   {
     "model": "SIAPE.CategoriasAjustes",
     "pk": 3,
-    "fields": { "nombre_categoria": "Entorno Físico" }
+    "fields": {
+      "nombre_categoria": "Entorno Físico",
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
+    }
   },
-  {
-    "model": "SIAPE.CategoriasAjustes",
-    "pk": 4,
-    "fields": { "nombre_categoria": "Apoyo Tecnológico" }
-  },
-  
   {
     "model": "SIAPE.Usuario",
     "pk": 1,
     "fields": {
-      "password": "pbkdf2_sha256$260000$hash_temporal_se_actualiza_con_script",
+      "password": "pbkdf2_sha256$600000$J9V7y2F4$S+u8/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9=",
       "email": "admin@siape.cl",
       "rut": "11111111-1",
       "first_name": "Admin",
       "last_name": "General",
       "is_staff": true,
       "is_superuser": true,
-      "is_active": true
+      "is_active": true,
+      "username": "admin@siape.cl",
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
     }
   },
   {
     "model": "SIAPE.Usuario",
     "pk": 2,
     "fields": {
-      "password": "pbkdf2_sha256$260000$hash_temporal_se_actualiza_con_script",
+      "password": "pbkdf2_sha256$600000$J9V7y2F4$S+u8/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9=",
       "email": "coord@inacap.cl",
       "rut": "22222222-2",
       "first_name": "Ana",
       "last_name": "Coordinadora",
-      "is_active": true
+      "is_staff": false,
+      "is_superuser": false,
+      "is_active": true,
+      "username": "coord@inacap.cl",
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
     }
   },
   {
     "model": "SIAPE.Usuario",
     "pk": 3,
     "fields": {
-      "password": "pbkdf2_sha256$260000$hash_temporal_se_actualiza_con_script",
+      "password": "pbkdf2_sha256$600000$J9V7y2F4$S+u8/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9=",
       "email": "tecnico@inacap.cl",
       "rut": "33333333-3",
       "first_name": "Pedro",
       "last_name": "Técnico",
-      "is_active": true
+      "is_active": true,
+      "username": "tecnico@inacap.cl",
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
     }
   },
   {
     "model": "SIAPE.Usuario",
     "pk": 4,
     "fields": {
-      "password": "pbkdf2_sha256$260000$hash_temporal_se_actualiza_con_script",
+      "password": "pbkdf2_sha256$600000$J9V7y2F4$S+u8/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9=",
       "email": "asesor@inacap.cl",
       "rut": "44444444-4",
       "first_name": "Luisa",
       "last_name": "Pedagógica",
-      "is_active": true
+      "is_active": true,
+      "username": "asesor@inacap.cl",
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
     }
   },
   {
     "model": "SIAPE.Usuario",
     "pk": 5,
     "fields": {
-      "password": "pbkdf2_sha256$260000$hash_temporal_se_actualiza_con_script",
+      "password": "pbkdf2_sha256$600000$J9V7y2F4$S+u8/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9=",
       "email": "director.ti@inacap.cl",
       "rut": "55555555-5",
       "first_name": "Carlos",
       "last_name": "Director TI",
-      "is_active": true
+      "is_active": true,
+      "username": "director.ti@inacap.cl",
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
     }
   },
   {
     "model": "SIAPE.Usuario",
     "pk": 6,
     "fields": {
-      "password": "pbkdf2_sha256$260000$hash_temporal_se_actualiza_con_script",
+      "password": "pbkdf2_sha256$600000$J9V7y2F4$S+u8/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9=",
       "email": "docente.web@inacap.cl",
       "rut": "66666666-6",
       "first_name": "Maria",
       "last_name": "ProfeWeb",
-      "is_active": true
+      "is_active": true,
+      "username": "docente.web@inacap.cl",
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
     }
   },
-  {
-    "model": "SIAPE.Usuario",
-    "pk": 7,
-    "fields": {
-      "password": "pbkdf2_sha256$260000$hash_temporal_se_actualiza_con_script",
-      "email": "director.salud@inacap.cl",
-      "rut": "77777777-7",
-      "first_name": "Roberto",
-      "last_name": "Director Salud",
-      "is_active": true
-    }
-  },
-  
   {
     "model": "SIAPE.PerfilUsuario",
     "pk": 1,
-    "fields": { "usuario": 1, "rol": 1, "area": null }
+    "fields": {
+      "usuario": 1,
+      "rol": 1,
+      "area": null,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
+    }
   },
   {
     "model": "SIAPE.PerfilUsuario",
     "pk": 2,
-    "fields": { "usuario": 2, "rol": 2, "area": null }
+    "fields": {
+      "usuario": 2,
+      "rol": 2,
+      "area": null,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
+    }
   },
   {
     "model": "SIAPE.PerfilUsuario",
     "pk": 3,
-    "fields": { "usuario": 3, "rol": 3, "area": null }
+    "fields": {
+      "usuario": 3,
+      "rol": 3,
+      "area": null,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
+    }
   },
   {
     "model": "SIAPE.PerfilUsuario",
     "pk": 4,
-    "fields": { "usuario": 4, "rol": 4, "area": null }
+    "fields": {
+      "usuario": 4,
+      "rol": 4,
+      "area": null,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
+    }
   },
   {
     "model": "SIAPE.PerfilUsuario",
     "pk": 5,
-    "fields": { "usuario": 5, "rol": 5, "area": 1 }
+    "fields": {
+      "usuario": 5,
+      "rol": 5,
+      "area": 1,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
+    }
   },
   {
     "model": "SIAPE.PerfilUsuario",
     "pk": 6,
-    "fields": { "usuario": 6, "rol": 6, "area": 1 }
+    "fields": {
+      "usuario": 6,
+      "rol": 6,
+      "area": 1,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
+    }
   },
-  {
-    "model": "SIAPE.PerfilUsuario",
-    "pk": 7,
-    "fields": { "usuario": 7, "rol": 5, "area": 2 }
-  },
-
   {
     "model": "SIAPE.Carreras",
     "pk": 1,
     "fields": {
       "nombre": "Ingeniería en Informática",
       "director": 5,
-      "area": 1
+      "area": 1,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
     }
   },
   {
@@ -202,20 +274,12 @@
     "pk": 2,
     "fields": {
       "nombre": "Enfermería",
-      "director": 7,
-      "area": 2
+      "director": null,
+      "area": 2,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
     }
   },
-  {
-    "model": "SIAPE.Carreras",
-    "pk": 3,
-    "fields": {
-      "nombre": "Analista Programador",
-      "director": 5,
-      "area": 1
-    }
-  },
-
   {
     "model": "SIAPE.Asignaturas",
     "pk": 1,
@@ -223,30 +287,11 @@
       "nombre": "Programación Web",
       "seccion": "D-01",
       "carreras": 1,
-      "docente": 6
+      "docente": 6,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
     }
   },
-  {
-    "model": "SIAPE.Asignaturas",
-    "pk": 2,
-    "fields": {
-      "nombre": "Base de Datos",
-      "seccion": "V-02",
-      "carreras": 1,
-      "docente": 6
-    }
-  },
-  {
-    "model": "SIAPE.Asignaturas",
-    "pk": 3,
-    "fields": {
-      "nombre": "Anatomía",
-      "seccion": "S-01",
-      "carreras": 2,
-      "docente": 6
-    }
-  },
-
   {
     "model": "SIAPE.Estudiantes",
     "pk": 1,
@@ -256,7 +301,9 @@
       "rut": "11111111-K",
       "email": "juan.aprobado@alumnos.cl",
       "carreras": 1,
-      "numero": 911111111
+      "numero": 911111111,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
     }
   },
   {
@@ -268,7 +315,9 @@
       "rut": "22222222-K",
       "email": "camila.rechazada@alumnos.cl",
       "carreras": 1,
-      "numero": 922222222
+      "numero": 922222222,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
     }
   },
   {
@@ -280,7 +329,9 @@
       "rut": "33333333-K",
       "email": "pedro.nuevo@alumnos.cl",
       "carreras": 2,
-      "numero": 933333333
+      "numero": 933333333,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
     }
   },
   {
@@ -292,7 +343,9 @@
       "rut": "44444444-K",
       "email": "diego.cita@alumnos.cl",
       "carreras": 1,
-      "numero": 944444444
+      "numero": 944444444,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
     }
   },
   {
@@ -304,7 +357,9 @@
       "rut": "55555555-K",
       "email": "sofia.post@alumnos.cl",
       "carreras": 2,
-      "numero": 955555555
+      "numero": 955555555,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
     }
   },
   {
@@ -315,8 +370,10 @@
       "apellidos": "EnTecnico",
       "rut": "66666666-K",
       "email": "lucas.tec@alumnos.cl",
-      "carreras": 3,
-      "numero": 966666666
+      "carreras": 1,
+      "numero": 966666666,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
     }
   },
   {
@@ -328,7 +385,9 @@
       "rut": "77777777-K",
       "email": "ana.ped@alumnos.cl",
       "carreras": 1,
-      "numero": 977777777
+      "numero": 977777777,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
     }
   },
   {
@@ -340,36 +399,33 @@
       "rut": "88888888-K",
       "email": "matias.dir@alumnos.cl",
       "carreras": 1,
-      "numero": 988888888
+      "numero": 988888888,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
     }
   },
-
   {
     "model": "SIAPE.AsignaturasEnCurso",
     "pk": 1,
-    "fields": { "estado": true, "estudiantes": 1, "asignaturas": 1 }
+    "fields": {
+      "estado": true,
+      "estudiantes": 1,
+      "asignaturas": 1,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
+    }
   },
   {
     "model": "SIAPE.AsignaturasEnCurso",
     "pk": 2,
-    "fields": { "estado": true, "estudiantes": 1, "asignaturas": 2 }
+    "fields": {
+      "estado": true,
+      "estudiantes": 2,
+      "asignaturas": 1,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
+    }
   },
-  {
-    "model": "SIAPE.AsignaturasEnCurso",
-    "pk": 3,
-    "fields": { "estado": true, "estudiantes": 4, "asignaturas": 1 }
-  },
-  {
-    "model": "SIAPE.AsignaturasEnCurso",
-    "pk": 4,
-    "fields": { "estado": true, "estudiantes": 7, "asignaturas": 1 }
-  },
-  {
-    "model": "SIAPE.AsignaturasEnCurso",
-    "pk": 5,
-    "fields": { "estado": true, "estudiantes": 8, "asignaturas": 2 }
-  },
-
   {
     "model": "SIAPE.Solicitudes",
     "pk": 1,
@@ -498,7 +554,6 @@
       "updated_at": "2025-11-25T09:30:00Z"
     }
   },
-
   {
     "model": "SIAPE.Entrevistas",
     "pk": 1,
@@ -508,7 +563,9 @@
       "notas": "Entrevista finalizada caso aprobado.",
       "solicitudes": 1,
       "estado": "realizada",
-      "coordinadora": 2
+      "coordinadora": 2,
+      "created_at": "2025-10-02T10:00:00Z",
+      "updated_at": "2025-10-02T10:00:00Z"
     }
   },
   {
@@ -520,7 +577,9 @@
       "notas": "Entrevista finalizada caso rechazado.",
       "solicitudes": 2,
       "estado": "realizada",
-      "coordinadora": 2
+      "coordinadora": 2,
+      "created_at": "2025-10-06T15:00:00Z",
+      "updated_at": "2025-10-06T15:00:00Z"
     }
   },
   {
@@ -532,7 +591,9 @@
       "notas": "",
       "solicitudes": 4,
       "estado": "pendiente",
-      "coordinadora": 2
+      "coordinadora": 2,
+      "created_at": "2025-11-29T09:00:00Z",
+      "updated_at": "2025-11-29T09:00:00Z"
     }
   },
   {
@@ -544,7 +605,9 @@
       "notas": "Estudiante asiste puntualmente.",
       "solicitudes": 5,
       "estado": "realizada",
-      "coordinadora": 2
+      "coordinadora": 2,
+      "created_at": "2025-11-24T15:00:00Z",
+      "updated_at": "2025-11-24T15:00:00Z"
     }
   },
   {
@@ -556,7 +619,9 @@
       "notas": "Se deriva a técnico.",
       "solicitudes": 6,
       "estado": "realizada",
-      "coordinadora": 2
+      "coordinadora": 2,
+      "created_at": "2025-11-16T11:00:00Z",
+      "updated_at": "2025-11-16T11:00:00Z"
     }
   },
   {
@@ -568,7 +633,9 @@
       "notas": "Ok.",
       "solicitudes": 7,
       "estado": "realizada",
-      "coordinadora": 2
+      "coordinadora": 2,
+      "created_at": "2025-11-11T10:00:00Z",
+      "updated_at": "2025-11-11T10:00:00Z"
     }
   },
   {
@@ -580,16 +647,19 @@
       "notas": "Listo para aprobación.",
       "solicitudes": 8,
       "estado": "realizada",
-      "coordinadora": 2
+      "coordinadora": 2,
+      "created_at": "2025-11-06T14:00:00Z",
+      "updated_at": "2025-11-06T14:00:00Z"
     }
   },
-
   {
     "model": "SIAPE.AjusteRazonable",
     "pk": 1,
     "fields": {
       "descripcion": "Uso de fuente Arial 14 en pruebas.",
-      "categorias_ajustes": 1
+      "categorias_ajustes": 1,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
     }
   },
   {
@@ -597,7 +667,9 @@
     "pk": 2,
     "fields": {
       "descripcion": "Tiempo extra 15 min.",
-      "categorias_ajustes": 2
+      "categorias_ajustes": 2,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
     }
   },
   {
@@ -605,7 +677,9 @@
     "pk": 3,
     "fields": {
       "descripcion": "Uso de grabadora.",
-      "categorias_ajustes": 4
+      "categorias_ajustes": 1,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
     }
   },
   {
@@ -613,10 +687,11 @@
     "pk": 4,
     "fields": {
       "descripcion": "Ubicación preferencial.",
-      "categorias_ajustes": 3
+      "categorias_ajustes": 3,
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
     }
   },
-
   {
     "model": "SIAPE.AjusteAsignado",
     "pk": 1,
@@ -626,7 +701,9 @@
       "estado_aprobacion": "aprobado",
       "director_aprobador": 5,
       "fecha_aprobacion": "2025-10-10T12:00:00Z",
-      "comentarios_director": "Ok."
+      "comentarios_director": "Ok.",
+      "created_at": "2025-10-10T12:00:00Z",
+      "updated_at": "2025-10-10T12:00:00Z"
     }
   },
   {
@@ -638,7 +715,9 @@
       "estado_aprobacion": "rechazado",
       "director_aprobador": 5,
       "fecha_aprobacion": "2025-10-15T10:00:00Z",
-      "comentarios_director": "Falta evidencia."
+      "comentarios_director": "Falta evidencia.",
+      "created_at": "2025-10-15T10:00:00Z",
+      "updated_at": "2025-10-15T10:00:00Z"
     }
   },
   {
@@ -649,7 +728,9 @@
       "solicitudes": 7,
       "estado_aprobacion": "pendiente",
       "director_aprobador": null,
-      "fecha_aprobacion": null
+      "fecha_aprobacion": null,
+      "created_at": "2025-11-22T14:00:00Z",
+      "updated_at": "2025-11-22T14:00:00Z"
     }
   },
   {
@@ -660,17 +741,20 @@
       "solicitudes": 8,
       "estado_aprobacion": "pendiente",
       "director_aprobador": null,
-      "fecha_aprobacion": null
+      "fecha_aprobacion": null,
+      "created_at": "2025-11-25T09:30:00Z",
+      "updated_at": "2025-11-25T09:30:00Z"
     }
   },
-
   {
     "model": "SIAPE.HorarioBloqueado",
     "pk": 1,
     "fields": {
       "coordinadora": 2,
       "fecha_hora": "2025-11-28T14:00:00Z",
-      "motivo": "Reunión equipo"
+      "motivo": "Reunión equipo",
+      "created_at": "2025-11-01T12:00:00Z",
+      "updated_at": "2025-11-01T12:00:00Z"
     }
   }
 ]
