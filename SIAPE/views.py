@@ -77,6 +77,76 @@ class PublicSolicitudCreateView(APIView):
                 )
             # Los errores de validación (incluyendo "hora tomada") se devuelven aquí
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def buscar_estudiante_por_rut(request):
+    """
+    Endpoint público para buscar un estudiante por su RUT.
+    Devuelve los datos del estudiante si existe, o un 404 si no.
+    Usado en el formulario de solicitud para autocompletar datos.
+    """
+    import re
+    rut = request.query_params.get('rut', '').strip()
+    
+    if not rut:
+        return Response(
+            {'error': 'Debe proporcionar un RUT'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Normalizar el RUT (remover puntos y espacios, mantener guión)
+    rut_normalizado = re.sub(r'[.\s]', '', rut).upper()
+    
+    # Buscar estudiante por RUT exacto o normalizado
+    estudiante = Estudiantes.objects.filter(
+        Q(rut=rut) | Q(rut=rut_normalizado)
+    ).select_related('carreras').first()
+    
+    if not estudiante:
+        return Response(
+            {'encontrado': False, 'message': 'Estudiante no encontrado en el sistema'},
+            status=status.HTTP_200_OK
+        )
+    
+    # Obtener asignaturas activas del estudiante
+    asignaturas_activas = AsignaturasEnCurso.objects.filter(
+        estudiantes=estudiante,
+        estado=True
+    ).select_related('asignaturas', 'asignaturas__docente__usuario').values(
+        'asignaturas__id',
+        'asignaturas__nombre',
+        'asignaturas__seccion',
+        'asignaturas__docente__usuario__first_name',
+        'asignaturas__docente__usuario__last_name'
+    )
+    
+    asignaturas_list = [
+        {
+            'id': a['asignaturas__id'],
+            'nombre': a['asignaturas__nombre'],
+            'seccion': a['asignaturas__seccion'],
+            'docente': f"{a['asignaturas__docente__usuario__first_name']} {a['asignaturas__docente__usuario__last_name']}" if a['asignaturas__docente__usuario__first_name'] else 'Sin docente'
+        }
+        for a in asignaturas_activas
+    ]
+    
+    return Response({
+        'encontrado': True,
+        'estudiante': {
+            'id': estudiante.id,
+            'nombres': estudiante.nombres,
+            'apellidos': estudiante.apellidos,
+            'rut': estudiante.rut,
+            'email': estudiante.email,
+            'numero': estudiante.numero,
+            'carrera_id': estudiante.carreras.id,
+            'carrera_nombre': estudiante.carreras.nombre,
+        },
+        'asignaturas': asignaturas_list
+    }, status=status.HTTP_200_OK)
+
     
 def vista_formulario_solicitud(request):
     """
@@ -3186,6 +3256,587 @@ def estadisticas_director(request):
     
     return render(request, 'SIAPE/estadisticas_director.html', context)
 
+
+# ----------------------------------------------------
+#           CARGA MASIVA DE DATOS (DIRECTOR)
+# ----------------------------------------------------
+
+@login_required
+def gestion_carga_masiva_director(request):
+    """
+    Panel principal para la gestión de carga masiva de datos.
+    Permite al Director de Carrera subir archivos Excel con:
+    - Estudiantes
+    - Asignaturas
+    - Docentes
+    - Asignaciones estudiante-asignatura
+    - Asignaciones docente-asignatura
+    """
+    try:
+        perfil_director = request.user.perfil
+        if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para esta acción.')
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+    
+    # Obtener carreras del director
+    carreras_del_director = Carreras.objects.filter(director=perfil_director)
+    
+    context = {
+        'nombre_usuario': request.user.first_name,
+        'carreras': carreras_del_director,
+    }
+    
+    return render(request, 'SIAPE/gestion_carga_masiva_director.html', context)
+
+
+@login_required
+@require_POST
+def cargar_estudiantes_excel(request):
+    """
+    Procesa un archivo Excel con datos de estudiantes.
+    Columnas esperadas: RUT, Nombres, Apellidos, Email, Telefono (opcional), Carrera_ID
+    """
+    import openpyxl
+    from django.db import transaction
+    
+    try:
+        perfil_director = request.user.perfil
+        if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
+            return Response({'error': 'No tienes permisos'}, status=403)
+    except AttributeError:
+        return Response({'error': 'Perfil no encontrado'}, status=403)
+    
+    archivo = request.FILES.get('archivo_excel')
+    if not archivo:
+        messages.error(request, 'Debe seleccionar un archivo Excel.')
+        return redirect('gestion_carga_masiva_director')
+    
+    # Validar extensión
+    if not archivo.name.endswith(('.xlsx', '.xls')):
+        messages.error(request, 'El archivo debe ser un Excel (.xlsx o .xls).')
+        return redirect('gestion_carga_masiva_director')
+    
+    # Obtener carreras del director para validación
+    carreras_del_director = Carreras.objects.filter(director=perfil_director)
+    carreras_ids = list(carreras_del_director.values_list('id', flat=True))
+    
+    try:
+        wb = openpyxl.load_workbook(archivo)
+        ws = wb.active
+        
+        # Validar encabezados
+        headers = [cell.value.lower().strip() if cell.value else '' for cell in ws[1]]
+        required_headers = ['rut', 'nombres', 'apellidos', 'email']
+        
+        for h in required_headers:
+            if h not in headers:
+                messages.error(request, f'El archivo debe contener la columna: {h.upper()}')
+                return redirect('gestion_carga_masiva_director')
+        
+        # Obtener índices de columnas
+        col_idx = {h: headers.index(h) for h in headers if h}
+        
+        creados = 0
+        actualizados = 0
+        errores = []
+        
+        with transaction.atomic():
+            for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                try:
+                    rut = str(row[col_idx.get('rut', 0)] or '').strip()
+                    nombres = str(row[col_idx.get('nombres', 1)] or '').strip()
+                    apellidos = str(row[col_idx.get('apellidos', 2)] or '').strip()
+                    email = str(row[col_idx.get('email', 3)] or '').strip()
+                    telefono = row[col_idx.get('telefono', -1)] if 'telefono' in col_idx else None
+                    carrera_id = row[col_idx.get('carrera_id', -1)] if 'carrera_id' in col_idx else None
+                    
+                    # Validaciones básicas
+                    if not rut or not nombres or not apellidos or not email:
+                        errores.append(f'Fila {row_num}: Datos incompletos')
+                        continue
+                    
+                    # Validar carrera (si se proporciona)
+                    carrera = None
+                    if carrera_id:
+                        try:
+                            carrera_id_int = int(carrera_id)
+                            if carrera_id_int not in carreras_ids:
+                                errores.append(f'Fila {row_num}: Carrera {carrera_id} no pertenece a tus carreras asignadas')
+                                continue
+                            carrera = Carreras.objects.get(id=carrera_id_int)
+                        except (ValueError, Carreras.DoesNotExist):
+                            errores.append(f'Fila {row_num}: Carrera ID inválido')
+                            continue
+                    else:
+                        # Si no se especifica carrera, usar la primera del director
+                        carrera = carreras_del_director.first()
+                    
+                    if not carrera:
+                        errores.append(f'Fila {row_num}: No se pudo determinar la carrera')
+                        continue
+                    
+                    # Crear o actualizar estudiante
+                    estudiante, created = Estudiantes.objects.update_or_create(
+                        rut=rut,
+                        defaults={
+                            'nombres': nombres,
+                            'apellidos': apellidos,
+                            'email': email,
+                            'numero': int(telefono) if telefono and str(telefono).isdigit() else None,
+                            'carreras': carrera
+                        }
+                    )
+                    
+                    if created:
+                        creados += 1
+                    else:
+                        actualizados += 1
+                        
+                except Exception as e:
+                    errores.append(f'Fila {row_num}: {str(e)}')
+        
+        # Mensaje de resultado
+        msg = f'Proceso completado: {creados} estudiantes creados, {actualizados} actualizados.'
+        if errores:
+            msg += f' {len(errores)} errores encontrados.'
+            for error in errores[:5]:  # Mostrar solo los primeros 5 errores
+                messages.warning(request, error)
+        messages.success(request, msg)
+        
+    except Exception as e:
+        messages.error(request, f'Error al procesar el archivo: {str(e)}')
+    
+    return redirect('gestion_carga_masiva_director')
+
+
+@login_required
+@require_POST
+def cargar_docentes_excel(request):
+    """
+    Procesa un archivo Excel con datos de docentes.
+    Columnas esperadas: RUT, Nombres, Apellidos, Email, Password (opcional)
+    Crea Usuario + PerfilUsuario con rol Docente.
+    """
+    import openpyxl
+    from django.db import transaction
+    
+    try:
+        perfil_director = request.user.perfil
+        if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para esta acción.')
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+    
+    archivo = request.FILES.get('archivo_excel')
+    if not archivo:
+        messages.error(request, 'Debe seleccionar un archivo Excel.')
+        return redirect('gestion_carga_masiva_director')
+    
+    if not archivo.name.endswith(('.xlsx', '.xls')):
+        messages.error(request, 'El archivo debe ser un Excel (.xlsx o .xls).')
+        return redirect('gestion_carga_masiva_director')
+    
+    try:
+        wb = openpyxl.load_workbook(archivo)
+        ws = wb.active
+        
+        headers = [cell.value.lower().strip() if cell.value else '' for cell in ws[1]]
+        required_headers = ['rut', 'nombres', 'apellidos', 'email']
+        
+        for h in required_headers:
+            if h not in headers:
+                messages.error(request, f'El archivo debe contener la columna: {h.upper()}')
+                return redirect('gestion_carga_masiva_director')
+        
+        col_idx = {h: headers.index(h) for h in headers if h}
+        
+        # Obtener rol Docente
+        rol_docente = Roles.objects.filter(nombre_rol='Docente').first()
+        if not rol_docente:
+            messages.error(request, 'No existe el rol "Docente" en el sistema.')
+            return redirect('gestion_carga_masiva_director')
+        
+        # Obtener área del director para asignar a los docentes
+        area_director = perfil_director.area
+        
+        creados = 0
+        actualizados = 0
+        errores = []
+        
+        with transaction.atomic():
+            for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                try:
+                    rut = str(row[col_idx.get('rut', 0)] or '').strip()
+                    nombres = str(row[col_idx.get('nombres', 1)] or '').strip()
+                    apellidos = str(row[col_idx.get('apellidos', 2)] or '').strip()
+                    email = str(row[col_idx.get('email', 3)] or '').strip()
+                    password = str(row[col_idx.get('password', -1)] or '') if 'password' in col_idx else None
+                    
+                    if not rut or not nombres or not apellidos or not email:
+                        errores.append(f'Fila {row_num}: Datos incompletos')
+                        continue
+                    
+                    # Verificar si el usuario ya existe
+                    usuario_existente = Usuario.objects.filter(Q(rut=rut) | Q(email=email)).first()
+                    
+                    if usuario_existente:
+                        # Actualizar datos existentes
+                        usuario_existente.first_name = nombres
+                        usuario_existente.last_name = apellidos
+                        usuario_existente.save()
+                        
+                        # Asegurar que tenga perfil de docente
+                        perfil, _ = PerfilUsuario.objects.get_or_create(
+                            usuario=usuario_existente,
+                            defaults={'rol': rol_docente, 'area': area_director}
+                        )
+                        if perfil.rol != rol_docente:
+                            perfil.rol = rol_docente
+                            perfil.save()
+                        
+                        actualizados += 1
+                    else:
+                        # Crear nuevo usuario
+                        default_password = password if password else f'{rut[:4]}Docente!'
+                        
+                        usuario = Usuario.objects.create_user(
+                            email=email,
+                            password=default_password,
+                            first_name=nombres,
+                            last_name=apellidos,
+                            rut=rut
+                        )
+                        
+                        # Crear perfil de docente
+                        PerfilUsuario.objects.create(
+                            usuario=usuario,
+                            rol=rol_docente,
+                            area=area_director
+                        )
+                        
+                        creados += 1
+                        
+                except Exception as e:
+                    errores.append(f'Fila {row_num}: {str(e)}')
+        
+        msg = f'Proceso completado: {creados} docentes creados, {actualizados} actualizados.'
+        if errores:
+            msg += f' {len(errores)} errores encontrados.'
+            for error in errores[:5]:
+                messages.warning(request, error)
+        messages.success(request, msg)
+        
+    except Exception as e:
+        messages.error(request, f'Error al procesar el archivo: {str(e)}')
+    
+    return redirect('gestion_carga_masiva_director')
+
+
+@login_required
+@require_POST
+def cargar_asignaturas_excel(request):
+    """
+    Procesa un archivo Excel con datos de asignaturas.
+    Columnas esperadas: Nombre, Seccion, Carrera_ID, Docente_RUT (o Docente_Email)
+    """
+    import openpyxl
+    from django.db import transaction
+    
+    try:
+        perfil_director = request.user.perfil
+        if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para esta acción.')
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+    
+    archivo = request.FILES.get('archivo_excel')
+    if not archivo:
+        messages.error(request, 'Debe seleccionar un archivo Excel.')
+        return redirect('gestion_carga_masiva_director')
+    
+    if not archivo.name.endswith(('.xlsx', '.xls')):
+        messages.error(request, 'El archivo debe ser un Excel (.xlsx o .xls).')
+        return redirect('gestion_carga_masiva_director')
+    
+    carreras_del_director = Carreras.objects.filter(director=perfil_director)
+    carreras_ids = list(carreras_del_director.values_list('id', flat=True))
+    
+    try:
+        wb = openpyxl.load_workbook(archivo)
+        ws = wb.active
+        
+        headers = [cell.value.lower().strip() if cell.value else '' for cell in ws[1]]
+        required_headers = ['nombre', 'seccion']
+        
+        for h in required_headers:
+            if h not in headers:
+                messages.error(request, f'El archivo debe contener la columna: {h.upper()}')
+                return redirect('gestion_carga_masiva_director')
+        
+        col_idx = {h: headers.index(h) for h in headers if h}
+        
+        creados = 0
+        actualizados = 0
+        errores = []
+        
+        with transaction.atomic():
+            for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                try:
+                    nombre = str(row[col_idx.get('nombre', 0)] or '').strip()
+                    seccion = str(row[col_idx.get('seccion', 1)] or '').strip()
+                    carrera_id = row[col_idx.get('carrera_id', -1)] if 'carrera_id' in col_idx else None
+                    docente_rut = str(row[col_idx.get('docente_rut', -1)] or '').strip() if 'docente_rut' in col_idx else None
+                    docente_email = str(row[col_idx.get('docente_email', -1)] or '').strip() if 'docente_email' in col_idx else None
+                    
+                    if not nombre or not seccion:
+                        errores.append(f'Fila {row_num}: Datos incompletos')
+                        continue
+                    
+                    # Determinar carrera
+                    carrera = None
+                    if carrera_id:
+                        try:
+                            carrera_id_int = int(carrera_id)
+                            if carrera_id_int not in carreras_ids:
+                                errores.append(f'Fila {row_num}: Carrera {carrera_id} no pertenece a tus carreras')
+                                continue
+                            carrera = Carreras.objects.get(id=carrera_id_int)
+                        except (ValueError, Carreras.DoesNotExist):
+                            errores.append(f'Fila {row_num}: Carrera ID inválido')
+                            continue
+                    else:
+                        carrera = carreras_del_director.first()
+                    
+                    if not carrera:
+                        errores.append(f'Fila {row_num}: No se pudo determinar la carrera')
+                        continue
+                    
+                    # Buscar docente
+                    docente_perfil = None
+                    if docente_rut:
+                        docente_perfil = PerfilUsuario.objects.filter(
+                            usuario__rut=docente_rut,
+                            rol__nombre_rol='Docente'
+                        ).first()
+                    elif docente_email:
+                        docente_perfil = PerfilUsuario.objects.filter(
+                            usuario__email=docente_email,
+                            rol__nombre_rol='Docente'
+                        ).first()
+                    
+                    if not docente_perfil:
+                        errores.append(f'Fila {row_num}: No se encontró el docente especificado')
+                        continue
+                    
+                    # Crear o actualizar asignatura
+                    asignatura, created = Asignaturas.objects.update_or_create(
+                        nombre=nombre,
+                        seccion=seccion,
+                        carreras=carrera,
+                        defaults={'docente': docente_perfil}
+                    )
+                    
+                    if created:
+                        creados += 1
+                    else:
+                        actualizados += 1
+                        
+                except Exception as e:
+                    errores.append(f'Fila {row_num}: {str(e)}')
+        
+        msg = f'Proceso completado: {creados} asignaturas creadas, {actualizados} actualizadas.'
+        if errores:
+            msg += f' {len(errores)} errores encontrados.'
+            for error in errores[:5]:
+                messages.warning(request, error)
+        messages.success(request, msg)
+        
+    except Exception as e:
+        messages.error(request, f'Error al procesar el archivo: {str(e)}')
+    
+    return redirect('gestion_carga_masiva_director')
+
+
+@login_required
+@require_POST
+def cargar_inscripciones_excel(request):
+    """
+    Procesa un archivo Excel para inscribir estudiantes en asignaturas.
+    Columnas esperadas: Estudiante_RUT, Asignatura_Nombre, Asignatura_Seccion (o Asignatura_ID)
+    """
+    import openpyxl
+    from django.db import transaction
+    
+    try:
+        perfil_director = request.user.perfil
+        if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para esta acción.')
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+    
+    archivo = request.FILES.get('archivo_excel')
+    if not archivo:
+        messages.error(request, 'Debe seleccionar un archivo Excel.')
+        return redirect('gestion_carga_masiva_director')
+    
+    if not archivo.name.endswith(('.xlsx', '.xls')):
+        messages.error(request, 'El archivo debe ser un Excel (.xlsx o .xls).')
+        return redirect('gestion_carga_masiva_director')
+    
+    carreras_del_director = Carreras.objects.filter(director=perfil_director)
+    
+    try:
+        wb = openpyxl.load_workbook(archivo)
+        ws = wb.active
+        
+        headers = [cell.value.lower().strip() if cell.value else '' for cell in ws[1]]
+        
+        if 'estudiante_rut' not in headers:
+            messages.error(request, 'El archivo debe contener la columna: ESTUDIANTE_RUT')
+            return redirect('gestion_carga_masiva_director')
+        
+        col_idx = {h: headers.index(h) for h in headers if h}
+        
+        creados = 0
+        ya_existentes = 0
+        errores = []
+        
+        with transaction.atomic():
+            for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                try:
+                    estudiante_rut = str(row[col_idx.get('estudiante_rut', 0)] or '').strip()
+                    asignatura_id = row[col_idx.get('asignatura_id', -1)] if 'asignatura_id' in col_idx else None
+                    asignatura_nombre = str(row[col_idx.get('asignatura_nombre', -1)] or '').strip() if 'asignatura_nombre' in col_idx else None
+                    asignatura_seccion = str(row[col_idx.get('asignatura_seccion', -1)] or '').strip() if 'asignatura_seccion' in col_idx else None
+                    
+                    if not estudiante_rut:
+                        errores.append(f'Fila {row_num}: RUT del estudiante requerido')
+                        continue
+                    
+                    # Buscar estudiante
+                    estudiante = Estudiantes.objects.filter(rut=estudiante_rut).first()
+                    if not estudiante:
+                        errores.append(f'Fila {row_num}: Estudiante con RUT {estudiante_rut} no encontrado')
+                        continue
+                    
+                    # Verificar que el estudiante pertenece a una carrera del director
+                    if estudiante.carreras not in carreras_del_director:
+                        errores.append(f'Fila {row_num}: El estudiante no pertenece a tus carreras')
+                        continue
+                    
+                    # Buscar asignatura
+                    asignatura = None
+                    if asignatura_id:
+                        try:
+                            asignatura = Asignaturas.objects.get(id=int(asignatura_id))
+                        except (ValueError, Asignaturas.DoesNotExist):
+                            errores.append(f'Fila {row_num}: Asignatura ID inválido')
+                            continue
+                    elif asignatura_nombre and asignatura_seccion:
+                        asignatura = Asignaturas.objects.filter(
+                            nombre=asignatura_nombre,
+                            seccion=asignatura_seccion,
+                            carreras__in=carreras_del_director
+                        ).first()
+                    
+                    if not asignatura:
+                        errores.append(f'Fila {row_num}: No se encontró la asignatura')
+                        continue
+                    
+                    # Crear inscripción si no existe
+                    inscripcion, created = AsignaturasEnCurso.objects.get_or_create(
+                        estudiantes=estudiante,
+                        asignaturas=asignatura,
+                        defaults={'estado': True}
+                    )
+                    
+                    if created:
+                        creados += 1
+                    else:
+                        ya_existentes += 1
+                        
+                except Exception as e:
+                    errores.append(f'Fila {row_num}: {str(e)}')
+        
+        msg = f'Proceso completado: {creados} inscripciones creadas, {ya_existentes} ya existían.'
+        if errores:
+            msg += f' {len(errores)} errores encontrados.'
+            for error in errores[:5]:
+                messages.warning(request, error)
+        messages.success(request, msg)
+        
+    except Exception as e:
+        messages.error(request, f'Error al procesar el archivo: {str(e)}')
+    
+    return redirect('gestion_carga_masiva_director')
+
+
+@login_required
+def descargar_plantilla_excel(request, tipo):
+    """
+    Genera y descarga una plantilla Excel vacía según el tipo solicitado.
+    Tipos: estudiantes, docentes, asignaturas, inscripciones
+    """
+    import openpyxl
+    from django.http import HttpResponse
+    
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para esta acción.')
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+    
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    
+    if tipo == 'estudiantes':
+        ws.title = 'Estudiantes'
+        ws.append(['RUT', 'Nombres', 'Apellidos', 'Email', 'Telefono', 'Carrera_ID'])
+        ws.append(['12345678-9', 'Juan', 'Pérez González', 'juan.perez@email.com', '912345678', '1'])
+        filename = 'plantilla_estudiantes.xlsx'
+        
+    elif tipo == 'docentes':
+        ws.title = 'Docentes'
+        ws.append(['RUT', 'Nombres', 'Apellidos', 'Email', 'Password'])
+        ws.append(['98765432-1', 'María', 'González López', 'maria.gonzalez@email.com', 'MiPassword123'])
+        filename = 'plantilla_docentes.xlsx'
+        
+    elif tipo == 'asignaturas':
+        ws.title = 'Asignaturas'
+        ws.append(['Nombre', 'Seccion', 'Carrera_ID', 'Docente_RUT', 'Docente_Email'])
+        ws.append(['Cálculo I', 'A-001', '1', '98765432-1', ''])
+        filename = 'plantilla_asignaturas.xlsx'
+        
+    elif tipo == 'inscripciones':
+        ws.title = 'Inscripciones'
+        ws.append(['Estudiante_RUT', 'Asignatura_ID', 'Asignatura_Nombre', 'Asignatura_Seccion'])
+        ws.append(['12345678-9', '', 'Cálculo I', 'A-001'])
+        filename = 'plantilla_inscripciones.xlsx'
+        
+    else:
+        messages.error(request, 'Tipo de plantilla no válido.')
+        return redirect('gestion_carga_masiva_director')
+    
+    # Ajustar ancho de columnas
+    for col in ws.columns:
+        max_length = max(len(str(cell.value or '')) for cell in col)
+        ws.column_dimensions[col[0].column_letter].width = max_length + 2
+    
+    # Crear respuesta HTTP
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename={filename}'
+    wb.save(response)
+    
+    return response
 
 
 # ----------------------------------------------------

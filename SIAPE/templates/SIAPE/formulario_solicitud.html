@@ -22,53 +22,81 @@
         
         <div class="form-header">
             <h1>Solicitud de Entrevista de Apoyo</h1>
-            <p>Ingresa tus datos y el asunto para agendar una entrevista con la Coordinación de Inclusión.</p>
+            <p>Ingresa tu RUT para verificar tus datos en el sistema, luego completa el asunto para agendar una entrevista con la Encargada de Inclusión.</p>
         </div>
 
         <form id="solicitud-form" enctype="multipart/form-data">
             {% csrf_token %}
 
-            <!-- Campos del formulario en 2 columnas -->
-            <div class="form-grid">
-                
-                <!-- Columna Izquierda -->
-                <div class="form-group">
-                    <label for="nombres">Nombres <span>*</span></label>
-                    <input type="text" id="nombres" name="nombres" placeholder="Ej: Juan" required>
+            <!-- Búsqueda por RUT -->
+            <div class="rut-search-section">
+                <div class="form-group form-group-rut">
+                    <label for="rut">Ingresa tu RUT <span>*</span></label>
+                    <div class="rut-input-wrapper">
+                        <input type="text" id="rut" name="rut" placeholder="Ej: 12345678-K" required>
+                        <button type="button" id="btn-buscar-rut" class="btn btn-secondary">
+                            <i class="fas fa-search"></i> Buscar
+                        </button>
+                    </div>
+                    <small class="form-hint">Ingresa tu RUT y presiona "Buscar" para autocompletar tus datos.</small>
                 </div>
                 
-                <div class="form-group">
-                    <label for="apellidos">Apellidos <span>*</span></label>
-                    <input type="text" id="apellidos" name="apellidos" placeholder="Ej: Pérez González" required>
-                </div>
+                <!-- Mensaje de estado de búsqueda -->
+                <div id="rut-search-status" class="rut-status" style="display: none;"></div>
+            </div>
 
+            <!-- Datos del estudiante ENCONTRADO (solo lectura para verificación) -->
+            <div id="datos-estudiante-verificacion" style="display: none;">
+                <h3 class="section-title"><i class="fas fa-user-check"></i> Verifica tus Datos</h3>
+                <p class="form-hint">Por favor, verifica que estos son tus datos correctos. Si hay algún error, contacta a tu Director de Carrera.</p>
                 
-                <div class="form-group">
-                    <label for="carrera_id">Tu Carrera <span>*</span></label>
-                    <select id="carrera_id" name="carrera_id" required>
-                        <option value="">-- Selecciona tu carrera --</option>
-                        {% for c in carreras %}
-                            <option value="{{ c.id }}">{{ c.nombre }}</option>
-                        {% endfor %}
-                    </select>
+                <div class="datos-verificacion-card">
+                    <div class="dato-item">
+                        <span class="dato-label"><i class="fas fa-user"></i> Nombre completo</span>
+                        <span class="dato-valor" id="display-nombre-completo">-</span>
+                    </div>
+                    <div class="dato-item">
+                        <span class="dato-label"><i class="fas fa-id-card"></i> RUT</span>
+                        <span class="dato-valor" id="display-rut">-</span>
+                    </div>
+                    <div class="dato-item">
+                        <span class="dato-label"><i class="fas fa-envelope"></i> Correo electrónico</span>
+                        <span class="dato-valor" id="display-email">-</span>
+                    </div>
+                    <div class="dato-item">
+                        <span class="dato-label"><i class="fas fa-graduation-cap"></i> Carrera</span>
+                        <span class="dato-valor" id="display-carrera">-</span>
+                    </div>
+                    <div class="dato-item">
+                        <span class="dato-label"><i class="fas fa-phone"></i> Teléfono</span>
+                        <span class="dato-valor" id="display-telefono">No registrado</span>
+                    </div>
                 </div>
+                
+                <!-- Campos ocultos para enviar los datos -->
+                <input type="hidden" id="nombres" name="nombres">
+                <input type="hidden" id="apellidos" name="apellidos">
+                <input type="hidden" id="email" name="email">
+                <input type="hidden" id="carrera_id" name="carrera_id">
+                <input type="hidden" id="numero" name="numero">
+            </div>
 
-                <!-- Columna Derecha -->
-                <div class="form-group">
-                    <label for="email">Correo Electrónico <span>*</span></label>
-                    <input type="email" id="email" name="email" placeholder="juan.perez@estudiante.edu" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="rut">RUT<span>*</span></label>
-                    <input type="text" id="rut" name="rut" placeholder="Ej: 12345678-K" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="numero">Teléfono de Contacto (Opcional)</label>
-                    <input type="text" id="numero" name="numero" placeholder="Ej: +56 9 1234 5678">
+            <!-- Mensaje cuando el estudiante NO está registrado -->
+            <div id="estudiante-no-encontrado" style="display: none;">
+                <div class="no-encontrado-card">
+                    <div class="no-encontrado-icon">
+                        <i class="fas fa-user-times"></i>
+                    </div>
+                    <h3>No estás registrado en el sistema</h3>
+                    <p>Tu RUT no se encuentra en nuestra base de datos. Para poder realizar una solicitud, debes estar registrado como estudiante.</p>
+                    <p><strong>¿Qué puedes hacer?</strong></p>
+                    <ul>
+                        <li>Verifica que hayas escrito correctamente tu RUT</li>
+                        <li>Contacta a tu Director de Carrera para que te registre en el sistema</li>
+                    </ul>
                 </div>
             </div>
+            
 
             <!-- Asunto (Ancho completo) -->
             <div class="form-group">
@@ -181,6 +209,161 @@
 
     <!-- El script se queda aquí, al final del bloque de contenido -->
     <script>
+        // --- LÓGICA DE BÚSQUEDA POR RUT (Sección 0) ---
+        
+        // Variables para el estado del estudiante
+        let estudianteEncontrado = null;
+        
+        // Elementos del DOM para búsqueda por RUT
+        const rutInput = document.getElementById('rut');
+        const btnBuscarRut = document.getElementById('btn-buscar-rut');
+        const rutSearchStatus = document.getElementById('rut-search-status');
+        
+        // Secciones de datos
+        const seccionVerificacion = document.getElementById('datos-estudiante-verificacion');
+        const seccionNoEncontrado = document.getElementById('estudiante-no-encontrado');
+        
+        // Campos ocultos (para estudiante encontrado)
+        const nombresHidden = document.getElementById('nombres');
+        const apellidosHidden = document.getElementById('apellidos');
+        const emailHidden = document.getElementById('email');
+        const carreraHidden = document.getElementById('carrera_id');
+        const numeroHidden = document.getElementById('numero');
+        
+        // Displays de verificación
+        const displayNombreCompleto = document.getElementById('display-nombre-completo');
+        const displayRut = document.getElementById('display-rut');
+        const displayEmail = document.getElementById('display-email');
+        const displayCarrera = document.getElementById('display-carrera');
+        const displayTelefono = document.getElementById('display-telefono');
+        
+        // Función para buscar estudiante por RUT
+        async function buscarEstudiantePorRut() {
+            const rut = rutInput.value.trim();
+            
+            if (!rut) {
+                mostrarEstadoRut('Por favor, ingresa tu RUT', 'warning');
+                return;
+            }
+            
+            mostrarEstadoRut('<i class="fas fa-spinner fa-spin"></i> Buscando...', 'loading');
+            btnBuscarRut.disabled = true;
+            
+            try {
+                const response = await fetch(`/api/buscar-estudiante/?rut=${encodeURIComponent(rut)}`);
+                const data = await response.json();
+                
+                if (data.encontrado) {
+                    estudianteEncontrado = data.estudiante;
+                    
+                    // Mostrar datos en modo verificación
+                    mostrarDatosVerificacion(data.estudiante);
+                    
+                    mostrarEstadoRut(
+                        `<i class="fas fa-check-circle"></i> ¡Datos encontrados! Verifica que son correctos.`,
+                        'success'
+                    );
+                } else {
+                    estudianteEncontrado = null;
+                    
+                    // Mostrar mensaje de no encontrado
+                    mostrarNoEncontrado();
+                    
+                    mostrarEstadoRut(
+                        '<i class="fas fa-times-circle"></i> RUT no registrado en el sistema.',
+                        'error'
+                    );
+                }
+            } catch (error) {
+                console.error('Error buscando estudiante:', error);
+                mostrarEstadoRut(
+                    '<i class="fas fa-exclamation-triangle"></i> Error de conexión. Intenta de nuevo.',
+                    'error'
+                );
+            }
+            
+            btnBuscarRut.disabled = false;
+        }
+        
+        // Mostrar estado de búsqueda
+        function mostrarEstadoRut(mensaje, tipo) {
+            rutSearchStatus.innerHTML = mensaje;
+            rutSearchStatus.className = 'rut-status ' + tipo;
+            rutSearchStatus.style.display = 'block';
+        }
+        
+        // Mostrar datos en modo verificación (solo lectura)
+        function mostrarDatosVerificacion(estudiante) {
+            // Llenar los displays de verificación
+            displayNombreCompleto.textContent = `${estudiante.nombres} ${estudiante.apellidos}`;
+            displayRut.textContent = estudiante.rut;
+            displayEmail.textContent = estudiante.email;
+            displayCarrera.textContent = estudiante.carrera_nombre;
+            displayTelefono.textContent = estudiante.numero || 'No registrado';
+            
+            // Llenar los campos ocultos para el envío
+            nombresHidden.value = estudiante.nombres;
+            apellidosHidden.value = estudiante.apellidos;
+            emailHidden.value = estudiante.email;
+            carreraHidden.value = estudiante.carrera_id;
+            numeroHidden.value = estudiante.numero || '';
+            
+            // Mostrar sección de verificación, ocultar no encontrado
+            seccionVerificacion.style.display = 'block';
+            seccionNoEncontrado.style.display = 'none';
+        }
+        
+        // Mostrar mensaje de no encontrado
+        function mostrarNoEncontrado() {
+            // Ocultar verificación, mostrar mensaje de no encontrado
+            seccionVerificacion.style.display = 'none';
+            seccionNoEncontrado.style.display = 'block';
+            
+            // Limpiar campos ocultos
+            nombresHidden.value = '';
+            apellidosHidden.value = '';
+            emailHidden.value = '';
+            carreraHidden.value = '';
+            numeroHidden.value = '';
+        }
+        
+        // Resetear a estado inicial
+        function resetearEstadoEstudiante() {
+            estudianteEncontrado = null;
+            seccionVerificacion.style.display = 'none';
+            seccionNoEncontrado.style.display = 'none';
+            rutSearchStatus.style.display = 'none';
+            
+            // Limpiar campos ocultos
+            nombresHidden.value = '';
+            apellidosHidden.value = '';
+            emailHidden.value = '';
+            carreraHidden.value = '';
+            numeroHidden.value = '';
+        }
+        
+        // Event listeners para búsqueda por RUT
+        if (btnBuscarRut) {
+            btnBuscarRut.addEventListener('click', buscarEstudiantePorRut);
+        }
+        
+        if (rutInput) {
+            // Buscar al presionar Enter en el campo RUT
+            rutInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    buscarEstudiantePorRut();
+                }
+            });
+            
+            // Limpiar estado cuando cambia el RUT
+            rutInput.addEventListener('input', () => {
+                if (estudianteEncontrado || seccionNoEncontrado.style.display === 'block') {
+                    resetearEstadoEstudiante();
+                }
+            });
+        }
+        
         // --- LÓGICA DEL CALENDARIO (Sección 1) - Se ejecuta primero ---
         
         // Variables globales del calendario
@@ -660,6 +843,15 @@
             form.addEventListener('submit', async function(e) {
                 e.preventDefault(); // Prevenir envío por defecto primero
                 
+                // Validar que el estudiante haya sido encontrado
+                if (!estudianteEncontrado) {
+                    mensajeDiv.className = 'error';
+                    mensajeDiv.innerHTML = '<strong>Error:</strong><ul><li>Debes buscar tu RUT primero y estar registrado en el sistema para enviar una solicitud.</li></ul>';
+                    mensajeDiv.style.display = 'block';
+                    rutInput.focus();
+                    return;
+                }
+                
                 // Validar que se haya seleccionado una hora
                 const horaCitaInput = document.getElementById('hora_cita');
                 const fechaCitaInput = document.getElementById('fecha_cita');
@@ -730,6 +922,8 @@
                         mensajeDiv.innerHTML = `<strong>¡Solicitud enviada con éxito!</strong> El proceso ha iniciado. Tu <strong>ID de seguimiento de caso es: ${data.solicitud_id}</strong>.`;
                         mensajeDiv.style.display = 'block';
                         form.reset();
+                        // Resetear estado del estudiante
+                        resetearEstadoEstudiante();
                         // Resetear el checkbox de autorización manualmente si existe
                         const autorizacionCheckbox = document.getElementById('autorizacion_datos');
                         if (autorizacionCheckbox) {
