@@ -40,7 +40,7 @@ from .permissions import (
 )
 
 # ------------ CONSTANTES ------------
-ROL_ASESOR = 'Asesora Pedagógica'
+ROL_ASESOR = 'Asesor Pedagógico'
 ROL_DIRECTOR = 'Director de Carrera'
 ROL_DOCENTE = 'Docente'
 ROL_ADMIN = 'Administrador'
@@ -480,19 +480,6 @@ def redireccionamiento_por_rol(request):
     if hasattr(request.user, 'perfil') and request.user.perfil and request.user.perfil.rol:
         rol = request.user.perfil.rol.nombre_rol
 
-    if rol == ROL_COORDINADORA:
-        return redirect('dashboard_encargado_inclusion')
-    elif rol == ROL_ASESORA_TECNICA:
-        return redirect('dashboard_coordinador_tecnico_pedagogico')
-    elif rol == ROL_ASESOR:
-        return redirect('dashboard_asesor')
-    elif rol == ROL_DIRECTOR:
-        return redirect('dashboard_director')
-    elif rol == ROL_ADMIN:
-        return redirect('dashboard_admin')
-    elif rol == ROL_DOCENTE:
-        return redirect('dashboard_docente')
-
         if rol == ROL_COORDINADORA:
             return redirect('dashboard_encargado_inclusion')
         elif rol == ROL_ASESORA_TECNICA:
@@ -503,6 +490,8 @@ def redireccionamiento_por_rol(request):
             return redirect('dashboard_director')
         elif rol == ROL_ADMIN:
             return redirect('dashboard_admin')
+        elif rol == ROL_DOCENTE:
+            return redirect('dashboard_docente')
 
     # Solo si no tiene rol o perfil, verificar si es superuser/staff para enviarlo al admin
     if request.user.is_superuser or request.user.is_staff:
