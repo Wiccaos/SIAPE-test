@@ -50,6 +50,9 @@
             <a href="{% url 'carreras_director' %}" class="nav-item">
                 <i class="fas fa-graduation-cap"></i> Mis Carreras
             </a>
+            <a href="{% url 'gestion_carga_masiva_director' %}" class="nav-item">
+                <i class="fas fa-file-upload"></i> Carga Masiva
+            </a>
         {% elif user.perfil.rol.nombre_rol == "Docente" %}
             <a href="{% url 'dashboard_docente' %}" class="nav-item">
                 <i class="fas fa-home"></i> Panel Principal

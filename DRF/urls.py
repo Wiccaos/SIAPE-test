@@ -49,6 +49,7 @@ urlpatterns = [
     path('api/horarios-disponibles/', views.get_horarios_disponibles, name='api-horarios-disponibles'),
     path('api/calendario-disponible/', views.get_calendario_disponible, name='api-calendario-disponible'),
     path('api/docente/caso/<int:solicitud_id>/', views.obtener_datos_caso_docente, name='api-datos-caso-docente'),
+    path('api/buscar-estudiante/', views.buscar_estudiante_por_rut, name='api-buscar-estudiante'),
 
     # URLs del Administrador
     path('dashboard/admin/', views.dashboard_admin, name='dashboard_admin'),
@@ -141,6 +142,14 @@ urlpatterns = [
     path('dashboard/director/carreras/', views.carreras_director, name='carreras_director'),
     path('dashboard/director/carreras/<int:carrera_id>/estudiantes/', views.estudiantes_por_carrera_director, name='estudiantes_carrera_director'),
     path('dashboard/director/estadisticas/', views.estadisticas_director, name='estadisticas_director'),
+    
+    # URLs de Carga Masiva (Director)
+    path('dashboard/director/carga-masiva/', views.gestion_carga_masiva_director, name='gestion_carga_masiva_director'),
+    path('dashboard/director/carga-masiva/estudiantes/', views.cargar_estudiantes_excel, name='cargar_estudiantes_excel'),
+    path('dashboard/director/carga-masiva/docentes/', views.cargar_docentes_excel, name='cargar_docentes_excel'),
+    path('dashboard/director/carga-masiva/asignaturas/', views.cargar_asignaturas_excel, name='cargar_asignaturas_excel'),
+    path('dashboard/director/carga-masiva/inscripciones/', views.cargar_inscripciones_excel, name='cargar_inscripciones_excel'),
+    path('dashboard/director/carga-masiva/plantilla/<str:tipo>/', views.descargar_plantilla_excel, name='descargar_plantilla_excel'),
 
     # URLs documentación
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
