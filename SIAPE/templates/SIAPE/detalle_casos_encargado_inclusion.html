@@ -167,14 +167,53 @@
                 <div class="detalle-card-content">
                     {% if ajustes_asignados %}
                         {% for item in ajustes_asignados %}
-                        <div class="detalle-sub-card" style="position: relative;">
-                            <p><strong>Categoría:</strong> {{ item.ajuste_razonable.categorias_ajustes.nombre_categoria }}</p>
+                        <div class="detalle-sub-card" style="position: relative; {% if item.estado_aprobacion == 'aprobado' %}border-left: 4px solid #28a745;{% elif item.estado_aprobacion == 'rechazado' %}border-left: 4px solid #dc3545;{% else %}border-left: 4px solid #ffc107;{% endif %}">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                                <p style="margin: 0;"><strong>Categoría:</strong> {{ item.ajuste_razonable.categorias_ajustes.nombre_categoria }}</p>
+                                {% if rol_usuario == "Director de Carrera" %}
+                                    <span class="status status-{{ item.estado_aprobacion }}" style="font-size: 0.85em;">
+                                        {% if item.estado_aprobacion == 'aprobado' %}
+                                            <i class="fas fa-check-circle"></i> Aprobado
+                                        {% elif item.estado_aprobacion == 'rechazado' %}
+                                            <i class="fas fa-times-circle"></i> Rechazado
+                                        {% else %}
+                                            <i class="fas fa-clock"></i> Pendiente
+                                        {% endif %}
+                                    </span>
+                                {% endif %}
+                            </div>
                             <p><strong>Descripción:</strong></p>
                             <pre class="notas-box">{{ item.ajuste_razonable.descripcion }}</pre>
                             <p class="text-small text-muted">
                                 <i class="fas fa-calendar"></i> Formulado el {{ item.created_at|date:"d/m/Y H:i" }}
                             </p>
-                            {% if puede_formular_ajustes and not es_docente %}
+                            {% if item.fecha_aprobacion %}
+                                <p class="text-small text-muted">
+                                    <i class="fas fa-check-double"></i> 
+                                    {% if item.estado_aprobacion == 'aprobado' %}Aprobado{% else %}Rechazado{% endif %} 
+                                    el {{ item.fecha_aprobacion|date:"d/m/Y H:i" }}
+                                    {% if item.director_aprobador %}
+                                        por {{ item.director_aprobador.usuario.first_name }} {{ item.director_aprobador.usuario.last_name }}
+                                    {% endif %}
+                                </p>
+                            {% endif %}
+                            {% if item.comentarios_director %}
+                                <div style="margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 5px; border-left: 3px solid #007bff;">
+                                    <p style="margin: 0; font-weight: bold; font-size: 0.9em;"><i class="fas fa-comment"></i> Comentarios del Director:</p>
+                                    <p style="margin: 5px 0 0 0; font-size: 0.9em;">{{ item.comentarios_director }}</p>
+                                </div>
+                            {% endif %}
+                            
+                            {% if puede_aprobar and item.estado_aprobacion == 'pendiente' %}
+                            <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                                <button type="button" class="btn-accion btn-accion-small btn-accion-green" onclick="abrirModalAprobarAjuste({{ item.id }}, '{{ item.ajuste_razonable.descripcion|truncatewords:10|escapejs }}')" style="padding: 5px 10px; font-size: 0.85em;">
+                                    <i class="fas fa-check"></i> Aprobar
+                                </button>
+                                <button type="button" class="btn-accion btn-accion-small btn-accion-red" onclick="abrirModalRechazarAjuste({{ item.id }}, '{{ item.ajuste_razonable.descripcion|truncatewords:10|escapejs }}')" style="padding: 5px 10px; font-size: 0.85em;">
+                                    <i class="fas fa-times"></i> Rechazar
+                                </button>
+                            </div>
+                            {% elif puede_formular_ajustes and not es_docente %}
                             <div style="margin-top: 10px; display: flex; gap: 10px;">
                                 <button type="button" class="btn-accion btn-accion-small" onclick="abrirModalEditarAjuste({{ item.id }}, event)" style="padding: 5px 10px; font-size: 0.85em;" data-descripcion="{{ item.ajuste_razonable.descripcion|escapejs }}" data-categoria-id="{{ item.ajuste_razonable.categorias_ajustes.id }}" data-categoria-nombre="{{ item.ajuste_razonable.categorias_ajustes.nombre_categoria|escapejs }}">
                                     <i class="fas fa-edit"></i> Editar
@@ -290,7 +329,8 @@
                     {% endif %}
                 {% endif %}
                 
-                {% if not es_docente and (puede_agendar_cita or puede_formular_ajustes or puede_enviar_asesor_tecnico or puede_enviar_asesor_pedagogico or puede_devolver_a_coordinadora or puede_enviar_a_director or puede_devolver_a_asesor_tecnico or puede_aprobar or puede_rechazar) %}
+                {% if not es_docente %}
+                    {% if puede_agendar_cita or puede_formular_ajustes or puede_enviar_asesor_tecnico or puede_enviar_asesor_pedagogico or puede_devolver_a_coordinadora or puede_enviar_a_director or puede_devolver_a_asesor_tecnico or puede_aprobar or puede_rechazar %}
                     <hr class="border-top-light margin-25-0">
                     
                     <h3 class="mb-15">Acciones del Caso</h3>
@@ -391,6 +431,7 @@
                             </form>
                         {% endif %}
                     </div>
+                    {% endif %}
                 {% endif %}
 
             </div>
@@ -624,6 +665,71 @@
                     <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalAgendar()">Cancelar</button>
                     <button type="submit" class="btn-accion btn-agendar">
                         <i class="fas fa-save"></i> Guardar Cita
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Modal para Aprobar Ajuste (Director) -->
+    {% if puede_aprobar %}
+    <div id="modalAprobarAjuste" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4><i class="fas fa-check-circle"></i> Aprobar Ajuste</h4>
+                <button class="close" onclick="cerrarModalAprobarAjuste()">&times;</button>
+            </div>
+            <form method="POST" action="" id="formAprobarAjuste">
+                {% csrf_token %}
+                <input type="hidden" id="aprobar_ajuste_id" name="ajuste_asignado_id">
+                
+                <div class="form-group">
+                    <label>Ajuste:</label>
+                    <input type="text" id="aprobar_ajuste_descripcion" class="input-readonly" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label for="comentarios_aprobar_ajuste">Comentarios (Opcional):</label>
+                    <textarea name="comentarios_director" id="comentarios_aprobar_ajuste" rows="4" placeholder="Puede agregar comentarios adicionales sobre la aprobación de este ajuste..."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalAprobarAjuste()">Cancelar</button>
+                    <button type="submit" class="btn-accion btn-accion-green">
+                        <i class="fas fa-check"></i> Aprobar Ajuste
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para Rechazar Ajuste (Director) -->
+    <div id="modalRechazarAjuste" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4><i class="fas fa-times-circle"></i> Rechazar Ajuste</h4>
+                <button class="close" onclick="cerrarModalRechazarAjuste()">&times;</button>
+            </div>
+            <form method="POST" action="" id="formRechazarAjuste">
+                {% csrf_token %}
+                <input type="hidden" id="rechazar_ajuste_id" name="ajuste_asignado_id">
+                
+                <div class="form-group">
+                    <label>Ajuste:</label>
+                    <input type="text" id="rechazar_ajuste_descripcion" class="input-readonly" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label for="comentarios_rechazar_ajuste">Comentarios (Requerido):</label>
+                    <textarea name="comentarios_director" id="comentarios_rechazar_ajuste" rows="4" required placeholder="Debe proporcionar un comentario explicando por qué rechaza este ajuste..."></textarea>
+                    <small class="text-muted">Es obligatorio proporcionar un comentario al rechazar un ajuste.</small>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalRechazarAjuste()">Cancelar</button>
+                    <button type="submit" class="btn-accion btn-accion-red">
+                        <i class="fas fa-times"></i> Rechazar Ajuste
                     </button>
                 </div>
             </form>
@@ -1116,6 +1222,38 @@
     }
     {% endif %}
 
+    {% if puede_aprobar %}
+    function abrirModalAprobarAjuste(ajusteAsignadoId, descripcion) {
+        document.getElementById('aprobar_ajuste_id').value = ajusteAsignadoId;
+        document.getElementById('aprobar_ajuste_descripcion').value = descripcion;
+        document.getElementById('formAprobarAjuste').action = '{% url "aprobar_ajuste_director" 0 %}'.replace('0', ajusteAsignadoId);
+        document.getElementById('comentarios_aprobar_ajuste').value = '';
+        document.getElementById('modalAprobarAjuste').style.display = 'block';
+    }
+
+    function cerrarModalAprobarAjuste() {
+        document.getElementById('modalAprobarAjuste').style.display = 'none';
+        document.getElementById('aprobar_ajuste_id').value = '';
+        document.getElementById('aprobar_ajuste_descripcion').value = '';
+        document.getElementById('comentarios_aprobar_ajuste').value = '';
+    }
+
+    function abrirModalRechazarAjuste(ajusteAsignadoId, descripcion) {
+        document.getElementById('rechazar_ajuste_id').value = ajusteAsignadoId;
+        document.getElementById('rechazar_ajuste_descripcion').value = descripcion;
+        document.getElementById('formRechazarAjuste').action = '{% url "rechazar_ajuste_director" 0 %}'.replace('0', ajusteAsignadoId);
+        document.getElementById('comentarios_rechazar_ajuste').value = '';
+        document.getElementById('modalRechazarAjuste').style.display = 'block';
+    }
+
+    function cerrarModalRechazarAjuste() {
+        document.getElementById('modalRechazarAjuste').style.display = 'none';
+        document.getElementById('rechazar_ajuste_id').value = '';
+        document.getElementById('rechazar_ajuste_descripcion').value = '';
+        document.getElementById('comentarios_rechazar_ajuste').value = '';
+    }
+    {% endif %}
+
     // Validación del formulario de agendar
     const formAgendar = document.getElementById('modalAgendar');
     if (formAgendar) {
@@ -1144,6 +1282,8 @@
         const modalFormular = document.getElementById('modalFormularAjuste');
         const modalEditar = document.getElementById('modalEditarAjuste');
         const modalEditarAsesor = document.getElementById('modalEditarAjusteAsesor');
+        const modalAprobarAjuste = document.getElementById('modalAprobarAjuste');
+        const modalRechazarAjuste = document.getElementById('modalRechazarAjuste');
         if (modalAgendar && event.target == modalAgendar) {
             cerrarModalAgendar();
         }
@@ -1156,6 +1296,14 @@
         {% if puede_editar_ajustes_asesor %}
         if (modalEditarAsesor && event.target == modalEditarAsesor) {
             cerrarModalEditarAjusteAsesor();
+        }
+        {% endif %}
+        {% if puede_aprobar %}
+        if (modalAprobarAjuste && event.target == modalAprobarAjuste) {
+            cerrarModalAprobarAjuste();
+        }
+        if (modalRechazarAjuste && event.target == modalRechazarAjuste) {
+            cerrarModalRechazarAjuste();
         }
         {% endif %}
     }

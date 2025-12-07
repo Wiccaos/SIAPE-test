@@ -2,262 +2,187 @@
   {
     "model": "SIAPE.Roles",
     "pk": 1,
-    "fields": {
-      "nombre_rol": "Administrador",
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
-    }
+    "fields": { "nombre_rol": "Administrador", "created_at": "2025-01-01T09:00:00Z", "updated_at": "2025-01-01T09:00:00Z" }
   },
   {
     "model": "SIAPE.Roles",
     "pk": 2,
-    "fields": {
-      "nombre_rol": "Encargado de Inclusión",
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
-    }
+    "fields": { "nombre_rol": "Encargado de Inclusión", "created_at": "2025-01-01T09:00:00Z", "updated_at": "2025-01-01T09:00:00Z" }
   },
   {
     "model": "SIAPE.Roles",
     "pk": 3,
-    "fields": {
-      "nombre_rol": "Coordinador Técnico Pedagógico",
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
-    }
+    "fields": { "nombre_rol": "Coordinador Técnico Pedagógico", "created_at": "2025-01-01T09:00:00Z", "updated_at": "2025-01-01T09:00:00Z" }
   },
   {
     "model": "SIAPE.Roles",
     "pk": 4,
-    "fields": {
-      "nombre_rol": "Asesor Pedagógico",
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
-    }
+    "fields": { "nombre_rol": "Asesor Pedagógico", "created_at": "2025-01-01T09:00:00Z", "updated_at": "2025-01-01T09:00:00Z" }
   },
   {
     "model": "SIAPE.Roles",
     "pk": 5,
-    "fields": {
-      "nombre_rol": "Director de Carrera",
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
-    }
+    "fields": { "nombre_rol": "Director de Carrera", "created_at": "2025-01-01T09:00:00Z", "updated_at": "2025-01-01T09:00:00Z" }
   },
   {
     "model": "SIAPE.Roles",
     "pk": 6,
-    "fields": {
-      "nombre_rol": "Docente",
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
-    }
+    "fields": { "nombre_rol": "Docente", "created_at": "2025-01-01T09:00:00Z", "updated_at": "2025-01-01T09:00:00Z" }
   },
+  
   {
     "model": "SIAPE.Areas",
     "pk": 1,
-    "fields": {
-      "nombre": "Tecnología e Informática",
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
-    }
+    "fields": { "nombre": "Tecnología e Informática", "created_at": "2025-01-01T09:00:00Z", "updated_at": "2025-01-01T09:00:00Z" }
   },
   {
     "model": "SIAPE.Areas",
     "pk": 2,
-    "fields": {
-      "nombre": "Salud",
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
-    }
+    "fields": { "nombre": "Salud", "created_at": "2025-01-01T09:00:00Z", "updated_at": "2025-01-01T09:00:00Z" }
   },
+  
   {
     "model": "SIAPE.CategoriasAjustes",
     "pk": 1,
-    "fields": {
-      "nombre_categoria": "Acceso a la Información",
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
-    }
+    "fields": { "nombre_categoria": "Acceso a la Información", "created_at": "2025-01-01T09:00:00Z", "updated_at": "2025-01-01T09:00:00Z" }
   },
   {
     "model": "SIAPE.CategoriasAjustes",
     "pk": 2,
-    "fields": {
-      "nombre_categoria": "Evaluación Diferenciada",
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
-    }
+    "fields": { "nombre_categoria": "Evaluación Diferenciada", "created_at": "2025-01-01T09:00:00Z", "updated_at": "2025-01-01T09:00:00Z" }
   },
   {
     "model": "SIAPE.CategoriasAjustes",
     "pk": 3,
-    "fields": {
-      "nombre_categoria": "Entorno Físico",
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
-    }
+    "fields": { "nombre_categoria": "Entorno Físico", "created_at": "2025-01-01T09:00:00Z", "updated_at": "2025-01-01T09:00:00Z" }
   },
+
   {
     "model": "SIAPE.Usuario",
     "pk": 1,
     "fields": {
-      "password": "pbkdf2_sha256$600000$J9V7y2F4$S+u8/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9=",
+      "password": "pbkdf2_sha256$600000$reemplazar$2y9L/Gj/...",
       "email": "admin@siape.cl",
       "rut": "11111111-1",
-      "first_name": "Admin",
-      "last_name": "General",
+      "first_name": "Administrador",
+      "last_name": "Sistema",
       "is_staff": true,
       "is_superuser": true,
       "is_active": true,
       "username": "admin@siape.cl",
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
+      "created_at": "2025-01-01T09:00:00Z",
+      "updated_at": "2025-01-01T09:00:00Z"
     }
   },
   {
     "model": "SIAPE.Usuario",
     "pk": 2,
     "fields": {
-      "password": "pbkdf2_sha256$600000$J9V7y2F4$S+u8/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9=",
-      "email": "coord@inacap.cl",
-      "rut": "22222222-2",
-      "first_name": "Ana",
-      "last_name": "Coordinadora",
+      "password": "pbkdf2_sha256$260000$yXfW5o9mK6vE5yB4wB3mYl2rN0qP4jG8$H1J2K3L4M5N6O7P8Q9R0S1T2U3V4W5X6Y7Z8A9B0C1D2E3F4G5H6I7J8K9L0M1N2",
+      "email": "camila.rojas@inacap.cl",
+      "rut": "15222333-4",
+      "first_name": "Camila",
+      "last_name": "Rojas",
       "is_staff": false,
       "is_superuser": false,
       "is_active": true,
-      "username": "coord@inacap.cl",
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
+      "username": "camila.rojas@inacap.cl",
+      "created_at": "2025-01-01T09:00:00Z",
+      "updated_at": "2025-01-01T09:00:00Z"
     }
   },
   {
     "model": "SIAPE.Usuario",
     "pk": 3,
     "fields": {
-      "password": "pbkdf2_sha256$600000$J9V7y2F4$S+u8/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9=",
-      "email": "tecnico@inacap.cl",
-      "rut": "33333333-3",
-      "first_name": "Pedro",
-      "last_name": "Técnico",
+      "password": "pbkdf2_sha256$260000$yXfW5o9mK6vE5yB4wB3mYl2rN0qP4jG8$H1J2K3L4M5N6O7P8Q9R0S1T2U3V4W5X6Y7Z8A9B0C1D2E3F4G5H6I7J8K9L0M1N2",
+      "email": "felipe.munoz@inacap.cl",
+      "rut": "16333444-5",
+      "first_name": "Felipe",
+      "last_name": "Muñoz",
       "is_active": true,
-      "username": "tecnico@inacap.cl",
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
+      "username": "felipe.munoz@inacap.cl",
+      "created_at": "2025-01-01T09:00:00Z",
+      "updated_at": "2025-01-01T09:00:00Z"
     }
   },
   {
     "model": "SIAPE.Usuario",
     "pk": 4,
     "fields": {
-      "password": "pbkdf2_sha256$600000$J9V7y2F4$S+u8/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9=",
-      "email": "asesor@inacap.cl",
-      "rut": "44444444-4",
-      "first_name": "Luisa",
-      "last_name": "Pedagógica",
+      "password": "pbkdf2_sha256$260000$yXfW5o9mK6vE5yB4wB3mYl2rN0qP4jG8$H1J2K3L4M5N6O7P8Q9R0S1T2U3V4W5X6Y7Z8A9B0C1D2E3F4G5H6I7J8K9L0M1N2",
+      "email": "daniela.vargas@inacap.cl",
+      "rut": "14555666-7",
+      "first_name": "Daniela",
+      "last_name": "Vargas",
       "is_active": true,
-      "username": "asesor@inacap.cl",
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
+      "username": "daniela.vargas@inacap.cl",
+      "created_at": "2025-01-01T09:00:00Z",
+      "updated_at": "2025-01-01T09:00:00Z"
     }
   },
   {
     "model": "SIAPE.Usuario",
     "pk": 5,
     "fields": {
-      "password": "pbkdf2_sha256$600000$J9V7y2F4$S+u8/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9=",
-      "email": "director.ti@inacap.cl",
-      "rut": "55555555-5",
-      "first_name": "Carlos",
-      "last_name": "Director TI",
+      "password": "pbkdf2_sha256$260000$yXfW5o9mK6vE5yB4wB3mYl2rN0qP4jG8$H1J2K3L4M5N6O7P8Q9R0S1T2U3V4W5X6Y7Z8A9B0C1D2E3F4G5H6I7J8K9L0M1N2",
+      "email": "rodrigo.soto@inacap.cl",
+      "rut": "12888999-0",
+      "first_name": "Rodrigo",
+      "last_name": "Soto",
       "is_active": true,
-      "username": "director.ti@inacap.cl",
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
+      "username": "rodrigo.soto@inacap.cl",
+      "created_at": "2025-01-01T09:00:00Z",
+      "updated_at": "2025-01-01T09:00:00Z"
     }
   },
   {
     "model": "SIAPE.Usuario",
     "pk": 6,
     "fields": {
-      "password": "pbkdf2_sha256$600000$J9V7y2F4$S+u8/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9/5+5+9=",
-      "email": "docente.web@inacap.cl",
-      "rut": "66666666-6",
-      "first_name": "Maria",
-      "last_name": "ProfeWeb",
+      "password": "pbkdf2_sha256$260000$yXfW5o9mK6vE5yB4wB3mYl2rN0qP4jG8$H1J2K3L4M5N6O7P8Q9R0S1T2U3V4W5X6Y7Z8A9B0C1D2E3F4G5H6I7J8K9L0M1N2",
+      "email": "andres.pinto@inacap.cl",
+      "rut": "13444555-6",
+      "first_name": "Andrés",
+      "last_name": "Pinto",
       "is_active": true,
-      "username": "docente.web@inacap.cl",
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
+      "username": "andres.pinto@inacap.cl",
+      "created_at": "2025-01-01T09:00:00Z",
+      "updated_at": "2025-01-01T09:00:00Z"
     }
   },
+
   {
     "model": "SIAPE.PerfilUsuario",
     "pk": 1,
-    "fields": {
-      "usuario": 1,
-      "rol": 1,
-      "area": null,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
-    }
+    "fields": { "usuario": 1, "rol": 1, "area": null, "created_at": "2025-01-01T09:00:00Z", "updated_at": "2025-01-01T09:00:00Z" }
   },
   {
     "model": "SIAPE.PerfilUsuario",
     "pk": 2,
-    "fields": {
-      "usuario": 2,
-      "rol": 2,
-      "area": null,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
-    }
+    "fields": { "usuario": 2, "rol": 2, "area": null, "created_at": "2025-01-01T09:00:00Z", "updated_at": "2025-01-01T09:00:00Z" }
   },
   {
     "model": "SIAPE.PerfilUsuario",
     "pk": 3,
-    "fields": {
-      "usuario": 3,
-      "rol": 3,
-      "area": null,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
-    }
+    "fields": { "usuario": 3, "rol": 3, "area": null, "created_at": "2025-01-01T09:00:00Z", "updated_at": "2025-01-01T09:00:00Z" }
   },
   {
     "model": "SIAPE.PerfilUsuario",
     "pk": 4,
-    "fields": {
-      "usuario": 4,
-      "rol": 4,
-      "area": null,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
-    }
+    "fields": { "usuario": 4, "rol": 4, "area": null, "created_at": "2025-01-01T09:00:00Z", "updated_at": "2025-01-01T09:00:00Z" }
   },
   {
     "model": "SIAPE.PerfilUsuario",
     "pk": 5,
-    "fields": {
-      "usuario": 5,
-      "rol": 5,
-      "area": 1,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
-    }
+    "fields": { "usuario": 5, "rol": 5, "area": 1, "created_at": "2025-01-01T09:00:00Z", "updated_at": "2025-01-01T09:00:00Z" }
   },
   {
     "model": "SIAPE.PerfilUsuario",
     "pk": 6,
-    "fields": {
-      "usuario": 6,
-      "rol": 6,
-      "area": 1,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
-    }
+    "fields": { "usuario": 6, "rol": 6, "area": 1, "created_at": "2025-01-01T09:00:00Z", "updated_at": "2025-01-01T09:00:00Z" }
   },
+
   {
     "model": "SIAPE.Carreras",
     "pk": 1,
@@ -265,204 +190,228 @@
       "nombre": "Ingeniería en Informática",
       "director": 5,
       "area": 1,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
+      "created_at": "2025-01-01T09:00:00Z",
+      "updated_at": "2025-01-01T09:00:00Z"
     }
   },
   {
     "model": "SIAPE.Carreras",
     "pk": 2,
     "fields": {
-      "nombre": "Enfermería",
+      "nombre": "Técnico en Enfermería",
       "director": null,
       "area": 2,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
+      "created_at": "2025-01-01T09:00:00Z",
+      "updated_at": "2025-01-01T09:00:00Z"
     }
   },
+
   {
     "model": "SIAPE.Asignaturas",
     "pk": 1,
     "fields": {
-      "nombre": "Programación Web",
-      "seccion": "D-01",
+      "nombre": "Desarrollo Web Fullstack",
+      "seccion": "DW-501",
       "carreras": 1,
       "docente": 6,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
+      "created_at": "2025-01-01T09:00:00Z",
+      "updated_at": "2025-01-01T09:00:00Z"
     }
   },
+  {
+    "model": "SIAPE.Asignaturas",
+    "pk": 2,
+    "fields": {
+      "nombre": "Arquitectura de Software",
+      "seccion": "AS-302",
+      "carreras": 1,
+      "docente": 6,
+      "created_at": "2025-01-01T09:00:00Z",
+      "updated_at": "2025-01-01T09:00:00Z"
+    }
+  },
+
   {
     "model": "SIAPE.Estudiantes",
     "pk": 1,
     "fields": {
-      "nombres": "Juan",
-      "apellidos": "Aprobado",
-      "rut": "11111111-K",
-      "email": "juan.aprobado@alumnos.cl",
+      "nombres": "Javiera Ignacia",
+      "apellidos": "González Tapia",
+      "rut": "20111222-3",
+      "email": "javiera.gonzalez@alumnos.cl",
       "carreras": 1,
-      "numero": 911111111,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
+      "numero": 988776655,
+      "created_at": "2025-01-01T09:00:00Z",
+      "updated_at": "2025-01-01T09:00:00Z"
     }
   },
   {
     "model": "SIAPE.Estudiantes",
     "pk": 2,
     "fields": {
-      "nombres": "Camila",
-      "apellidos": "Rechazada",
-      "rut": "22222222-K",
-      "email": "camila.rechazada@alumnos.cl",
+      "nombres": "Matías Alonso",
+      "apellidos": "Fernández Ruiz",
+      "rut": "21333444-5",
+      "email": "matias.fernandez@alumnos.cl",
       "carreras": 1,
-      "numero": 922222222,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
+      "numero": 977665544,
+      "created_at": "2025-01-01T09:00:00Z",
+      "updated_at": "2025-01-01T09:00:00Z"
     }
   },
   {
     "model": "SIAPE.Estudiantes",
     "pk": 3,
     "fields": {
-      "nombres": "Pedro",
-      "apellidos": "PendienteEntrevista",
-      "rut": "33333333-K",
-      "email": "pedro.nuevo@alumnos.cl",
+      "nombres": "Sofía Belén",
+      "apellidos": "Pérez Castro",
+      "rut": "22555666-7",
+      "email": "sofia.perez@alumnos.cl",
       "carreras": 2,
-      "numero": 933333333,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
+      "numero": 966554433,
+      "created_at": "2025-01-01T09:00:00Z",
+      "updated_at": "2025-01-01T09:00:00Z"
     }
   },
   {
     "model": "SIAPE.Estudiantes",
     "pk": 4,
     "fields": {
-      "nombres": "Diego",
-      "apellidos": "ConCita",
-      "rut": "44444444-K",
-      "email": "diego.cita@alumnos.cl",
+      "nombres": "Nicolás Andrés",
+      "apellidos": "Torres Silva",
+      "rut": "19888999-K",
+      "email": "nicolas.torres@alumnos.cl",
       "carreras": 1,
-      "numero": 944444444,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
+      "numero": 955443322,
+      "created_at": "2025-01-01T09:00:00Z",
+      "updated_at": "2025-01-01T09:00:00Z"
     }
   },
   {
     "model": "SIAPE.Estudiantes",
     "pk": 5,
     "fields": {
-      "nombres": "Sofia",
-      "apellidos": "PostEntrevista",
-      "rut": "55555555-K",
-      "email": "sofia.post@alumnos.cl",
+      "nombres": "Valentina Paz",
+      "apellidos": "Ramírez Lagos",
+      "rut": "20444333-2",
+      "email": "valentina.ramirez@alumnos.cl",
       "carreras": 2,
-      "numero": 955555555,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
+      "numero": 944332211,
+      "created_at": "2025-01-01T09:00:00Z",
+      "updated_at": "2025-01-01T09:00:00Z"
     }
   },
   {
     "model": "SIAPE.Estudiantes",
     "pk": 6,
     "fields": {
-      "nombres": "Lucas",
-      "apellidos": "EnTecnico",
-      "rut": "66666666-K",
-      "email": "lucas.tec@alumnos.cl",
+      "nombres": "Benjamín Eduardo",
+      "apellidos": "Castillo Orellana",
+      "rut": "21666777-8",
+      "email": "benjamin.castillo@alumnos.cl",
       "carreras": 1,
-      "numero": 966666666,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
+      "numero": 933221100,
+      "created_at": "2025-01-01T09:00:00Z",
+      "updated_at": "2025-01-01T09:00:00Z"
     }
   },
   {
     "model": "SIAPE.Estudiantes",
     "pk": 7,
     "fields": {
-      "nombres": "Ana",
-      "apellidos": "EnPedagogico",
-      "rut": "77777777-K",
-      "email": "ana.ped@alumnos.cl",
+      "nombres": "Martina Isidora",
+      "apellidos": "López Vega",
+      "rut": "22111000-9",
+      "email": "martina.lopez@alumnos.cl",
       "carreras": 1,
-      "numero": 977777777,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
+      "numero": 922110099,
+      "created_at": "2025-01-01T09:00:00Z",
+      "updated_at": "2025-01-01T09:00:00Z"
     }
   },
   {
     "model": "SIAPE.Estudiantes",
     "pk": 8,
     "fields": {
-      "nombres": "Matias",
-      "apellidos": "EnDirector",
-      "rut": "88888888-K",
-      "email": "matias.dir@alumnos.cl",
+      "nombres": "Vicente Tomás",
+      "apellidos": "Morales Pino",
+      "rut": "19222333-1",
+      "email": "vicente.morales@alumnos.cl",
       "carreras": 1,
-      "numero": 988888888,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
+      "numero": 911009988,
+      "created_at": "2025-01-01T09:00:00Z",
+      "updated_at": "2025-01-01T09:00:00Z"
     }
   },
+
   {
     "model": "SIAPE.AsignaturasEnCurso",
     "pk": 1,
-    "fields": {
-      "estado": true,
-      "estudiantes": 1,
-      "asignaturas": 1,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
-    }
+    "fields": { "estado": true, "estudiantes": 1, "asignaturas": 1, "created_at": "2025-03-01T09:00:00Z", "updated_at": "2025-03-01T09:00:00Z" }
   },
   {
     "model": "SIAPE.AsignaturasEnCurso",
     "pk": 2,
-    "fields": {
-      "estado": true,
-      "estudiantes": 2,
-      "asignaturas": 1,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
-    }
+    "fields": { "estado": true, "estudiantes": 2, "asignaturas": 1, "created_at": "2025-03-01T09:00:00Z", "updated_at": "2025-03-01T09:00:00Z" }
   },
+  {
+    "model": "SIAPE.AsignaturasEnCurso",
+    "pk": 3,
+    "fields": { "estado": true, "estudiantes": 4, "asignaturas": 2, "created_at": "2025-03-01T09:00:00Z", "updated_at": "2025-03-01T09:00:00Z" }
+  },
+  {
+    "model": "SIAPE.AsignaturasEnCurso",
+    "pk": 4,
+    "fields": { "estado": true, "estudiantes": 6, "asignaturas": 1, "created_at": "2025-03-01T09:00:00Z", "updated_at": "2025-03-01T09:00:00Z" }
+  },
+  {
+    "model": "SIAPE.AsignaturasEnCurso",
+    "pk": 5,
+    "fields": { "estado": true, "estudiantes": 7, "asignaturas": 2, "created_at": "2025-03-01T09:00:00Z", "updated_at": "2025-03-01T09:00:00Z" }
+  },
+  {
+    "model": "SIAPE.AsignaturasEnCurso",
+    "pk": 6,
+    "fields": { "estado": true, "estudiantes": 8, "asignaturas": 2, "created_at": "2025-03-01T09:00:00Z", "updated_at": "2025-03-01T09:00:00Z" }
+  },
+
   {
     "model": "SIAPE.Solicitudes",
     "pk": 1,
     "fields": {
-      "asunto": "CASO FINALIZADO: Dificultad Visual - Aprobado",
-      "descripcion": "El estudiante presenta baja visión diagnosticada. Requiere material ampliado.",
+      "asunto": "Dificultad Visual - Requiere Material Ampliado",
+      "descripcion": "Estudiante diagnosticada con baja visión severa. Se requiere que todo el material de clase sea entregado con fuente Arial tamaño 14 o superior, y ubicación preferencial en primera fila.",
       "autorizacion_datos": true,
       "estudiantes": 1,
       "estado": "aprobado",
       "coordinadora_asignada": 2,
       "asesor_tecnico_asignado": 3,
       "asesor_pedagogico_asignado": 4,
-      "created_at": "2025-10-01T10:00:00Z",
-      "updated_at": "2025-10-10T12:00:00Z"
+      "created_at": "2025-03-10T10:00:00Z",
+      "updated_at": "2025-03-20T12:00:00Z"
     }
   },
   {
     "model": "SIAPE.Solicitudes",
     "pk": 2,
     "fields": {
-      "asunto": "CASO FINALIZADO: Problemas de Concentración - Rechazado",
-      "descripcion": "Solicita tiempo extra sin antecedentes médicos suficientes.",
+      "asunto": "Solicitud de Tiempo Extra por Ansiedad",
+      "descripcion": "Estudiante solicita tiempo adicional en evaluaciones debido a cuadros de ansiedad. No presenta documentación médica actual que respalde la solicitud según normativa vigente.",
       "autorizacion_datos": true,
       "estudiantes": 2,
       "estado": "rechazado",
       "coordinadora_asignada": 2,
       "asesor_tecnico_asignado": 3,
       "asesor_pedagogico_asignado": 4,
-      "created_at": "2025-10-05T14:30:00Z",
-      "updated_at": "2025-10-15T10:00:00Z"
+      "created_at": "2025-04-05T14:30:00Z",
+      "updated_at": "2025-04-15T10:00:00Z"
     }
   },
   {
     "model": "SIAPE.Solicitudes",
     "pk": 3,
     "fields": {
-      "asunto": "ETAPA 1: Solicitud Nueva (Sin cita)",
+      "asunto": "Dificultades de Movilidad en Taller",
       "descripcion": "",
       "autorizacion_datos": true,
       "estudiantes": 3,
@@ -478,7 +427,7 @@
     "model": "SIAPE.Solicitudes",
     "pk": 4,
     "fields": {
-      "asunto": "ETAPA 1: Con Cita Agendada",
+      "asunto": "Solicitud de Intérprete de Señas",
       "descripcion": "",
       "autorizacion_datos": true,
       "estudiantes": 4,
@@ -494,8 +443,8 @@
     "model": "SIAPE.Solicitudes",
     "pk": 5,
     "fields": {
-      "asunto": "ETAPA 2: Entrevista Realizada - Falta Formular Caso",
-      "descripcion": "Estudiante entrevistada. Pendiente redacción profesional del caso.",
+      "asunto": "Problemas de Audición Leve",
+      "descripcion": "Entrevista realizada. Estudiante reporta hipoacusia leve en oído izquierdo. Pendiente redacción técnica del caso para derivación.",
       "autorizacion_datos": true,
       "estudiantes": 5,
       "estado": "pendiente_formulacion_caso",
@@ -510,8 +459,8 @@
     "model": "SIAPE.Solicitudes",
     "pk": 6,
     "fields": {
-      "asunto": "ETAPA 3: En Asesoría Técnica - Falta Crear Ajustes",
-      "descripcion": "Estudiante con hipoacusia leve. Se deriva para definir implementación técnica.",
+      "asunto": "Requerimiento de Software Lector",
+      "descripcion": "Estudiante con discapacidad visual. Se deriva a Coordinación Técnica para evaluar licencia de software JAWS o NVDA en laboratorios.",
       "autorizacion_datos": true,
       "estudiantes": 6,
       "estado": "pendiente_formulacion_ajustes",
@@ -526,8 +475,8 @@
     "model": "SIAPE.Solicitudes",
     "pk": 7,
     "fields": {
-      "asunto": "ETAPA 4: En Asesoría Pedagógica - Falta Preaprobación",
-      "descripcion": "Estudiante con TDAH. Ajustes técnicos propuestos, pendiente validación pedagógica.",
+      "asunto": "TDAH - Ajustes de Evaluación",
+      "descripcion": "Estudiante con TDAH confirmado. Se proponen ajustes de tiempo y entorno silencioso. Pendiente validación pedagógica.",
       "autorizacion_datos": true,
       "estudiantes": 7,
       "estado": "pendiente_preaprobacion",
@@ -542,8 +491,8 @@
     "model": "SIAPE.Solicitudes",
     "pk": 8,
     "fields": {
-      "asunto": "ETAPA 5: En Dirección - Falta Aprobación Final",
-      "descripcion": "Solicitud completa y validada. Pendiente firma del Director.",
+      "asunto": "Movilidad Reducida - Acceso",
+      "descripcion": "Solicitud para asegurar clases en primer piso o acceso a ascensor preferencial. Validado técnicamente.",
       "autorizacion_datos": true,
       "estudiantes": 8,
       "estado": "pendiente_aprobacion",
@@ -554,32 +503,33 @@
       "updated_at": "2025-11-25T09:30:00Z"
     }
   },
+
   {
     "model": "SIAPE.Entrevistas",
     "pk": 1,
     "fields": {
-      "fecha_entrevista": "2025-10-02T10:00:00Z",
+      "fecha_entrevista": "2025-03-12T10:00:00Z",
       "modalidad": "Presencial",
-      "notas": "Entrevista finalizada caso aprobado.",
+      "notas": "Estudiante presenta credencial de discapacidad. Se acuerda solicitar material adaptado.",
       "solicitudes": 1,
       "estado": "realizada",
       "coordinadora": 2,
-      "created_at": "2025-10-02T10:00:00Z",
-      "updated_at": "2025-10-02T10:00:00Z"
+      "created_at": "2025-03-10T10:00:00Z",
+      "updated_at": "2025-03-12T11:00:00Z"
     }
   },
   {
     "model": "SIAPE.Entrevistas",
     "pk": 2,
     "fields": {
-      "fecha_entrevista": "2025-10-06T15:00:00Z",
+      "fecha_entrevista": "2025-04-07T15:00:00Z",
       "modalidad": "Virtual",
-      "notas": "Entrevista finalizada caso rechazado.",
+      "notas": "Estudiante relata episodios de ansiedad. Se solicita certificado médico actualizado, no lo presenta.",
       "solicitudes": 2,
       "estado": "realizada",
       "coordinadora": 2,
-      "created_at": "2025-10-06T15:00:00Z",
-      "updated_at": "2025-10-06T15:00:00Z"
+      "created_at": "2025-04-05T14:30:00Z",
+      "updated_at": "2025-04-07T15:30:00Z"
     }
   },
   {
@@ -592,8 +542,8 @@
       "solicitudes": 4,
       "estado": "pendiente",
       "coordinadora": 2,
-      "created_at": "2025-11-29T09:00:00Z",
-      "updated_at": "2025-11-29T09:00:00Z"
+      "created_at": "2025-11-25T10:00:00Z",
+      "updated_at": "2025-11-25T10:00:00Z"
     }
   },
   {
@@ -602,12 +552,12 @@
     "fields": {
       "fecha_entrevista": "2025-11-24T15:00:00Z",
       "modalidad": "Virtual",
-      "notas": "Estudiante asiste puntualmente.",
+      "notas": "Entrevista realizada. Estudiante explica su dificultad auditiva en salas grandes.",
       "solicitudes": 5,
       "estado": "realizada",
       "coordinadora": 2,
-      "created_at": "2025-11-24T15:00:00Z",
-      "updated_at": "2025-11-24T15:00:00Z"
+      "created_at": "2025-11-20T11:00:00Z",
+      "updated_at": "2025-11-24T15:30:00Z"
     }
   },
   {
@@ -616,12 +566,12 @@
     "fields": {
       "fecha_entrevista": "2025-11-16T11:00:00Z",
       "modalidad": "Presencial",
-      "notas": "Se deriva a técnico.",
+      "notas": "Se verifica necesidad de lector de pantalla. Derivado a Técnico.",
       "solicitudes": 6,
       "estado": "realizada",
       "coordinadora": 2,
-      "created_at": "2025-11-16T11:00:00Z",
-      "updated_at": "2025-11-16T11:00:00Z"
+      "created_at": "2025-11-15T11:00:00Z",
+      "updated_at": "2025-11-16T11:30:00Z"
     }
   },
   {
@@ -630,12 +580,12 @@
     "fields": {
       "fecha_entrevista": "2025-11-11T10:00:00Z",
       "modalidad": "Presencial",
-      "notas": "Ok.",
+      "notas": "Entrevista OK. Se proponen ajustes de evaluación.",
       "solicitudes": 7,
       "estado": "realizada",
       "coordinadora": 2,
-      "created_at": "2025-11-11T10:00:00Z",
-      "updated_at": "2025-11-11T10:00:00Z"
+      "created_at": "2025-11-10T09:00:00Z",
+      "updated_at": "2025-11-11T10:30:00Z"
     }
   },
   {
@@ -644,54 +594,56 @@
     "fields": {
       "fecha_entrevista": "2025-11-06T14:00:00Z",
       "modalidad": "Virtual",
-      "notas": "Listo para aprobación.",
+      "notas": "Listo para validación final.",
       "solicitudes": 8,
       "estado": "realizada",
       "coordinadora": 2,
-      "created_at": "2025-11-06T14:00:00Z",
-      "updated_at": "2025-11-06T14:00:00Z"
+      "created_at": "2025-11-05T15:00:00Z",
+      "updated_at": "2025-11-06T14:30:00Z"
     }
   },
+
   {
     "model": "SIAPE.AjusteRazonable",
     "pk": 1,
     "fields": {
-      "descripcion": "Uso de fuente Arial 14 en pruebas.",
+      "descripcion": "Entrega de material digital y uso de fuente Arial 14.",
       "categorias_ajustes": 1,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
+      "created_at": "2025-01-01T09:00:00Z",
+      "updated_at": "2025-01-01T09:00:00Z"
     }
   },
   {
     "model": "SIAPE.AjusteRazonable",
     "pk": 2,
     "fields": {
-      "descripcion": "Tiempo extra 15 min.",
+      "descripcion": "Tiempo adicional de 15 minutos por hora en evaluaciones.",
       "categorias_ajustes": 2,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
+      "created_at": "2025-01-01T09:00:00Z",
+      "updated_at": "2025-01-01T09:00:00Z"
     }
   },
   {
     "model": "SIAPE.AjusteRazonable",
     "pk": 3,
     "fields": {
-      "descripcion": "Uso de grabadora.",
-      "categorias_ajustes": 1,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
+      "descripcion": "Evaluación oral en lugar de escrita.",
+      "categorias_ajustes": 2,
+      "created_at": "2025-01-01T09:00:00Z",
+      "updated_at": "2025-01-01T09:00:00Z"
     }
   },
   {
     "model": "SIAPE.AjusteRazonable",
     "pk": 4,
     "fields": {
-      "descripcion": "Ubicación preferencial.",
+      "descripcion": "Uso de ascensor y sala en primer piso.",
       "categorias_ajustes": 3,
-      "created_at": "2025-01-01T12:00:00Z",
-      "updated_at": "2025-01-01T12:00:00Z"
+      "created_at": "2025-01-01T09:00:00Z",
+      "updated_at": "2025-01-01T09:00:00Z"
     }
   },
+
   {
     "model": "SIAPE.AjusteAsignado",
     "pk": 1,
@@ -700,10 +652,10 @@
       "solicitudes": 1,
       "estado_aprobacion": "aprobado",
       "director_aprobador": 5,
-      "fecha_aprobacion": "2025-10-10T12:00:00Z",
-      "comentarios_director": "Ok.",
-      "created_at": "2025-10-10T12:00:00Z",
-      "updated_at": "2025-10-10T12:00:00Z"
+      "fecha_aprobacion": "2025-03-20T12:00:00Z",
+      "comentarios_director": "Aprobado para implementación inmediata.",
+      "created_at": "2025-03-18T10:00:00Z",
+      "updated_at": "2025-03-20T12:00:00Z"
     }
   },
   {
@@ -714,10 +666,10 @@
       "solicitudes": 2,
       "estado_aprobacion": "rechazado",
       "director_aprobador": 5,
-      "fecha_aprobacion": "2025-10-15T10:00:00Z",
-      "comentarios_director": "Falta evidencia.",
-      "created_at": "2025-10-15T10:00:00Z",
-      "updated_at": "2025-10-15T10:00:00Z"
+      "fecha_aprobacion": "2025-04-15T10:00:00Z",
+      "comentarios_director": "Falta evidencia médica requerida.",
+      "created_at": "2025-04-12T10:00:00Z",
+      "updated_at": "2025-04-15T10:00:00Z"
     }
   },
   {
@@ -729,6 +681,7 @@
       "estado_aprobacion": "pendiente",
       "director_aprobador": null,
       "fecha_aprobacion": null,
+      "comentarios_director": "",
       "created_at": "2025-11-22T14:00:00Z",
       "updated_at": "2025-11-22T14:00:00Z"
     }
@@ -742,17 +695,19 @@
       "estado_aprobacion": "pendiente",
       "director_aprobador": null,
       "fecha_aprobacion": null,
+      "comentarios_director": "",
       "created_at": "2025-11-25T09:30:00Z",
       "updated_at": "2025-11-25T09:30:00Z"
     }
   },
+
   {
     "model": "SIAPE.HorarioBloqueado",
     "pk": 1,
     "fields": {
       "coordinadora": 2,
       "fecha_hora": "2025-11-28T14:00:00Z",
-      "motivo": "Reunión equipo",
+      "motivo": "Reunión de Coordinación",
       "created_at": "2025-11-01T12:00:00Z",
       "updated_at": "2025-11-01T12:00:00Z"
     }

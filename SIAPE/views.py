@@ -2303,6 +2303,105 @@ def rechazar_caso(request, solicitud_id):
     # 5. --- Redirigir de vuelta al detalle ---
     return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
 
+@require_POST
+@login_required
+def aprobar_ajuste_director(request, ajuste_asignado_id):
+    """
+    Vista para que el Director apruebe un ajuste individual.
+    Cambia el estado del ajuste de 'pendiente' a 'aprobado'.
+    """
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+        perfil = None
+
+    # 2. --- Obtener el Ajuste Asignado ---
+    ajuste_asignado = get_object_or_404(AjusteAsignado, id=ajuste_asignado_id)
+    solicitud = ajuste_asignado.solicitudes
+    
+    # 3. --- Verificar que el caso está en el estado correcto ---
+    if solicitud.estado != 'pendiente_aprobacion':
+        messages.error(request, 'Este caso no está en estado de aprobación. Solo se pueden aprobar ajustes de casos pendientes de aprobación.')
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
+    
+    try:
+        # 4. --- Obtener comentarios (opcional) ---
+        comentarios = request.POST.get('comentarios_director', '').strip()
+        
+        # 5. --- Cambiar el estado del ajuste ---
+        ajuste_asignado.estado_aprobacion = 'aprobado'
+        ajuste_asignado.director_aprobador = perfil
+        ajuste_asignado.fecha_aprobacion = timezone.now()
+        if comentarios:
+            ajuste_asignado.comentarios_director = comentarios
+        ajuste_asignado.save()
+        
+        messages.success(request, f'Ajuste aprobado exitosamente: {ajuste_asignado.ajuste_razonable.descripcion[:50]}...')
+        
+    except Exception as e:
+        logger.error(f"Error al aprobar ajuste: {str(e)}")
+        messages.error(request, f'Error al aprobar el ajuste: {str(e)}')
+    
+    # 6. --- Redirigir de vuelta al detalle ---
+    return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
+
+@require_POST
+@login_required
+def rechazar_ajuste_director(request, ajuste_asignado_id):
+    """
+    Vista para que el Director rechace un ajuste individual.
+    Cambia el estado del ajuste de 'pendiente' a 'rechazado'.
+    """
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+        perfil = None
+
+    # 2. --- Obtener el Ajuste Asignado ---
+    ajuste_asignado = get_object_or_404(AjusteAsignado, id=ajuste_asignado_id)
+    solicitud = ajuste_asignado.solicitudes
+    
+    # 3. --- Verificar que el caso está en el estado correcto ---
+    if solicitud.estado != 'pendiente_aprobacion':
+        messages.error(request, 'Este caso no está en estado de aprobación. Solo se pueden rechazar ajustes de casos pendientes de aprobación.')
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
+    
+    try:
+        # 4. --- Obtener comentarios (requerido para rechazo) ---
+        comentarios = request.POST.get('comentarios_director', '').strip()
+        
+        if not comentarios:
+            messages.error(request, 'Debe proporcionar un comentario al rechazar un ajuste.')
+            return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
+        
+        # 5. --- Cambiar el estado del ajuste ---
+        ajuste_asignado.estado_aprobacion = 'rechazado'
+        ajuste_asignado.director_aprobador = perfil
+        ajuste_asignado.fecha_aprobacion = timezone.now()
+        ajuste_asignado.comentarios_director = comentarios
+        ajuste_asignado.save()
+        
+        messages.warning(request, f'Ajuste rechazado: {ajuste_asignado.ajuste_razonable.descripcion[:50]}...')
+        
+    except Exception as e:
+        logger.error(f"Error al rechazar ajuste: {str(e)}")
+        messages.error(request, f'Error al rechazar el ajuste: {str(e)}')
+    
+    # 6. --- Redirigir de vuelta al detalle ---
+    return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
+
 @require_POST # Solo permite esta vista vía POST
 @login_required
 def actualizar_descripcion_caso(request, solicitud_id):

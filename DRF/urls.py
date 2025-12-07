@@ -136,6 +136,8 @@ urlpatterns = [
     # URLs de Director de Carrera
     path('dashboard/director/casos/<int:solicitud_id>/aprobar/', views.aprobar_caso, name='aprobar_caso'),
     path('dashboard/director/casos/<int:solicitud_id>/rechazar/', views.rechazar_caso, name='rechazar_caso'),
+    path('dashboard/director/ajustes/<int:ajuste_asignado_id>/aprobar/', views.aprobar_ajuste_director, name='aprobar_ajuste_director'),
+    path('dashboard/director/ajustes/<int:ajuste_asignado_id>/rechazar/', views.rechazar_ajuste_director, name='rechazar_ajuste_director'),
     path('dashboard/director/carreras/', views.carreras_director, name='carreras_director'),
     path('dashboard/director/carreras/<int:carrera_id>/estudiantes/', views.estudiantes_por_carrera_director, name='estudiantes_carrera_director'),
     path('dashboard/director/estadisticas/', views.estadisticas_director, name='estadisticas_director'),
