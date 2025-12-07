@@ -9,8 +9,23 @@
 }
 .login-container h2 {
     text-align: center;
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
     color: #333;
+}
+
+.login-subtitle {
+    text-align: center;
+    margin-bottom: 0.5rem;
+    color: #555;
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.login-description {
+    text-align: center;
+    margin-bottom: 2rem;
+    color: #666;
+    font-size: 0.95rem;
 }
 .login-form .form-group {
     margin-bottom: 1.5rem;
@@ -55,4 +70,13 @@
     text-align: center;
     margin-top: 1.5rem;
     font-size: 0.9rem;
+}
+
+/* Modo oscuro */
+body.dark-mode .login-subtitle {
+    color: #d0d0d0 !important;
+}
+
+body.dark-mode .login-description {
+    color: #b0b0b0 !important;
 }

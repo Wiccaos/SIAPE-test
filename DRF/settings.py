@@ -153,9 +153,9 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
 
 # Redireccionar al inicio despues de login
-LOGIN_REDIRECT_URL = '/' 
+LOGIN_REDIRECT_URL = '/home/' 
 LOGIN_URL = '/login'
-LOGOUT_REDIRECT_URL = '/login'
+LOGOUT_REDIRECT_URL = '/'  # Redirige al index (página principal)
 
 
 # SESSION expira después de 1 hora

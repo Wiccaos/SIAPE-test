@@ -1,0 +1,101 @@
+{% extends "plantilla.html" %}
+{% load static %}
+
+{% block title %}Inicio | SIAPE{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+<link rel="stylesheet" href="{% static 'CSS/index.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="index-content">
+    <!-- Hero Section -->
+    <div class="index-hero">
+        <h1><i class="fas fa-graduation-cap"></i> SIAPE</h1>
+        <p>Sistema Institucional de Apoyos Personalizados para Estudiantes</p>
+    </div>
+    
+    <!-- Descripción del Sistema -->
+    <div class="index-description">
+        <h2><i class="fas fa-info-circle"></i> ¿Qué es SIAPE?</h2>
+        <p>
+            SIAPE es una plataforma integral diseñada para gestionar y dar seguimiento a los ajustes razonables 
+            solicitados por estudiantes que requieren apoyo personalizado en su proceso educativo. El sistema 
+            facilita la comunicación y coordinación entre estudiantes, docentes, coordinadores y directores de carrera.
+        </p>
+        <p>
+            Nuestro objetivo es garantizar que cada estudiante reciba el apoyo necesario para alcanzar su máximo 
+            potencial académico, mediante un proceso transparente, eficiente y centrado en las necesidades individuales.
+        </p>
+        
+        <div class="features-grid">
+            <div class="feature-item">
+                <i class="fas fa-user-check feature-icon"></i>
+                <div class="feature-text">
+                    <strong>Gestión Centralizada</strong>
+                    <span>Administración eficiente de todas las solicitudes de ajustes razonables en un solo lugar.</span>
+                </div>
+            </div>
+            <div class="feature-item">
+                <i class="fas fa-users-cog feature-icon"></i>
+                <div class="feature-text">
+                    <strong>Trabajo Colaborativo</strong>
+                    <span>Coordinación entre diferentes roles para garantizar el mejor apoyo al estudiante.</span>
+                </div>
+            </div>
+            <div class="feature-item">
+                <i class="fas fa-chart-line feature-icon"></i>
+                <div class="feature-text">
+                    <strong>Seguimiento Continuo</strong>
+                    <span>Monitoreo del estado de cada solicitud desde su creación hasta su aprobación final.</span>
+                </div>
+            </div>
+            <div class="feature-item">
+                <i class="fas fa-shield-alt feature-icon"></i>
+                <div class="feature-text">
+                    <strong>Seguridad y Privacidad</strong>
+                    <span>Protección de datos personales y confidencialidad en todo el proceso.</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Acciones Principales -->
+    <div class="index-actions">
+        <div class="action-card">
+            <div class="action-card-icon">
+                <i class="fas fa-sign-in-alt"></i>
+            </div>
+            <h3>Iniciar Sesión</h3>
+            <p>Accede a tu panel de control según tu rol en el sistema (Coordinador, Asesor, Director, Docente, etc.)</p>
+            <a href="{% url 'login' %}" class="action-btn">
+                <i class="fas fa-sign-in-alt"></i> Iniciar Sesión
+            </a>
+        </div>
+        
+        <div class="action-card">
+            <div class="action-card-icon">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <h3>Crear Solicitud</h3>
+            <p>Si eres estudiante, puedes crear una nueva solicitud de ajuste razonable y agendar una entrevista.</p>
+            <a href="{% url 'formulario-solicitud' %}" class="action-btn action-btn-success">
+                <i class="fas fa-plus-circle"></i> Crear Solicitud
+            </a>
+        </div>
+        
+        <div class="action-card">
+            <div class="action-card-icon">
+                <i class="fas fa-search"></i>
+            </div>
+            <h3>Seguimiento de Caso</h3>
+            <p>Consulta el estado y seguimiento de tu solicitud ingresando tu RUT y número de seguimiento.</p>
+            <a href="{% url 'seguimiento_caso' %}" class="action-btn action-btn-secondary">
+                <i class="fas fa-eye"></i> Ver Seguimiento
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

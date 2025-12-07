@@ -1,0 +1,240 @@
+/* Estilos para la página index (página principal) */
+
+.index-hero {
+    background: linear-gradient(135deg, #cc0000 0%, #990000 100%);
+    color: white;
+    padding: 4rem 2rem;
+    text-align: center;
+    margin: 2rem -2rem 3rem -2rem;
+}
+
+.index-hero h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    font-weight: 700;
+}
+
+.index-hero p {
+    font-size: 1.2rem;
+    max-width: 800px;
+    margin: 0 auto 2rem;
+    opacity: 0.95;
+}
+
+.index-content {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.index-description {
+    background: white;
+    padding: 2.5rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 3rem;
+}
+
+.index-description h2 {
+    color: #cc0000;
+    margin-bottom: 1.5rem;
+    font-size: 2rem;
+}
+
+.index-description p {
+    line-height: 1.8;
+    color: #555;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.index-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem;
+    margin-top: 3rem;
+}
+
+.action-card {
+    background: white;
+    padding: 2.5rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    text-align: center;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.action-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+}
+
+.action-card-icon {
+    font-size: 3.5rem;
+    color: #cc0000;
+    margin-bottom: 1.5rem;
+}
+
+.action-card h3 {
+    color: #333;
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+}
+
+.action-card p {
+    color: #666;
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+}
+
+.action-btn {
+    display: inline-block;
+    padding: 0.75rem 2rem;
+    background-color: #cc0000;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    font-weight: 600;
+    transition: background-color 0.3s ease;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.action-btn:hover {
+    background-color: #990000;
+    color: white;
+}
+
+.action-btn-secondary {
+    background-color: #0066cc;
+}
+
+.action-btn-secondary:hover {
+    background-color: #0052a3;
+}
+
+.action-btn-success {
+    background-color: #28a745;
+}
+
+.action-btn-success:hover {
+    background-color: #218838;
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.feature-item {
+    display: flex;
+    align-items: start;
+    gap: 1rem;
+}
+
+.feature-icon {
+    color: #cc0000;
+    font-size: 1.5rem;
+    margin-top: 0.25rem;
+}
+
+.feature-text {
+    flex: 1;
+}
+
+.feature-text strong {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #333;
+}
+
+.feature-text span {
+    color: #666;
+    font-size: 0.95rem;
+}
+
+/* =============================================================
+   MODO OSCURO - Página Index
+================================================================ */
+
+body.dark-mode .index-hero {
+    background: linear-gradient(135deg, #8b0000 0%, #660000 100%);
+    color: #ffffff;
+}
+
+body.dark-mode .index-description {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+    border-color: #3a3a3a !important;
+}
+
+body.dark-mode .index-description h2 {
+    color: #ff4444 !important;
+}
+
+body.dark-mode .index-description p {
+    color: #d0d0d0 !important;
+}
+
+body.dark-mode .action-card {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+    border-color: #3a3a3a !important;
+}
+
+body.dark-mode .action-card:hover {
+    box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+}
+
+body.dark-mode .action-card h3 {
+    color: #ffffff !important;
+}
+
+body.dark-mode .action-card p {
+    color: #d0d0d0 !important;
+}
+
+body.dark-mode .action-card-icon {
+    color: #ff4444 !important;
+}
+
+body.dark-mode .action-btn {
+    background-color: #cc0000;
+    color: #ffffff;
+}
+
+body.dark-mode .action-btn:hover {
+    background-color: #990000;
+    color: #ffffff;
+}
+
+body.dark-mode .action-btn-secondary {
+    background-color: #0066cc;
+}
+
+body.dark-mode .action-btn-secondary:hover {
+    background-color: #0052a3;
+}
+
+body.dark-mode .action-btn-success {
+    background-color: #28a745;
+}
+
+body.dark-mode .action-btn-success:hover {
+    background-color: #218838;
+}
+
+body.dark-mode .feature-icon {
+    color: #ff4444 !important;
+}
+
+body.dark-mode .feature-text strong {
+    color: #ffffff !important;
+}
+
+body.dark-mode .feature-text span {
+    color: #d0d0d0 !important;
+}
+

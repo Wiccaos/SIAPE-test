@@ -49,6 +49,7 @@ urlpatterns = [
     path('api/horarios-disponibles/', views.get_horarios_disponibles, name='api-horarios-disponibles'),
     path('api/calendario-disponible/', views.get_calendario_disponible, name='api-calendario-disponible'),
     path('api/docente/caso/<int:solicitud_id>/', views.obtener_datos_caso_docente, name='api-datos-caso-docente'),
+    path('api/docente/ajuste/<int:ajuste_asignado_id>/comentario/', views.agregar_comentario_ajuste_docente, name='api-comentario-ajuste-docente'),
     path('api/buscar-estudiante/', views.buscar_estudiante_por_rut, name='api-buscar-estudiante'),
 
     # URLs del Administrador
@@ -58,7 +59,7 @@ urlpatterns = [
     path('dashboard/admin/gestion-usuarios/editar/<int:perfil_id>/', views.editar_usuario_admin, name='editar_usuario_admin'),
     # GESTIÓN INSTITUCIONAL - ADMIN
     path('dashboard/admin/gestion-institucional/', views.gestion_institucional_admin, name='gestion_institucional_admin'),
-    path('dashboard/admin/asignar-estudiantes-asignaturas/', views.asignar_estudiantes_asignaturas_admin, name='asignar_estudiantes_asignaturas_admin'),
+    # path('dashboard/admin/asignar-estudiantes-asignaturas/', views.asignar_estudiantes_asignaturas_admin, name='asignar_estudiantes_asignaturas_admin'),  # Eliminado - ahora lo hace el Director
     path('dashboard/admin/carreras/agregar/', views.agregar_carrera_admin, name='agregar_carrera_admin'),
     path('dashboard/admin/carreras/editar/<int:carrera_id>/', views.editar_carrera_admin, name='editar_carrera_admin'),
     path('dashboard/admin/carreras/eliminar/<int:carrera_id>/', views.eliminar_carrera_admin, name='eliminar_carrera_admin'),

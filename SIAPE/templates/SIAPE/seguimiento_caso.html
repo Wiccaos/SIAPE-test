@@ -1,0 +1,177 @@
+{% extends "plantilla.html" %}
+{% load static %}
+
+{% block title %}Seguimiento de Caso | SIAPE{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+<link rel="stylesheet" href="{% static 'CSS/seguimiento.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="seguimiento-container">
+    <div class="seguimiento-form-card">
+        <h2><i class="fas fa-search"></i> Consultar Seguimiento de Caso</h2>
+        <p style="text-align: center; color: #666; margin-bottom: 1.5rem;">
+            Ingrese su RUT y el número de seguimiento que recibió al crear su solicitud.
+        </p>
+        
+        {% if error %}
+        <div class="error-message">
+            <i class="fas fa-exclamation-triangle"></i> {{ error }}
+        </div>
+        {% endif %}
+        
+        <form method="POST">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="rut"><i class="fas fa-id-card"></i> RUT del Estudiante</label>
+                <input type="text" id="rut" name="rut" placeholder="12345678-9" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="numero_seguimiento"><i class="fas fa-hashtag"></i> Número de Seguimiento</label>
+                <input type="number" id="numero_seguimiento" name="numero_seguimiento" placeholder="Ingrese el ID del caso" required min="1">
+                <small style="display: block; margin-top: 0.5rem; color: #666; font-size: 0.9rem;">
+                    <i class="fas fa-info-circle"></i> Este número se entrega al crear la solicitud y se envió a su correo electrónico.
+                </small>
+            </div>
+            
+            <button type="submit" class="btn-buscar">
+                <i class="fas fa-search"></i> Buscar Caso
+            </button>
+        </form>
+    </div>
+    
+    {% if solicitud %}
+    <div class="caso-info-card">
+        <h3><i class="fas fa-file-alt"></i> Información del Caso</h3>
+        
+        <div class="info-row">
+            <span class="info-label">Estudiante:</span>
+            <span class="info-value">{{ solicitud.estudiantes.nombres }} {{ solicitud.estudiantes.apellidos }}</span>
+        </div>
+        
+        <div class="info-row">
+            <span class="info-label">RUT:</span>
+            <span class="info-value">{{ solicitud.estudiantes.rut }}</span>
+        </div>
+        
+        <div class="info-row">
+            <span class="info-label">Carrera:</span>
+            <span class="info-value">{{ solicitud.estudiantes.carreras.nombre }}</span>
+        </div>
+        
+        <div class="info-row">
+            <span class="info-label">Asunto:</span>
+            <span class="info-value">{{ solicitud.asunto }}</span>
+        </div>
+        
+        <div class="info-row">
+            <span class="info-label">Estado:</span>
+            <span class="info-value">
+                <span class="status-badge status-{{ solicitud.estado }}">
+                    {{ solicitud.get_estado_display }}
+                </span>
+            </span>
+        </div>
+        
+        <div class="info-row">
+            <span class="info-label">Fecha de Solicitud:</span>
+            <span class="info-value">{{ solicitud.created_at|date:"d/m/Y H:i" }}</span>
+        </div>
+        
+        {% if solicitud.coordinadora_asignada %}
+        <div class="info-row">
+            <span class="info-label">Encargado de Inclusión:</span>
+            <span class="info-value">{{ solicitud.coordinadora_asignada.usuario.first_name }} {{ solicitud.coordinadora_asignada.usuario.last_name }}</span>
+        </div>
+        {% endif %}
+        
+        {% if solicitud.asesor_tecnico_asignado %}
+        <div class="info-row">
+            <span class="info-label">Coordinador Técnico Pedagógico:</span>
+            <span class="info-value">{{ solicitud.asesor_tecnico_asignado.usuario.first_name }} {{ solicitud.asesor_tecnico_asignado.usuario.last_name }}</span>
+        </div>
+        {% endif %}
+        
+        {% if solicitud.asesor_pedagogico_asignado %}
+        <div class="info-row">
+            <span class="info-label">Asesor Pedagógico:</span>
+            <span class="info-value">{{ solicitud.asesor_pedagogico_asignado.usuario.first_name }} {{ solicitud.asesor_pedagogico_asignado.usuario.last_name }}</span>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Ajustes Aprobados -->
+    {% if ajustes_aprobados %}
+    <div class="caso-info-card">
+        <h3><i class="fas fa-check-circle"></i> Ajustes Aprobados</h3>
+        <div class="ajustes-list">
+            {% for ajuste in ajustes_aprobados %}
+            <div class="ajuste-item">
+                <h4><i class="fas fa-tag"></i> {{ ajuste.ajuste_razonable.categorias_ajustes.nombre_categoria }}</h4>
+                <p>{{ ajuste.ajuste_razonable.descripcion }}</p>
+                {% if ajuste.fecha_aprobacion %}
+                <p style="margin-top: 0.5rem; font-size: 0.9rem; color: #888;">
+                    <i class="fas fa-calendar-check"></i> Aprobado el {{ ajuste.fecha_aprobacion|date:"d/m/Y H:i" }}
+                </p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="caso-info-card">
+        <h3><i class="fas fa-check-circle"></i> Ajustes Aprobados</h3>
+        <p style="color: #666; text-align: center; padding: 1rem;">
+            <i class="fas fa-info-circle"></i> Aún no hay ajustes aprobados para este caso.
+        </p>
+    </div>
+    {% endif %}
+    
+    <!-- Entrevistas -->
+    {% if entrevistas %}
+    <div class="caso-info-card">
+        <h3><i class="fas fa-calendar-alt"></i> Entrevistas</h3>
+        <div class="entrevistas-list">
+            {% for entrevista in entrevistas %}
+            <div class="entrevista-item">
+                <div class="info-row">
+                    <span class="info-label">Fecha:</span>
+                    <span class="info-value">{{ entrevista.fecha_entrevista|date:"d/m/Y H:i" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Modalidad:</span>
+                    <span class="info-value">{{ entrevista.modalidad }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Estado:</span>
+                    <span class="info-value">
+                        <span class="status-badge status-{{ entrevista.estado }}">
+                            {{ entrevista.get_estado_display }}
+                        </span>
+                    </span>
+                </div>
+                {% if entrevista.notas %}
+                <div class="info-row">
+                    <span class="info-label">Notas:</span>
+                    <span class="info-value">{{ entrevista.notas }}</span>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    {% endif %}
+    
+    <div style="text-align: center;">
+        <a href="{% url 'index' %}" class="btn-volver">
+            <i class="fas fa-arrow-left"></i> Volver al Inicio
+        </a>
+    </div>
+</div>
+{% endblock %}
+

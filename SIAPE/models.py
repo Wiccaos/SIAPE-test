@@ -419,6 +419,25 @@ class AjusteAsignado(models.Model):
         default='',
         verbose_name="Comentarios del Director"
     )
+    comentarios_docente = models.TextField(
+        blank=True,
+        default='',
+        verbose_name="Comentarios del Docente"
+    )
+    docente_comentador = models.ForeignKey(
+        'PerfilUsuario',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        limit_choices_to={'rol__nombre_rol': 'Docente'},
+        related_name='ajustes_comentados',
+        verbose_name="Docente que Comentó"
+    )
+    fecha_comentario_docente = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha del Comentario del Docente"
+    )
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

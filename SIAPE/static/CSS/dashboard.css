@@ -3349,3 +3349,477 @@ body.dark-mode .alert-error {
     color: #ff6b6b !important;
 }
 
+/* =============================================================
+   ESTILOS PARA MODAL DE DOCENTE - MIS ALUMNOS
+   ============================================================= */
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 30px;
+    border: 1px solid #888;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.close-modal {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close-modal:hover,
+.close-modal:focus {
+    color: #000;
+    text-decoration: none;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #eee;
+}
+
+.modal-header h2 {
+    margin: 0;
+    color: #cc0000;
+}
+
+.modal-body {
+    /* Estilos del cuerpo del modal */
+}
+
+.modal-estudiante-info {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.modal-estudiante-foto {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background-color: #cc0000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 2.5rem;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.modal-estudiante-datos {
+    flex: 1;
+    min-width: 0;
+}
+
+.modal-estudiante-datos h3 {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 1.3rem;
+    line-height: 1.4;
+}
+
+.modal-estudiante-datos p {
+    margin: 5px 0;
+    color: #666;
+    line-height: 1.5;
+}
+
+.modal-seccion {
+    margin-bottom: 25px;
+}
+
+.modal-seccion h4 {
+    color: #cc0000;
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 8px;
+}
+
+.modal-ajuste-item {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    border-left: 4px solid #28a745;
+}
+
+.modal-ajuste-categoria {
+    font-weight: bold;
+    color: #28a745;
+    margin-bottom: 8px;
+    font-size: 1rem;
+}
+
+.modal-ajuste-descripcion {
+    color: #555;
+    line-height: 1.6;
+}
+
+.status-sin-caso {
+    background-color: #f0f0f0;
+    color: #777;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+/* =============================================================
+   MODO OSCURO - MODAL DE DOCENTE
+   ============================================================= */
+
+body.dark-mode .modal-content {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+    border-color: #3a3a3a !important;
+}
+
+body.dark-mode .modal-header {
+    border-bottom-color: #3a3a3a !important;
+}
+
+body.dark-mode .modal-header h2 {
+    color: #ff4444 !important;
+}
+
+body.dark-mode .close-modal {
+    color: #aaa !important;
+}
+
+body.dark-mode .close-modal:hover,
+body.dark-mode .close-modal:focus {
+    color: #ffffff !important;
+}
+
+body.dark-mode .modal-estudiante-info {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .modal-estudiante-datos h3 {
+    color: #ffffff !important;
+}
+
+body.dark-mode .modal-estudiante-datos p {
+    color: #d0d0d0 !important;
+}
+
+body.dark-mode .modal-seccion h4 {
+    color: #ff4444 !important;
+    border-bottom-color: #3a3a3a !important;
+}
+
+body.dark-mode .modal-ajuste-item {
+    background-color: #2a2a2a !important;
+    border-left-color: #28a745 !important;
+}
+
+body.dark-mode .modal-ajuste-categoria {
+    color: #90ee90 !important;
+}
+
+body.dark-mode .modal-ajuste-descripcion {
+    color: #d0d0d0 !important;
+}
+
+body.dark-mode .status-sin-caso {
+    background-color: #2a2a2a !important;
+    color: #888 !important;
+}
+
+/* Estilos para contenido generado dinámicamente en el modal */
+body.dark-mode .modal-body div[style*="background-color: #f8f9fa"] {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .modal-body div[style*="color: #666"] {
+    color: #d0d0d0 !important;
+}
+
+.modal-descripcion-caso {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 6px;
+    white-space: pre-line;
+    line-height: 1.6;
+    color: #333;
+    text-align: left;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    margin: 0;
+    text-indent: 0;
+}
+
+.modal-ajuste-item-warning {
+    border-left-color: #ffc107 !important;
+}
+
+.modal-ajuste-descripcion-warning {
+    color: #666;
+    font-style: italic;
+}
+
+body.dark-mode .modal-descripcion-caso {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .modal-ajuste-item-warning {
+    border-left-color: #ffc107 !important;
+}
+
+body.dark-mode .modal-ajuste-descripcion-warning {
+    color: #d0d0d0 !important;
+}
+
+/* =============================================================
+   ESTILOS PARA COMENTARIOS DEL DOCENTE
+   ============================================================= */
+
+.modal-comentario-docente {
+    margin-top: 15px;
+    padding: 15px;
+    background-color: #e8f4f8;
+    border-radius: 6px;
+    border-left: 4px solid #007bff;
+}
+
+.modal-comentario-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.modal-comentario-header strong {
+    color: #007bff;
+}
+
+.modal-comentario-fecha {
+    font-size: 0.85rem;
+    color: #666;
+    font-style: italic;
+}
+
+.modal-comentario-texto {
+    color: #333;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+.modal-comentario-acciones {
+    margin-top: 10px;
+}
+
+.btn-comentario {
+    padding: 0.5rem 1rem;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.btn-comentario:hover {
+    background-color: #0056b3;
+}
+
+.btn-comentario-guardar {
+    background-color: #28a745;
+}
+
+.btn-comentario-guardar:hover {
+    background-color: #218838;
+}
+
+.btn-comentario-cancelar {
+    background-color: #6c757d;
+    margin-left: 10px;
+}
+
+.btn-comentario-cancelar:hover {
+    background-color: #5a6268;
+}
+
+.modal-formulario-comentario {
+    margin-top: 15px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+}
+
+.modal-formulario-comentario-content label {
+    display: block;
+    margin-bottom: 8px;
+    color: #333;
+    font-weight: 500;
+}
+
+.modal-textarea-comentario {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 0.95rem;
+    font-family: inherit;
+    resize: vertical;
+    box-sizing: border-box;
+    margin-bottom: 10px;
+}
+
+.modal-formulario-comentario-botones {
+    display: flex;
+    gap: 10px;
+}
+
+/* Modo oscuro - Comentarios del docente */
+body.dark-mode .modal-comentario-docente {
+    background-color: #1a3a4a !important;
+    border-left-color: #007bff !important;
+}
+
+body.dark-mode .modal-comentario-header strong {
+    color: #4da6ff !important;
+}
+
+body.dark-mode .modal-comentario-fecha {
+    color: #b0b0b0 !important;
+}
+
+body.dark-mode .modal-comentario-texto {
+    color: #ffffff !important;
+}
+
+body.dark-mode .modal-formulario-comentario {
+    background-color: #2a2a2a !important;
+    border-color: #3a3a3a !important;
+}
+
+body.dark-mode .modal-formulario-comentario-content label {
+    color: #ffffff !important;
+}
+
+body.dark-mode .modal-textarea-comentario {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+    border-color: #4a4a4a !important;
+}
+
+body.dark-mode .modal-textarea-comentario::placeholder {
+    color: #888 !important;
+}
+
+/* =============================================================
+   ESTILOS PARA BARRA DE FILTROS - GESTIÓN DE USUARIOS
+   ============================================================= */
+
+.search-filters-container {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.search-filters-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr auto;
+    gap: 15px;
+    align-items: end;
+}
+
+.search-filter-group {
+    margin: 0;
+}
+
+.search-filter-label {
+    margin-bottom: 5px;
+    display: block;
+    font-weight: 500;
+    color: #333;
+}
+
+.search-filter-input,
+.search-filter-select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #ffffff;
+    color: #333;
+    font-size: 0.95rem;
+    box-sizing: border-box;
+}
+
+.search-filter-input::placeholder {
+    color: #999;
+}
+
+.search-filter-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.search-filter-btn {
+    white-space: nowrap;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* Modo oscuro - Barra de filtros */
+body.dark-mode .search-filters-container {
+    background-color: #2a2a2a !important;
+    border-color: #3a3a3a !important;
+}
+
+body.dark-mode .search-filter-label {
+    color: #ffffff !important;
+}
+
+body.dark-mode .search-filter-input,
+body.dark-mode .search-filter-select {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+    border-color: #4a4a4a !important;
+}
+
+body.dark-mode .search-filter-input::placeholder {
+    color: #888 !important;
+}
+
+body.dark-mode .search-filter-select option {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+}
+

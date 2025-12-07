@@ -4,16 +4,15 @@
 {% block title %}Login | SIAPE{% endblock %}
 
 {% block extra_head %}
-    <!-- 
-      Quitamos el bloque <style> y lo reemplazamos
-      por este <link> al nuevo archivo CSS.
-    -->
     <link rel="stylesheet" href="{% static 'CSS/login.css' %}">
 {% endblock %}
 
 {% block content %}
 <div class="login-container">
     <h2>Inicio de Sesión</h2>
+    
+    <p class="login-subtitle">Inicio de Sesión para el área de Asesoría Pedagógica</p>
+    <p class="login-description">Ingrese su correo electrónico y contraseña para iniciar sesión.</p>
 
     <form method="post" action="{% url 'login' %}" class="login-form">
         {% csrf_token %}

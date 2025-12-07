@@ -21,8 +21,10 @@ router.register(r'ajuste_asignado', views.AjusteAsignadoViewSet)
 router.register(r'perfil_usuarios', views.PerfilUsuarioViewSet)
 
 urlpatterns = [
-    path('', views.redireccionamiento_por_rol, name='home'),
+    path('', views.pagina_index, name='index'),
+    path('home/', views.redireccionamiento_por_rol, name='home'),
     path('solicitud-publica/', PublicSolicitudCreateView.as_view(), name='solicitud-publica'),
+    path('seguimiento-caso/', views.seguimiento_caso_estudiante, name='seguimiento_caso'),
     path('api/', include(router.urls)),
     path('panel-control-coordinadora/', views.panel_control_encargado_inclusion, name='panel_control_encargado_inclusion'), 
 ]

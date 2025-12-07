@@ -50,34 +50,34 @@
             </div>
             
             <!-- Barra de búsqueda y filtros -->
-            <div class="search-filters-container" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+            <div class="search-filters-container">
                 <form method="get" action="{% url 'gestion_usuarios_admin' %}" id="formBusqueda">
-                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 15px; align-items: end;">
+                    <div class="search-filters-grid">
                         <!-- Campo de búsqueda -->
-                        <div class="form-group" style="margin: 0;">
-                            <label for="q" style="margin-bottom: 5px; display: block; font-weight: 500;">
+                        <div class="form-group search-filter-group">
+                            <label for="q" class="search-filter-label">
                                 <i class="fas fa-search"></i> Buscar:
                             </label>
                             <input 
                                 type="text" 
                                 name="q" 
                                 id="q" 
+                                class="search-filter-input"
                                 value="{{ filtros_aplicados.q }}"
                                 placeholder="Nombre, Email o RUT..."
-                                style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;"
                                 maxlength="100"
                             >
                         </div>
                         
                         <!-- Filtro por Rol -->
-                        <div class="form-group" style="margin: 0;">
-                            <label for="rol" style="margin-bottom: 5px; display: block; font-weight: 500;">
+                        <div class="form-group search-filter-group">
+                            <label for="rol" class="search-filter-label">
                                 <i class="fas fa-user-tag"></i> Rol:
                             </label>
                             <select 
                                 name="rol" 
                                 id="rol" 
-                                style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;"
+                                class="search-filter-select"
                             >
                                 <option value="">Todos los roles</option>
                                 {% for rol in roles_disponibles %}
@@ -89,14 +89,14 @@
                         </div>
                         
                         <!-- Filtro por Área -->
-                        <div class="form-group" style="margin: 0;">
-                            <label for="area" style="margin-bottom: 5px; display: block; font-weight: 500;">
+                        <div class="form-group search-filter-group">
+                            <label for="area" class="search-filter-label">
                                 <i class="fas fa-building"></i> Área:
                             </label>
                             <select 
                                 name="area" 
                                 id="area" 
-                                style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;"
+                                class="search-filter-select"
                             >
                                 <option value="">Todas las áreas</option>
                                 {% for area in areas_disponibles %}
@@ -108,12 +108,12 @@
                         </div>
                         
                         <!-- Botones de acción -->
-                        <div style="display: flex; gap: 10px;">
-                            <button type="submit" class="btn-accion btn-asignar" style="white-space: nowrap;">
+                        <div class="search-filter-buttons">
+                            <button type="submit" class="btn-accion btn-asignar search-filter-btn">
                                 <i class="fas fa-search"></i> Buscar
                             </button>
                             {% if filtros_aplicados.q or filtros_aplicados.rol or filtros_aplicados.area %}
-                                <a href="{% url 'gestion_usuarios_admin' %}" class="btn-accion btn-accion-gray" style="white-space: nowrap; text-decoration: none; display: inline-flex; align-items: center;">
+                                <a href="{% url 'gestion_usuarios_admin' %}" class="btn-accion btn-accion-gray search-filter-btn">
                                     <i class="fas fa-times"></i> Limpiar
                                 </a>
                             {% endif %}

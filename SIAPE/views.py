@@ -471,11 +471,100 @@ def get_calendario_disponible(request):
 
 
 # ----------- Vistas para la página ------------
-@login_required
+def pagina_index(request):
+    """
+    Página principal (index) del sistema.
+    Muestra descripción del sistema y botones de acceso.
+    """
+    return render(request, 'SIAPE/index.html')
+
+def seguimiento_caso_estudiante(request):
+    """
+    Vista pública para que los estudiantes puedan ver el seguimiento de su caso.
+    Requiere RUT y número de seguimiento (ID del caso) para autenticación.
+    """
+    solicitud = None
+    error = None
+    ajustes_aprobados = []
+    entrevistas = []
+    
+    if request.method == 'POST':
+        rut = request.POST.get('rut', '').strip()
+        numero_seguimiento = request.POST.get('numero_seguimiento', '').strip()
+        
+        if rut and numero_seguimiento:
+            # Validar que el número de seguimiento sea un número válido
+            try:
+                solicitud_id = int(numero_seguimiento)
+            except ValueError:
+                error = 'El número de seguimiento debe ser un número válido.'
+                context = {
+                    'solicitud': None,
+                    'ajustes_aprobados': [],
+                    'entrevistas': [],
+                    'error': error
+                }
+                return render(request, 'SIAPE/seguimiento_caso.html', context)
+            
+            # Buscar estudiante por RUT
+            estudiante = Estudiantes.objects.filter(rut=rut).first()
+            
+            if estudiante:
+                # Buscar la solicitud por ID y verificar que pertenezca al estudiante
+                try:
+                    solicitud = Solicitudes.objects.filter(
+                        id=solicitud_id,
+                        estudiantes=estudiante
+                    ).select_related(
+                        'estudiantes',
+                        'estudiantes__carreras',
+                        'coordinadora_asignada__usuario',
+                        'asesor_tecnico_asignado__usuario',
+                        'asesor_pedagogico_asignado__usuario'
+                    ).prefetch_related(
+                        'ajusteasignado_set__ajuste_razonable__categorias_ajustes',
+                        'ajusteasignado_set__director_aprobador__usuario',
+                        'entrevistas_set__coordinadora__usuario'
+                    ).first()
+                    
+                    if not solicitud:
+                        error = 'No se encontró un caso con ese número de seguimiento asociado a este RUT. Verifique los datos e intente nuevamente.'
+                    else:
+                        # Obtener solo los ajustes aprobados para mostrar al estudiante
+                        ajustes_aprobados = AjusteAsignado.objects.filter(
+                            solicitudes=solicitud,
+                            estado_aprobacion='aprobado'
+                        ).select_related('ajuste_razonable__categorias_ajustes')
+                        
+                        # Obtener las entrevistas relacionadas
+                        entrevistas = Entrevistas.objects.filter(
+                            solicitudes=solicitud
+                        ).select_related('coordinadora__usuario').order_by('-fecha_entrevista')
+                except Solicitudes.DoesNotExist:
+                    error = 'No se encontró un caso con ese número de seguimiento. Verifique los datos e intente nuevamente.'
+            else:
+                error = 'RUT no encontrado en el sistema. Verifique sus datos e intente nuevamente.'
+        else:
+            error = 'Por favor, complete todos los campos.'
+    
+    context = {
+        'solicitud': solicitud,
+        'ajustes_aprobados': ajustes_aprobados,
+        'entrevistas': entrevistas if solicitud else [],
+        'error': error
+    }
+    
+    return render(request, 'SIAPE/seguimiento_caso.html', context)
+
 def redireccionamiento_por_rol(request):
     """
     Redirecciona al dashboard correspondiente según el rol del usuario.
+    Si el usuario no está autenticado, muestra la página index.
     """
+    # Si el usuario no está autenticado, mostrar la página index
+    if not request.user.is_authenticated:
+        return redirect('index')
+    
     # Primero verificar si el usuario tiene un perfil con rol
     if hasattr(request.user, 'perfil') and request.user.perfil and request.user.perfil.rol:
         rol = request.user.perfil.rol.nombre_rol
@@ -508,7 +597,7 @@ def vista_protegida(request):
 
 def logout_view(request):
     logout(request)
-    return redirect('login') 
+    return redirect('index') 
 
 @login_required
 def casos_generales(request):
@@ -986,128 +1075,129 @@ def gestion_institucional_admin(request):
     }
     return render(request, 'SIAPE/gestion_institucional_admin.html', context)
 
-@login_required
-def asignar_estudiantes_asignaturas_admin(request):
-    """
-    Vista para que el Administrador asigne estudiantes a asignaturas.
-    """
-    if not _check_admin_permission(request):
-        return redirect('home')
-    
-    # Obtener todos los estudiantes y asignaturas
-    estudiantes = Estudiantes.objects.select_related('carreras').all().order_by('nombres', 'apellidos')
-    asignaturas = Asignaturas.objects.select_related('carreras', 'docente__usuario').all().order_by('nombre', 'seccion')
-    carreras = Carreras.objects.all().order_by('nombre')
-    
-    # Filtrar por carrera si se proporciona (con validación)
-    carrera_id = request.GET.get('carrera', '')
-    if carrera_id:
-        # Validar que carrera_id sea un número entero
-        try:
-            carrera_id_int = int(carrera_id)
-            if carrera_id_int <= 0:
-                raise ValueError("ID inválido")
-            carrera_seleccionada = Carreras.objects.get(id=carrera_id_int)
-            estudiantes = estudiantes.filter(carreras_id=carrera_id_int)
-            asignaturas = asignaturas.filter(carreras_id=carrera_id_int)
-        except (ValueError, Carreras.DoesNotExist):
-            carrera_seleccionada = None
-            messages.error(request, 'Carrera no válida.')
-    else:
-        carrera_seleccionada = None
-    
-    # Procesar el formulario si es POST
-    if request.method == 'POST':
-        estudiante_id = request.POST.get('estudiante')
-        asignaturas_ids = request.POST.getlist('asignaturas')
-        estado = request.POST.get('estado', 'True') == 'True'
-        
-        if estudiante_id and asignaturas_ids:
-            try:
-                # Validar que estudiante_id sea un número entero válido
-                estudiante_id_int = int(estudiante_id)
-                if estudiante_id_int <= 0:
-                    raise ValueError("ID de estudiante inválido")
-                
-                estudiante = Estudiantes.objects.get(id=estudiante_id_int)
-                
-                # Validar que todos los IDs de asignaturas sean enteros válidos
-                asignaturas_ids_int = []
-                for asign_id in asignaturas_ids:
-                    try:
-                        asign_id_int = int(asign_id)
-                        if asign_id_int <= 0:
-                            continue
-                        asignaturas_ids_int.append(asign_id_int)
-                    except ValueError:
-                        continue
-                
-                if not asignaturas_ids_int:
-                    messages.error(request, 'Debe seleccionar al menos una asignatura válida.')
-                    return redirect('asignar_estudiantes_asignaturas_admin')
-                
-                # Limitar el número de asignaturas para prevenir abuso
-                if len(asignaturas_ids_int) > 50:
-                    messages.error(request, 'No se pueden asignar más de 50 asignaturas a la vez.')
-                    return redirect('asignar_estudiantes_asignaturas_admin')
-                
-                asignaturas_seleccionadas = Asignaturas.objects.filter(id__in=asignaturas_ids_int)
-                
-                asignaciones_creadas = 0
-                asignaciones_actualizadas = 0
-                
-                for asignatura in asignaturas_seleccionadas:
-                    # Verificar si ya existe la asignación
-                    asignacion, created = AsignaturasEnCurso.objects.get_or_create(
-                        estudiantes=estudiante,
-                        asignaturas=asignatura,
-                        defaults={'estado': estado}
-                    )
-                    
-                    if not created:
-                        # Si ya existe, actualizar el estado
-                        asignacion.estado = estado
-                        asignacion.save()
-                        asignaciones_actualizadas += 1
-                    else:
-                        asignaciones_creadas += 1
-                
-                if asignaciones_creadas > 0 or asignaciones_actualizadas > 0:
-                    messages.success(
-                        request, 
-                        f'Se asignaron {asignaciones_creadas} asignatura(s) nueva(s) y se actualizaron {asignaciones_actualizadas} asignación(es) existente(s) para {estudiante.nombres} {estudiante.apellidos}.'
-                    )
-                else:
-                    messages.info(request, 'No se realizaron cambios.')
-                    
-            except Estudiantes.DoesNotExist:
-                messages.error(request, 'El estudiante seleccionado no existe.')
-            except Exception as e:
-                messages.error(request, f'Error al asignar: {str(e)}')
-        else:
-            messages.error(request, 'Debe seleccionar un estudiante y al menos una asignatura.')
-        
-        # Redirigir para evitar reenvío del formulario
-        return redirect('asignar_estudiantes_asignaturas_admin')
-    
-    # Obtener asignaciones existentes para mostrar en la tabla
-    asignaciones = AsignaturasEnCurso.objects.select_related(
-        'estudiantes', 
-        'estudiantes__carreras',
-        'asignaturas',
-        'asignaturas__carreras',
-        'asignaturas__docente__usuario'
-    ).all().order_by('-created_at')[:50]  # Últimas 50 asignaciones
-    
-    context = {
-        'estudiantes_list': estudiantes,
-        'asignaturas_list': asignaturas,
-        'carreras_list': carreras,
-        'carrera_seleccionada': carrera_seleccionada,
-        'asignaciones_list': asignaciones,
-    }
-    
-    return render(request, 'SIAPE/asignar_estudiantes_asignaturas_admin.html', context)
+# Vista eliminada - La funcionalidad de asignar estudiantes a asignaturas ahora la realiza el Director de Carrera
+# @login_required
+# def asignar_estudiantes_asignaturas_admin(request):
+#     """
+#     Vista para que el Administrador asigne estudiantes a asignaturas.
+#     """
+#     if not _check_admin_permission(request):
+#         return redirect('home')
+#     
+#     # Obtener todos los estudiantes y asignaturas
+#     estudiantes = Estudiantes.objects.select_related('carreras').all().order_by('nombres', 'apellidos')
+#     asignaturas = Asignaturas.objects.select_related('carreras', 'docente__usuario').all().order_by('nombre', 'seccion')
+#     carreras = Carreras.objects.all().order_by('nombre')
+#     
+#     # Filtrar por carrera si se proporciona (con validación)
+#     carrera_id = request.GET.get('carrera', '')
+#     if carrera_id:
+#         # Validar que carrera_id sea un número entero
+#         try:
+#             carrera_id_int = int(carrera_id)
+#             if carrera_id_int <= 0:
+#                 raise ValueError("ID inválido")
+#             carrera_seleccionada = Carreras.objects.get(id=carrera_id_int)
+#             estudiantes = estudiantes.filter(carreras_id=carrera_id_int)
+#             asignaturas = asignaturas.filter(carreras_id=carrera_id_int)
+#         except (ValueError, Carreras.DoesNotExist):
+#             carrera_seleccionada = None
+#             messages.error(request, 'Carrera no válida.')
+#     else:
+#         carrera_seleccionada = None
+#     
+#     # Procesar el formulario si es POST
+#     if request.method == 'POST':
+#         estudiante_id = request.POST.get('estudiante')
+#         asignaturas_ids = request.POST.getlist('asignaturas')
+#         estado = request.POST.get('estado', 'True') == 'True'
+#         
+#         if estudiante_id and asignaturas_ids:
+#             try:
+#                 # Validar que estudiante_id sea un número entero válido
+#                 estudiante_id_int = int(estudiante_id)
+#                 if estudiante_id_int <= 0:
+#                     raise ValueError("ID de estudiante inválido")
+#                 
+#                 estudiante = Estudiantes.objects.get(id=estudiante_id_int)
+#                 
+#                 # Validar que todos los IDs de asignaturas sean enteros válidos
+#                 asignaturas_ids_int = []
+#                 for asign_id in asignaturas_ids:
+#                     try:
+#                         asign_id_int = int(asign_id)
+#                         if asign_id_int <= 0:
+#                             continue
+#                         asignaturas_ids_int.append(asign_id_int)
+#                     except ValueError:
+#                         continue
+#                 
+#                 if not asignaturas_ids_int:
+#                     messages.error(request, 'Debe seleccionar al menos una asignatura válida.')
+#                     return redirect('asignar_estudiantes_asignaturas_admin')
+#                 
+#                 # Limitar el número de asignaturas para prevenir abuso
+#                 if len(asignaturas_ids_int) > 50:
+#                     messages.error(request, 'No se pueden asignar más de 50 asignaturas a la vez.')
+#                     return redirect('asignar_estudiantes_asignaturas_admin')
+#                 
+#                 asignaturas_seleccionadas = Asignaturas.objects.filter(id__in=asignaturas_ids_int)
+#                 
+#                 asignaciones_creadas = 0
+#                 asignaciones_actualizadas = 0
+#                 
+#                 for asignatura in asignaturas_seleccionadas:
+#                     # Verificar si ya existe la asignación
+#                     asignacion, created = AsignaturasEnCurso.objects.get_or_create(
+#                         estudiantes=estudiante,
+#                         asignaturas=asignatura,
+#                         defaults={'estado': estado}
+#                     )
+#                     
+#                     if not created:
+#                         # Si ya existe, actualizar el estado
+#                         asignacion.estado = estado
+#                         asignacion.save()
+#                         asignaciones_actualizadas += 1
+#                     else:
+#                         asignaciones_creadas += 1
+#                 
+#                 if asignaciones_creadas > 0 or asignaciones_actualizadas > 0:
+#                     messages.success(
+#                         request, 
+#                         f'Se asignaron {asignaciones_creadas} asignatura(s) nueva(s) y se actualizaron {asignaciones_actualizadas} asignación(es) existente(s) para {estudiante.nombres} {estudiante.apellidos}.'
+#                     )
+#                 else:
+#                     messages.info(request, 'No se realizaron cambios.')
+#                     
+#             except Estudiantes.DoesNotExist:
+#                 messages.error(request, 'El estudiante seleccionado no existe.')
+#             except Exception as e:
+#                 messages.error(request, f'Error al asignar: {str(e)}')
+#         else:
+#             messages.error(request, 'Debe seleccionar un estudiante y al menos una asignatura.')
+#         
+#         # Redirigir para evitar reenvío del formulario
+#         return redirect('asignar_estudiantes_asignaturas_admin')
+#     
+#     # Obtener asignaciones existentes para mostrar en la tabla
+#     asignaciones = AsignaturasEnCurso.objects.select_related(
+#         'estudiantes', 
+#         'estudiantes__carreras',
+#         'asignaturas',
+#         'asignaturas__carreras',
+#         'asignaturas__docente__usuario'
+#     ).all().order_by('-created_at')[:50]  # Últimas 50 asignaciones
+#     
+#     context = {
+#         'estudiantes_list': estudiantes,
+#         'asignaturas_list': asignaturas,
+#         'carreras_list': carreras,
+#         'carrera_seleccionada': carrera_seleccionada,
+#         'asignaciones_list': asignaciones,
+#     }
+#     
+#     return render(request, 'SIAPE/asignar_estudiantes_asignaturas_admin.html', context)
 
 @login_required
 def agregar_rol_admin(request):
@@ -4081,14 +4171,18 @@ def obtener_datos_caso_docente(request, solicitud_id):
     ajustes_asignados = AjusteAsignado.objects.filter(
         solicitudes=solicitud,
         estado_aprobacion='aprobado'
-    ).select_related('ajuste_razonable__categorias_ajustes')
+    ).select_related('ajuste_razonable__categorias_ajustes', 'docente_comentador__usuario')
     
     ajustes_data = []
     for ajuste in ajustes_asignados:
         ajustes_data.append({
+            'id': ajuste.id,
             'categoria': ajuste.ajuste_razonable.categorias_ajustes.nombre_categoria,
             'descripcion': ajuste.ajuste_razonable.descripcion,
-            'estado_aprobacion': ajuste.estado_aprobacion
+            'estado_aprobacion': ajuste.estado_aprobacion,
+            'comentarios_docente': ajuste.comentarios_docente or '',
+            'fecha_comentario_docente': ajuste.fecha_comentario_docente.strftime('%d/%m/%Y %H:%M') if ajuste.fecha_comentario_docente else None,
+            'docente_comentador': ajuste.docente_comentador.usuario.get_full_name() if ajuste.docente_comentador else None
         })
     
     # Preparar respuesta
@@ -4105,6 +4199,59 @@ def obtener_datos_caso_docente(request, solicitud_id):
     }
     
     return Response(data, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def agregar_comentario_ajuste_docente(request, ajuste_asignado_id):
+    """
+    Endpoint API para que el docente agregue o actualice un comentario sobre un ajuste.
+    """
+    try:
+        if request.user.perfil.rol.nombre_rol != ROL_DOCENTE:
+            return Response({'error': 'No autorizado'}, status=status.HTTP_403_FORBIDDEN)
+    except AttributeError:
+        return Response({'error': 'No autorizado'}, status=status.HTTP_403_FORBIDDEN)
+    
+    perfil_docente = request.user.perfil
+    
+    # Obtener el ajuste asignado
+    try:
+        ajuste = AjusteAsignado.objects.get(
+            id=ajuste_asignado_id,
+            estado_aprobacion='aprobado'
+        )
+    except AjusteAsignado.DoesNotExist:
+        return Response({'error': 'Ajuste no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Verificar que el docente tiene acceso a este ajuste (el estudiante debe estar en sus clases)
+    mis_asignaturas = Asignaturas.objects.filter(docente=perfil_docente)
+    estudiante_en_clases = AsignaturasEnCurso.objects.filter(
+        estudiantes=ajuste.solicitudes.estudiantes,
+        asignaturas__in=mis_asignaturas
+    ).exists()
+    
+    if not estudiante_en_clases:
+        return Response({'error': 'No autorizado'}, status=status.HTTP_403_FORBIDDEN)
+    
+    # Obtener el comentario del request
+    comentario = request.data.get('comentario', '').strip()
+    
+    if not comentario:
+        return Response({'error': 'El comentario no puede estar vacío'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Guardar el comentario
+    ajuste.comentarios_docente = comentario
+    ajuste.docente_comentador = perfil_docente
+    ajuste.fecha_comentario_docente = timezone.now()
+    ajuste.save()
+    
+    return Response({
+        'success': True,
+        'message': 'Comentario guardado exitosamente',
+        'comentario': ajuste.comentarios_docente,
+        'fecha_comentario': ajuste.fecha_comentario_docente.strftime('%d/%m/%Y %H:%M'),
+        'docente_comentador': perfil_docente.usuario.get_full_name()
+    }, status=status.HTTP_200_OK)
 
 @login_required
 def dashboard_docente(request):

@@ -48,7 +48,7 @@
                         {% if alumno.tiene_caso_aprobado %}
                             <span class="status status-aprobado">Con Caso Aprobado</span>
                         {% else %}
-                            <span class="status" style="background-color: #f0f0f0; color: #777;">Sin Caso</span>
+                            <span class="status status-sin-caso">Sin Caso</span>
                         {% endif %}
                     </td>
                     <td>
@@ -84,11 +84,11 @@
 <!-- Modal para Ver Caso (Docente) -->
 <div id="modalCasoDocente" class="modal" style="display: none;">
     <div class="modal-content" style="max-width: 700px; max-height: 90vh; overflow-y: auto;">
-        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #eee;">
-            <h2 style="margin: 0; color: #cc0000;">
+        <div class="modal-header">
+            <h2>
                 <i class="fas fa-user-graduate"></i> Detalle del Caso
             </h2>
-            <span class="close-modal" onclick="cerrarModalCasoDocente()" style="cursor: pointer; font-size: 28px; font-weight: bold; color: #999;">&times;</span>
+            <span class="close-modal" onclick="cerrarModalCasoDocente()">&times;</span>
         </div>
         
         <div class="modal-body" id="modalCasoDocenteBody">
@@ -100,109 +100,6 @@
     </div>
 </div>
 
-<style>
-.modal {
-    display: none;
-    position: fixed;
-    z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-    background-color: rgba(0,0,0,0.5);
-}
-
-.modal-content {
-    background-color: #fefefe;
-    margin: 5% auto;
-    padding: 30px;
-    border: 1px solid #888;
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-}
-
-.close-modal {
-    color: #aaa;
-    float: right;
-    font-size: 28px;
-    font-weight: bold;
-}
-
-.close-modal:hover,
-.close-modal:focus {
-    color: #000;
-    text-decoration: none;
-    cursor: pointer;
-}
-
-.modal-estudiante-info {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    padding: 20px;
-    background-color: #f8f9fa;
-    border-radius: 8px;
-    margin-bottom: 20px;
-}
-
-.modal-estudiante-foto {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    background-color: #cc0000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 2.5rem;
-    font-weight: bold;
-    flex-shrink: 0;
-}
-
-.modal-estudiante-datos h3 {
-    margin: 0 0 10px 0;
-    color: #333;
-    font-size: 1.3rem;
-}
-
-.modal-estudiante-datos p {
-    margin: 5px 0;
-    color: #666;
-}
-
-.modal-seccion {
-    margin-bottom: 25px;
-}
-
-.modal-seccion h4 {
-    color: #cc0000;
-    margin-bottom: 10px;
-    font-size: 1.1rem;
-    border-bottom: 2px solid #eee;
-    padding-bottom: 8px;
-}
-
-.modal-ajuste-item {
-    background-color: #f8f9fa;
-    padding: 15px;
-    border-radius: 6px;
-    margin-bottom: 15px;
-    border-left: 4px solid #28a745;
-}
-
-.modal-ajuste-categoria {
-    font-weight: bold;
-    color: #28a745;
-    margin-bottom: 8px;
-    font-size: 1rem;
-}
-
-.modal-ajuste-descripcion {
-    color: #555;
-    line-height: 1.6;
-}
-</style>
 
 <script>
 function abrirModalCasoDocente(solicitudId) {
@@ -240,20 +137,39 @@ function abrirModalCasoDocente(solicitudId) {
         
         let ajustesHTML = '';
         if (data.tiene_ajustes) {
-            ajustesHTML = data.ajustes.map(ajuste => `
-                <div class="modal-ajuste-item">
-                    <div class="modal-ajuste-categoria">
-                        <i class="fas fa-tag"></i> ${ajuste.categoria}
+            ajustesHTML = data.ajustes.map(ajuste => {
+                const tieneComentario = ajuste.comentarios_docente && ajuste.comentarios_docente.trim() !== '';
+                const comentarioHTML = tieneComentario ? `
+                    <div class="modal-comentario-docente">
+                        <div class="modal-comentario-header">
+                            <strong><i class="fas fa-comment"></i> Mi Comentario:</strong>
+                            ${ajuste.fecha_comentario_docente ? `<span class="modal-comentario-fecha">${ajuste.fecha_comentario_docente}</span>` : ''}
+                        </div>
+                        <div class="modal-comentario-texto">${ajuste.comentarios_docente}</div>
                     </div>
-                    <div class="modal-ajuste-descripcion">
-                        ${ajuste.descripcion}
+                ` : '';
+                
+                return `
+                    <div class="modal-ajuste-item" data-ajuste-id="${ajuste.id}">
+                        <div class="modal-ajuste-categoria">
+                            <i class="fas fa-tag"></i> ${ajuste.categoria}
+                        </div>
+                        <div class="modal-ajuste-descripcion">
+                            ${ajuste.descripcion}
+                        </div>
+                        ${comentarioHTML}
+                        <div class="modal-comentario-acciones">
+                            <button type="button" class="btn-comentario" onclick="abrirFormularioComentario(${ajuste.id}, ${tieneComentario ? 'true' : 'false'})">
+                                <i class="fas fa-${tieneComentario ? 'edit' : 'comment'}"></i> ${tieneComentario ? 'Editar Comentario' : 'Agregar Comentario'}
+                            </button>
+                        </div>
                     </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         } else {
             ajustesHTML = `
-                <div class="modal-ajuste-item" style="border-left-color: #ffc107;">
-                    <div class="modal-ajuste-descripcion" style="color: #666; font-style: italic;">
+                <div class="modal-ajuste-item modal-ajuste-item-warning">
+                    <div class="modal-ajuste-descripcion modal-ajuste-descripcion-warning">
                         <i class="fas fa-info-circle"></i> Este caso está aprobado pero aún no tiene ajustes asignados.
                     </div>
                 </div>
@@ -273,8 +189,8 @@ function abrirModalCasoDocente(solicitudId) {
             
             <div class="modal-seccion">
                 <h4><i class="fas fa-file-alt"></i> Descripción del Caso</h4>
-                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 6px; white-space: pre-wrap; line-height: 1.6;">
-                    ${data.descripcion_caso}
+                <div class="modal-descripcion-caso">
+                    ${data.descripcion_caso.trim()}
                 </div>
             </div>
             
@@ -323,6 +239,132 @@ function getCookie(name) {
         }
     }
     return cookieValue;
+}
+
+// Función para abrir el formulario de comentario
+function abrirFormularioComentario(ajusteId, tieneComentario) {
+    const ajusteItem = document.querySelector(`[data-ajuste-id="${ajusteId}"]`);
+    if (!ajusteItem) return;
+    
+    // Buscar si ya existe un formulario
+    let formularioExistente = ajusteItem.querySelector('.modal-formulario-comentario');
+    if (formularioExistente) {
+        formularioExistente.style.display = 'block';
+        return;
+    }
+    
+    // Obtener el comentario actual si existe
+    const comentarioActual = ajusteItem.querySelector('.modal-comentario-texto');
+    const textoActual = comentarioActual ? comentarioActual.textContent.trim() : '';
+    
+    // Crear formulario
+    const formulario = document.createElement('div');
+    formulario.className = 'modal-formulario-comentario';
+    formulario.innerHTML = `
+        <div class="modal-formulario-comentario-content">
+            <label for="comentario-${ajusteId}"><strong>${tieneComentario ? 'Editar' : 'Agregar'} Comentario:</strong></label>
+            <textarea id="comentario-${ajusteId}" class="modal-textarea-comentario" rows="4" placeholder="Ej: Aprobado, realizaré el ajuste. / Necesito equipo especial para...">${textoActual}</textarea>
+            <div class="modal-formulario-comentario-botones">
+                <button type="button" class="btn-comentario btn-comentario-guardar" onclick="guardarComentario(${ajusteId})">
+                    <i class="fas fa-save"></i> Guardar
+                </button>
+                <button type="button" class="btn-comentario btn-comentario-cancelar" onclick="cerrarFormularioComentario(${ajusteId})">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+            </div>
+        </div>
+    `;
+    
+    // Insertar después de las acciones
+    const accionesDiv = ajusteItem.querySelector('.modal-comentario-acciones');
+    accionesDiv.insertAdjacentElement('afterend', formulario);
+}
+
+// Función para cerrar el formulario de comentario
+function cerrarFormularioComentario(ajusteId) {
+    const ajusteItem = document.querySelector(`[data-ajuste-id="${ajusteId}"]`);
+    if (!ajusteItem) return;
+    
+    const formulario = ajusteItem.querySelector('.modal-formulario-comentario');
+    if (formulario) {
+        formulario.style.display = 'none';
+    }
+}
+
+// Función para guardar el comentario
+function guardarComentario(ajusteId) {
+    const textarea = document.getElementById(`comentario-${ajusteId}`);
+    if (!textarea) return;
+    
+    const comentario = textarea.value.trim();
+    if (!comentario) {
+        alert('Por favor, ingrese un comentario.');
+        return;
+    }
+    
+    // Deshabilitar botones mientras se guarda
+    const botones = document.querySelectorAll(`[onclick*="guardarComentario(${ajusteId})"], [onclick*="cerrarFormularioComentario(${ajusteId})"]`);
+    botones.forEach(btn => btn.disabled = true);
+    
+    // Enviar comentario al servidor
+    fetch(`/api/docente/ajuste/${ajusteId}/comentario/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            comentario: comentario
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Actualizar la interfaz con el nuevo comentario
+            const ajusteItem = document.querySelector(`[data-ajuste-id="${ajusteId}"]`);
+            if (ajusteItem) {
+                // Remover formulario
+                const formulario = ajusteItem.querySelector('.modal-formulario-comentario');
+                if (formulario) formulario.remove();
+                
+                // Actualizar o crear sección de comentario
+                let comentarioDiv = ajusteItem.querySelector('.modal-comentario-docente');
+                if (!comentarioDiv) {
+                    comentarioDiv = document.createElement('div');
+                    comentarioDiv.className = 'modal-comentario-docente';
+                    const accionesDiv = ajusteItem.querySelector('.modal-comentario-acciones');
+                    accionesDiv.insertAdjacentElement('beforebegin', comentarioDiv);
+                }
+                
+                comentarioDiv.innerHTML = `
+                    <div class="modal-comentario-header">
+                        <strong><i class="fas fa-comment"></i> Mi Comentario:</strong>
+                        <span class="modal-comentario-fecha">${data.fecha_comentario}</span>
+                    </div>
+                    <div class="modal-comentario-texto">${data.comentario}</div>
+                `;
+                
+                // Actualizar botón
+                const btnComentario = ajusteItem.querySelector('.btn-comentario');
+                if (btnComentario) {
+                    btnComentario.innerHTML = '<i class="fas fa-edit"></i> Editar Comentario';
+                }
+            }
+            
+            alert('Comentario guardado exitosamente.');
+        } else {
+            alert('Error al guardar el comentario: ' + (data.error || 'Error desconocido'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error al guardar el comentario. Por favor, intente nuevamente.');
+    })
+    .finally(() => {
+        // Rehabilitar botones
+        botones.forEach(btn => btn.disabled = false);
+    });
 }
 </script>
 

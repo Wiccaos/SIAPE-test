@@ -85,6 +85,12 @@
             {% else %}
                 <span>Plataforma de Apoyo Estudiantil</span>
                 
+                <!-- Botón de Iniciar Sesión -->
+                <a href="{% url 'login' %}" class="header-login-link">
+                    <i class="fas fa-sign-in-alt"></i>
+                    <span>Iniciar Sesión</span>
+                </a>
+                
                 <!-- Contenedor del Dropdown de Accesibilidad para usuarios no autenticados -->
                 <div class="header-dropdown">
                     <!-- Este es el botón que se ve siempre -->
