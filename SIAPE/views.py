@@ -1648,11 +1648,25 @@ def detalle_casos_encargado_inclusion(request, solicitud_id):
     
     estudiante = solicitud.estudiantes
     
-    # Obtenemos todos los ajustes asignados
-    ajustes = AjusteAsignado.objects.filter(solicitudes=solicitud).select_related(
-        'ajuste_razonable', 
-        'ajuste_razonable__categorias_ajustes'
-    )
+    # 3. --- Determinar acciones permitidas según el rol ---
+    rol_nombre = perfil.rol.nombre_rol if perfil else None
+    
+    # Obtenemos los ajustes asignados
+    # Si el usuario es docente, solo mostrar ajustes aprobados
+    # Para otros roles, mostrar todos los ajustes
+    if rol_nombre == ROL_DOCENTE:
+        ajustes = AjusteAsignado.objects.filter(
+            solicitudes=solicitud,
+            estado_aprobacion='aprobado'
+        ).select_related(
+            'ajuste_razonable', 
+            'ajuste_razonable__categorias_ajustes'
+        )
+    else:
+        ajustes = AjusteAsignado.objects.filter(solicitudes=solicitud).select_related(
+            'ajuste_razonable', 
+            'ajuste_razonable__categorias_ajustes'
+        )
     
     # Obtenemos todas las evidencias
     evidencias = Evidencias.objects.filter(solicitudes=solicitud)
@@ -1662,9 +1676,6 @@ def detalle_casos_encargado_inclusion(request, solicitud_id):
     
     # Obtenemos las categorías para el modal (si queremos añadir ajustes)
     categorias_ajustes = CategoriasAjustes.objects.all().order_by('nombre_categoria')
-
-    # 3. --- Determinar acciones permitidas según el rol ---
-    rol_nombre = perfil.rol.nombre_rol if perfil else None
     # Permisos de edición: Solo Encargado de Inclusión, Asesor Pedagógico y Admin pueden editar la descripción del caso
     # El Coordinador Técnico Pedagógico NO puede editar el caso formulado por el Encargado de Inclusión
     # El Docente solo puede VER, no editar
@@ -4066,10 +4077,10 @@ def obtener_datos_caso_docente(request, solicitud_id):
     if not estudiante_en_clases:
         return Response({'error': 'No autorizado'}, status=status.HTTP_403_FORBIDDEN)
     
-    # Obtener todos los ajustes asignados a la solicitud (no solo los aprobados)
-    # Si el caso está aprobado, mostramos todos los ajustes asignados
+    # Obtener solo los ajustes aprobados para el docente
     ajustes_asignados = AjusteAsignado.objects.filter(
-        solicitudes=solicitud
+        solicitudes=solicitud,
+        estado_aprobacion='aprobado'
     ).select_related('ajuste_razonable__categorias_ajustes')
     
     ajustes_data = []
