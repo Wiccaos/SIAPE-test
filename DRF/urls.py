@@ -98,6 +98,9 @@ urlpatterns = [
     # URLs de Encargado de Inclusión (Coordinadora)
     path('dashboard/coordinador/', views.dashboard_encargado_inclusion, name='dashboard_encargado_inclusion'),
     path('dashboard/casos-generales/', views.casos_generales, name='casos_generales'),
+    # URL genérica para ver casos (funciona para todos los roles)
+    path('casos/<int:solicitud_id>/', views.detalle_casos_encargado_inclusion, name='detalle_caso'),
+    # URLs específicas por rol (mantener para compatibilidad)
     path('dashboard/coordinador/casos/<int:solicitud_id>/', views.detalle_casos_encargado_inclusion, name='detalle_casos_encargado_inclusion'),
     path('dashboard/coordinador/panel-control/', views.panel_control_encargado_inclusion, name='panel_control_encargado_inclusion'),
     path('dashboard/coordinador/horarios-bloqueados/', views.gestionar_horarios_bloqueados, name='gestionar_horarios_bloqueados'),

@@ -171,6 +171,13 @@ class Estudiantes(models.Model):
     email = models.EmailField(max_length=191, unique=True)
     carreras = models.ForeignKey(Carreras, on_delete=models.CASCADE)
     numero = models.IntegerField(null=True, blank=True)
+    semestre_actual = models.IntegerField(
+        null=True,
+        blank=True,
+        choices=[(i, str(i)) for i in range(1, 9)],
+        verbose_name="Semestre Actual",
+        help_text="Semestre actual del estudiante (1-8)"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

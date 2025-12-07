@@ -1618,9 +1618,17 @@ def detalle_casos_encargado_inclusion(request, solicitud_id):
             if rol == 'Encargado de Inclusión':
                 tiene_acceso = solicitud.coordinadora_asignada == perfil
             elif rol == 'Coordinador Técnico Pedagógico':
-                tiene_acceso = solicitud.asesor_tecnico_asignado == perfil
+                # Puede ver si está asignado O si la solicitud está en estado que requiere su intervención
+                tiene_acceso = (
+                    solicitud.asesor_tecnico_asignado == perfil or
+                    solicitud.estado == 'pendiente_formulacion_ajustes'
+                )
             elif rol == 'Asesor Pedagógico':
-                tiene_acceso = solicitud.asesor_pedagogico_asignado == perfil
+                # Puede ver si está asignado O si la solicitud está en estado que requiere su intervención
+                tiene_acceso = (
+                    solicitud.asesor_pedagogico_asignado == perfil or
+                    solicitud.estado == 'pendiente_preaprobacion'
+                )
             elif rol == 'Director de Carrera':
                 # Director puede ver solicitudes de estudiantes de sus carreras
                 carreras_dirigidas = Carreras.objects.filter(director=perfil)
@@ -1750,7 +1758,7 @@ def formular_ajuste_asesor_tecnico(request, solicitud_id):
     # Verificar que el caso está en el estado correcto
     if solicitud.estado != 'pendiente_formulacion_ajustes':
         messages.error(request, 'Este caso no está en estado de formulación de ajustes.')
-        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+        return redirect('detalle_caso', solicitud_id=solicitud_id)
 
     # 3. --- Obtener Datos del Formulario ---
     descripcion = request.POST.get('descripcion', '').strip()
@@ -1760,29 +1768,29 @@ def formular_ajuste_asesor_tecnico(request, solicitud_id):
     # 4. --- Validaciones ---
     if not descripcion:
         messages.error(request, 'La descripción del ajuste es requerida.')
-        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+        return redirect('detalle_caso', solicitud_id=solicitud_id)
 
     # Verificar si se seleccionó "nueva" o si hay una categoría seleccionada
     crear_nueva_categoria = categoria_id == 'nueva' or (not categoria_id and nueva_categoria)
     
     if not categoria_id and not nueva_categoria:
         messages.error(request, 'Debe seleccionar una categoría o crear una nueva.')
-        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+        return redirect('detalle_caso', solicitud_id=solicitud_id)
 
     if categoria_id and categoria_id != 'nueva' and nueva_categoria:
         messages.error(request, 'No puede seleccionar una categoría existente y crear una nueva a la vez.')
-        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+        return redirect('detalle_caso', solicitud_id=solicitud_id)
 
     if crear_nueva_categoria and not nueva_categoria:
         messages.error(request, 'Debe proporcionar el nombre de la nueva categoría.')
-        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+        return redirect('detalle_caso', solicitud_id=solicitud_id)
 
     try:
         # 5. --- Obtener o Crear Categoría ---
         if crear_nueva_categoria:
             if not nueva_categoria:
                 messages.error(request, 'Debe proporcionar el nombre de la nueva categoría.')
-                return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+                return redirect('detalle_caso', solicitud_id=solicitud_id)
             categoria, created = CategoriasAjustes.objects.get_or_create(
                 nombre_categoria=nueva_categoria.strip().capitalize()
             )
@@ -1791,7 +1799,7 @@ def formular_ajuste_asesor_tecnico(request, solicitud_id):
         else:
             if not categoria_id or categoria_id == 'nueva':
                 messages.error(request, 'Debe seleccionar una categoría válida.')
-                return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+                return redirect('detalle_caso', solicitud_id=solicitud_id)
             categoria = get_object_or_404(CategoriasAjustes, id=categoria_id)
 
         # 6. --- Crear Ajuste Razonable ---
@@ -1971,11 +1979,13 @@ def enviar_a_asesor_tecnico(request, solicitud_id):
     # 3. --- Verificar que el caso está en el estado correcto ---
     if solicitud.estado != 'pendiente_formulacion_caso':
         messages.error(request, 'Este caso no está en estado de formulación del caso. Solo se pueden enviar casos después de formular el caso.')
-        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+        return redirect('detalle_caso', solicitud_id=solicitud_id)
     
     try:
         # 4. --- Cambiar el estado del caso ---
         solicitud.estado = 'pendiente_formulacion_ajustes'
+        # Nota: No asignamos asesor_tecnico_asignado aquí porque cualquier Coordinador Técnico Pedagógico
+        # puede trabajar en casos pendientes. Se asignará automáticamente cuando formulen el primer ajuste.
         solicitud.save()
         
         messages.success(request, 'Caso enviado al Coordinador Técnico Pedagógico exitosamente. El caso ahora está pendiente de formulación de ajustes.')
@@ -2010,13 +2020,13 @@ def enviar_a_asesor_pedagogico(request, solicitud_id):
     # Verificar que el caso está en el estado correcto
     if solicitud.estado != 'pendiente_formulacion_ajustes':
         messages.error(request, 'Este caso no está en estado de formulación de ajustes.')
-        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+        return redirect('detalle_caso', solicitud_id=solicitud_id)
 
     # 3. --- Verificar que hay ajustes asignados ---
     ajustes_count = AjusteAsignado.objects.filter(solicitudes=solicitud).count()
     if ajustes_count == 0:
         messages.error(request, 'Debe formular al menos un ajuste antes de enviar el caso al Asesor Pedagógico.')
-        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+        return redirect('detalle_caso', solicitud_id=solicitud_id)
 
     try:
         # 4. --- Cambiar el estado del caso ---
@@ -2056,7 +2066,7 @@ def devolver_a_coordinadora(request, solicitud_id):
     # 3. --- Verificar que el caso está en el estado correcto ---
     if solicitud.estado != 'pendiente_formulacion_ajustes':
         messages.error(request, 'Este caso no está en estado de formulación de ajustes. Solo se pueden devolver casos pendientes de formulación de ajustes.')
-        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+        return redirect('detalle_caso', solicitud_id=solicitud_id)
     
     try:
         # 4. --- Cambiar el estado del caso ---
@@ -2096,7 +2106,7 @@ def enviar_a_director(request, solicitud_id):
     # 3. --- Verificar que el caso está en el estado correcto ---
     if solicitud.estado != 'pendiente_preaprobacion':
         messages.error(request, 'Este caso no está en estado de preaprobación. Solo se pueden enviar casos pendientes de preaprobación.')
-        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+        return redirect('detalle_caso', solicitud_id=solicitud_id)
     
     try:
         # 4. --- Cambiar el estado del caso ---
@@ -2136,7 +2146,7 @@ def devolver_a_asesor_tecnico(request, solicitud_id):
     # 3. --- Verificar que el caso está en el estado correcto ---
     if solicitud.estado != 'pendiente_preaprobacion':
         messages.error(request, 'Este caso no está en estado de preaprobación. Solo se pueden devolver casos pendientes de preaprobación.')
-        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+        return redirect('detalle_caso', solicitud_id=solicitud_id)
     
     try:
         # 4. --- Cambiar el estado del caso ---
@@ -2177,7 +2187,7 @@ def editar_ajuste_asesor(request, ajuste_asignado_id):
     # Verificar que el caso está en el estado correcto
     if solicitud.estado != 'pendiente_preaprobacion':
         messages.error(request, 'Solo se pueden editar ajustes de casos en estado de preaprobación.')
-        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
+        return redirect('detalle_caso', solicitud_id=solicitud.id)
 
     # 3. --- Obtener Datos del Formulario ---
     descripcion = request.POST.get('descripcion', '').strip()
@@ -2187,29 +2197,29 @@ def editar_ajuste_asesor(request, ajuste_asignado_id):
     # 4. --- Validaciones ---
     if not descripcion:
         messages.error(request, 'La descripción del ajuste es requerida.')
-        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
+        return redirect('detalle_caso', solicitud_id=solicitud.id)
 
     # Verificar si se seleccionó "nueva" o si hay una categoría seleccionada
     crear_nueva_categoria = categoria_id == 'nueva' or (not categoria_id and nueva_categoria)
     
     if not categoria_id and not nueva_categoria:
         messages.error(request, 'Debe seleccionar una categoría o crear una nueva.')
-        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
+        return redirect('detalle_caso', solicitud_id=solicitud.id)
 
     if categoria_id and categoria_id != 'nueva' and nueva_categoria:
         messages.error(request, 'No puede seleccionar una categoría existente y crear una nueva a la vez.')
-        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
+        return redirect('detalle_caso', solicitud_id=solicitud.id)
 
     if crear_nueva_categoria and not nueva_categoria:
         messages.error(request, 'Debe proporcionar el nombre de la nueva categoría.')
-        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
+        return redirect('detalle_caso', solicitud_id=solicitud.id)
 
     try:
         # 5. --- Obtener o Crear Categoría ---
         if crear_nueva_categoria:
             if not nueva_categoria:
                 messages.error(request, 'Debe proporcionar el nombre de la nueva categoría.')
-                return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
+                return redirect('detalle_caso', solicitud_id=solicitud.id)
             categoria, created = CategoriasAjustes.objects.get_or_create(
                 nombre_categoria=nueva_categoria.strip().capitalize()
             )
@@ -2218,7 +2228,7 @@ def editar_ajuste_asesor(request, ajuste_asignado_id):
         else:
             if not categoria_id or categoria_id == 'nueva':
                 messages.error(request, 'Debe seleccionar una categoría válida.')
-                return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
+                return redirect('detalle_caso', solicitud_id=solicitud.id)
             categoria = get_object_or_404(CategoriasAjustes, id=categoria_id)
 
         # 6. --- Actualizar Ajuste Razonable ---
@@ -2261,7 +2271,7 @@ def eliminar_ajuste_asesor(request, ajuste_asignado_id):
     # Verificar que el caso está en el estado correcto
     if solicitud.estado != 'pendiente_preaprobacion':
         messages.error(request, 'Solo se pueden eliminar ajustes de casos en estado de preaprobación.')
-        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
+        return redirect('detalle_caso', solicitud_id=solicitud.id)
 
     try:
         # 3. --- Eliminar el Ajuste Asignado y el Ajuste Razonable asociado ---
@@ -2305,7 +2315,7 @@ def aprobar_caso(request, solicitud_id):
     # 3. --- Verificar que el caso está en el estado correcto ---
     if solicitud.estado != 'pendiente_aprobacion':
         messages.error(request, 'Este caso no está en estado de aprobación. Solo se pueden aprobar casos pendientes de aprobación.')
-        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+        return redirect('detalle_caso', solicitud_id=solicitud_id)
     
     try:
         # 4. --- Cambiar el estado del caso ---
@@ -2346,7 +2356,7 @@ def rechazar_caso(request, solicitud_id):
     # 3. --- Verificar que el caso está en el estado correcto ---
     if solicitud.estado != 'pendiente_aprobacion':
         messages.error(request, 'Este caso no está en estado de aprobación. Solo se pueden rechazar casos pendientes de aprobación.')
-        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+        return redirect('detalle_caso', solicitud_id=solicitud_id)
     
     try:
         # 4. --- Cambiar el estado del caso (vuelve a Asesoría Pedagógica) ---
@@ -2387,7 +2397,7 @@ def aprobar_ajuste_director(request, ajuste_asignado_id):
     # 3. --- Verificar que el caso está en el estado correcto ---
     if solicitud.estado != 'pendiente_aprobacion':
         messages.error(request, 'Este caso no está en estado de aprobación. Solo se pueden aprobar ajustes de casos pendientes de aprobación.')
-        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
+        return redirect('detalle_caso', solicitud_id=solicitud.id)
     
     try:
         # 4. --- Obtener comentarios (opcional) ---
@@ -2435,7 +2445,7 @@ def rechazar_ajuste_director(request, ajuste_asignado_id):
     # 3. --- Verificar que el caso está en el estado correcto ---
     if solicitud.estado != 'pendiente_aprobacion':
         messages.error(request, 'Este caso no está en estado de aprobación. Solo se pueden rechazar ajustes de casos pendientes de aprobación.')
-        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
+        return redirect('detalle_caso', solicitud_id=solicitud.id)
     
     try:
         # 4. --- Obtener comentarios (requerido para rechazo) ---
@@ -2443,7 +2453,7 @@ def rechazar_ajuste_director(request, ajuste_asignado_id):
         
         if not comentarios:
             messages.error(request, 'Debe proporcionar un comentario al rechazar un ajuste.')
-            return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud.id)
+            return redirect('detalle_caso', solicitud_id=solicitud.id)
         
         # 5. --- Cambiar el estado del ajuste ---
         ajuste_asignado.estado_aprobacion = 'rechazado'
@@ -2480,7 +2490,7 @@ def actualizar_descripcion_caso(request, solicitud_id):
         ]
         if perfil.rol.nombre_rol not in ROLES_PERMITIDOS:
             messages.error(request, 'No tienes permisos para esta acción.')
-            return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+            return redirect('detalle_caso', solicitud_id=solicitud_id)
     except AttributeError:
         if not request.user.is_superuser:
             return redirect('home')
@@ -2501,13 +2511,13 @@ def actualizar_descripcion_caso(request, solicitud_id):
         perfil = request.user.perfil
         rol_nombre = perfil.rol.nombre_rol if perfil else None
         if rol_nombre == ROL_ASESORA_TECNICA:
-            return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+            return redirect('detalle_caso', solicitud_id=solicitud_id)
         elif rol_nombre == ROL_COORDINADORA:
-            return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+            return redirect('detalle_caso', solicitud_id=solicitud_id)
         else:
-            return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+            return redirect('detalle_caso', solicitud_id=solicitud_id)
     except AttributeError:
-        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+        return redirect('detalle_caso', solicitud_id=solicitud_id)
 
 @login_required
 def panel_control_encargado_inclusion(request):
@@ -2840,7 +2850,7 @@ def agendar_cita_coordinadora(request):
             
             if not fecha_str or not hora_str:
                 messages.error(request, 'Debe seleccionar una fecha y un horario.')
-                return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+                return redirect('detalle_caso', solicitud_id=solicitud_id)
             
             # Parsear fecha y hora por separado
             fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d').date()
@@ -2856,7 +2866,7 @@ def agendar_cita_coordinadora(request):
             now = timezone.localtime(timezone.now())
             if fecha_entrevista < now:
                 messages.error(request, 'No se pueden agendar citas en el pasado.')
-                return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+                return redirect('detalle_caso', solicitud_id=solicitud_id)
             
             # Buscar coordinadora disponible para el horario seleccionado
             todas_las_coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
@@ -2882,7 +2892,7 @@ def agendar_cita_coordinadora(request):
             
             if not coordinadora_asignada:
                 messages.error(request, 'No hay coordinadoras disponibles para agendar la cita.')
-                return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+                return redirect('detalle_caso', solicitud_id=solicitud_id)
             
             # Verificar que no haya una cita ya agendada para esta solicitud en este horario
             cita_existente = Entrevistas.objects.filter(
@@ -2892,7 +2902,7 @@ def agendar_cita_coordinadora(request):
             
             if cita_existente:
                 messages.error(request, 'Ya existe una cita agendada para este caso en ese horario.')
-                return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+                return redirect('detalle_caso', solicitud_id=solicitud_id)
             
             # Crear la nueva entrevista
             nueva_entrevista = Entrevistas.objects.create(
@@ -2916,7 +2926,7 @@ def agendar_cita_coordinadora(request):
     # 3. Redirigir al detalle del caso
     solicitud_id = request.POST.get('solicitud_id') if request.method == 'POST' else request.GET.get('solicitud_id')
     if solicitud_id:
-        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+        return redirect('detalle_caso', solicitud_id=solicitud_id)
     return redirect('casos_generales')
 
 @login_required
@@ -3416,7 +3426,7 @@ def cargar_estudiantes_excel(request):
         
         # Validar encabezados
         headers = [cell.value.lower().strip() if cell.value else '' for cell in ws[1]]
-        required_headers = ['rut', 'nombres', 'apellidos', 'email']
+        required_headers = ['rut', 'nombres', 'apellidos', 'email', 'semestre_actual']
         
         for h in required_headers:
             if h not in headers:
@@ -3439,10 +3449,28 @@ def cargar_estudiantes_excel(request):
                     email = str(row[col_idx.get('email', 3)] or '').strip()
                     telefono = row[col_idx.get('telefono', -1)] if 'telefono' in col_idx else None
                     carrera_id = row[col_idx.get('carrera_id', -1)] if 'carrera_id' in col_idx else None
+                    semestre_actual = row[col_idx.get('semestre_actual', -1)] if 'semestre_actual' in col_idx else None
                     
                     # Validaciones básicas
                     if not rut or not nombres or not apellidos or not email:
                         errores.append(f'Fila {row_num}: Datos incompletos')
+                        continue
+                    
+                    # Validar semestre
+                    semestre_valido = None
+                    if semestre_actual is not None:
+                        try:
+                            semestre_int = int(semestre_actual)
+                            if 1 <= semestre_int <= 8:
+                                semestre_valido = semestre_int
+                            else:
+                                errores.append(f'Fila {row_num}: Semestre debe estar entre 1 y 8')
+                                continue
+                        except (ValueError, TypeError):
+                            errores.append(f'Fila {row_num}: Semestre inválido (debe ser un número entre 1 y 8)')
+                            continue
+                    else:
+                        errores.append(f'Fila {row_num}: Semestre actual es requerido')
                         continue
                     
                     # Validar carrera (si se proporciona)
@@ -3473,7 +3501,8 @@ def cargar_estudiantes_excel(request):
                             'apellidos': apellidos,
                             'email': email,
                             'numero': int(telefono) if telefono and str(telefono).isdigit() else None,
-                            'carreras': carrera
+                            'carreras': carrera,
+                            'semestre_actual': semestre_valido
                         }
                     )
                     
@@ -3886,8 +3915,8 @@ def descargar_plantilla_excel(request, tipo):
     
     if tipo == 'estudiantes':
         ws.title = 'Estudiantes'
-        ws.append(['RUT', 'Nombres', 'Apellidos', 'Email', 'Telefono', 'Carrera_ID'])
-        ws.append(['12345678-9', 'Juan', 'Pérez González', 'juan.perez@email.com', '912345678', '1'])
+        ws.append(['RUT', 'Nombres', 'Apellidos', 'Email', 'Telefono', 'Carrera_ID', 'Semestre_Actual'])
+        ws.append(['12345678-9', 'Juan', 'Pérez González', 'juan.perez@email.com', '912345678', '1', '3'])
         filename = 'plantilla_estudiantes.xlsx'
         
     elif tipo == 'docentes':

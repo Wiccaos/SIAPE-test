@@ -173,6 +173,7 @@ class EstudiantesSerializer(serializers.ModelSerializer):
             'rut', 
             'email', 
             'numero', 
+            'semestre_actual',
             'carreras',
             'carrera_id',
         ]

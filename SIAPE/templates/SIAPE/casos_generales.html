@@ -209,11 +209,11 @@
                     </td>
                     <td>
                         {% if user.perfil.rol.nombre_rol == "Coordinador Técnico Pedagógico" %}
-                            <a href="{% url 'detalle_casos_asesor_tecnico' solicitud.id %}" class="link-rojo">Ver más »</a>
+                            <a href="{% url 'detalle_caso' solicitud.id %}" class="link-rojo">Ver más »</a>
                         {% elif user.perfil.rol.nombre_rol == "Encargado de Inclusión" %}
-                            <a href="{% url 'detalle_casos_encargado_inclusion' solicitud.id %}" class="link-rojo">Ver más »</a>
+                            <a href="{% url 'detalle_caso' solicitud.id %}" class="link-rojo">Ver más »</a>
                         {% else %}
-                            <a href="{% url 'detalle_casos_encargado_inclusion' solicitud.id %}" class="link-rojo">Ver más »</a>
+                            <a href="{% url 'detalle_caso' solicitud.id %}" class="link-rojo">Ver más »</a>
                         {% endif %}
                     </td>
                 </tr>

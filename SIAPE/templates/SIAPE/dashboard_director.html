@@ -90,7 +90,7 @@
                     <td>{{ solicitud.asunto }}</td>
                     <td>{{ solicitud.created_at|date:"d/m/Y" }}</td>
                     <td class="acciones-container">
-                        <a href="{% url 'detalle_casos_encargado_inclusion' solicitud.id %}" class="btn-accion btn-agendar btn-accion-small">
+                        <a href="{% url 'detalle_caso' solicitud.id %}" class="btn-accion btn-agendar btn-accion-small">
                             <i class="fas fa-eye"></i> Ver
                         </a> 
 
@@ -150,7 +150,7 @@
                         <span class="status status-aprobado">Aprobado</span>
                     </td>
                     <td>
-                        <a href="{% url 'detalle_casos_encargado_inclusion' solicitud.id %}" class="btn-accion btn-agendar btn-accion-small">
+                        <a href="{% url 'detalle_caso' solicitud.id %}" class="btn-accion btn-agendar btn-accion-small">
                             <i class="fas fa-eye"></i> Ver Detalles
                         </a>
                     </td>

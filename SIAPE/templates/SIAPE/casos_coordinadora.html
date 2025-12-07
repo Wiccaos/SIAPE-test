@@ -64,7 +64,7 @@
                     <td>{{ solicitud.estudiantes.nombres }} {{ solicitud.estudiantes.apellidos }}</td>
                     <td>{{ solicitud.created_at|date:"d/m/Y" }}</td>
                     <td>
-                        <a href="{% url 'detalle_casos_encargado_inclusion' solicitud.id %}" class="link-rojo">Ver más »</a>
+                        <a href="{% url 'detalle_caso' solicitud.id %}" class="link-rojo">Ver más »</a>
                     </td>
                     <td>
                         {% if solicitud.estado == 'aprobado' %}

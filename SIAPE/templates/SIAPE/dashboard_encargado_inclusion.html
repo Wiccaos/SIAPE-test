@@ -114,7 +114,7 @@
                             {% endif %}
 
                             <div class="acciones-casos acciones-casos-flex">
-                                <a href="{% url 'detalle_casos_encargado_inclusion' cita.solicitudes.id %}" class="btn-accion btn-agendar">
+                                <a href="{% url 'detalle_caso' cita.solicitudes.id %}" class="btn-accion btn-agendar">
                                     <i class="fas fa-edit"></i> Ver/Editar Caso Completo
                                 </a>
                                 {% if cita.estado == 'pendiente' %}
