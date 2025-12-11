@@ -221,7 +221,7 @@
                                 <button type="button" class="btn-accion btn-accion-small" onclick="abrirModalEditarAjuste({{ item.id }}, event)" style="padding: 5px 10px; font-size: 0.85em;" data-descripcion="{{ item.ajuste_razonable.descripcion|escapejs }}" data-categoria-id="{{ item.ajuste_razonable.categorias_ajustes.id }}" data-categoria-nombre="{{ item.ajuste_razonable.categorias_ajustes.nombre_categoria|escapejs }}">
                                     <i class="fas fa-edit"></i> Editar
                                 </button>
-                                <form method="POST" action="{% url 'eliminar_ajuste_asesor_tecnico' item.id %}" style="display: inline;" onsubmit="return confirm('¿Está seguro de que desea eliminar este ajuste?');">
+                                <form method="POST" action="{% url 'eliminar_ajuste_coordinador_tecnico_pedagogico' item.id %}" style="display: inline;" onsubmit="return confirm('¿Está seguro de que desea eliminar este ajuste?');">
                                     {% csrf_token %}
                                     <button type="submit" class="btn-accion btn-accion-small btn-accion-red" style="padding: 5px 10px; font-size: 0.85em;">
                                         <i class="fas fa-trash"></i> Eliminar
@@ -333,7 +333,7 @@
                 {% endif %}
                 
                 {% if not es_docente %}
-                    {% if puede_agendar_cita or puede_formular_ajustes or puede_enviar_asesor_tecnico or puede_enviar_asesor_pedagogico or puede_devolver_a_coordinadora or puede_enviar_a_director or puede_devolver_a_asesor_tecnico or puede_aprobar or puede_rechazar %}
+                    {% if puede_agendar_cita or puede_formular_ajustes or puede_enviar_coordinador_tecnico_pedagogico or puede_enviar_asesor_pedagogico or puede_devolver_a_encargado_inclusion or puede_enviar_a_director or puede_devolver_a_coordinador_tecnico_pedagogico or puede_aprobar or puede_rechazar %}
                     <hr class="border-top-light margin-25-0">
                     
                     <h3 class="mb-15">Acciones del Caso</h3>
@@ -344,9 +344,9 @@
                             </button>
                         {% endif %}
                         
-                        {% if puede_enviar_asesor_tecnico %}
+                        {% if puede_enviar_coordinador_tecnico_pedagogico %}
                             {% if solicitud.descripcion %}
-                                <form method="POST" action="{% url 'enviar_a_asesor_tecnico' solicitud.id %}" style="display: inline;">
+                                <form method="POST" action="{% url 'enviar_a_coordinador_tecnico_pedagogico' solicitud.id %}" style="display: inline;">
                                     {% csrf_token %}
                                     <button type="submit" class="btn-accion btn-accion-green" onclick="return confirm('¿Está seguro de que desea enviar este caso a la Coordinador Técnico Pedagógico? El caso cambiará de estado a \'Pendiente de Formulación de Ajustes\'.')">
                                         <i class="fas fa-arrow-right"></i> Enviar a Coordinador Técnico Pedagógico
@@ -389,8 +389,8 @@
                             {% endif %}
                         {% endif %}
                         
-                        {% if puede_devolver_a_coordinadora %}
-                            <form method="POST" action="{% url 'devolver_a_coordinadora' solicitud.id %}" style="display: inline;">
+                        {% if puede_devolver_a_encargado_inclusion %}
+                            <form method="POST" action="{% url 'devolver_a_encargado_inclusion' solicitud.id %}" style="display: inline;">
                                 {% csrf_token %}
                                 <button type="submit" class="btn-accion btn-accion-orange" onclick="return confirm('¿Está seguro de devolver este caso a la Coordinadora? El caso volverá a estado \'Pendiente de Entrevista\'.')">
                                     <i class="fas fa-arrow-left"></i> Devolver a Encargado de Inclusión
@@ -407,8 +407,8 @@
                             </form>
                         {% endif %}
                         
-                        {% if puede_devolver_a_asesor_tecnico %}
-                            <form method="POST" action="{% url 'devolver_a_asesor_tecnico' solicitud.id %}" style="display: inline;">
+                        {% if puede_devolver_a_coordinador_tecnico_pedagogico %}
+                            <form method="POST" action="{% url 'devolver_a_coordinador_tecnico_pedagogico' solicitud.id %}" style="display: inline;">
                                 {% csrf_token %}
                                 <button type="submit" class="btn-accion btn-accion-orange" onclick="return confirm('¿Está seguro de devolver este caso al Asesor Técnico Pedagógico? El caso volverá a estado \'Pendiente de Formulación\'.')">
                                     <i class="fas fa-arrow-left"></i> Devolver a Asesor Técnico
@@ -456,7 +456,7 @@
                 <h4><i class="fas fa-tools"></i> Formular Nuevo Ajuste para el Caso</h4>
                 <button class="close" onclick="cerrarModalFormularAjuste()">&times;</button>
             </div>
-            <form method="POST" action="{% url 'formular_ajuste_asesor_tecnico' solicitud.id %}" id="formFormularAjuste">
+            <form method="POST" action="{% url 'formular_ajuste_coordinador_tecnico_pedagogico' solicitud.id %}" id="formFormularAjuste">
                 {% csrf_token %}
                 
                 <div class="form-group">
@@ -923,7 +923,12 @@
             const esFinDeSemana = diaSemana === 0 || diaSemana === 6;
             const hoyDate = new Date(hoyAgendar.getFullYear(), hoyAgendar.getMonth(), hoyAgendar.getDate());
             const esDiaPasado = fechaDate < hoyDate;
-            const esSeleccionable = !esFinDeSemana && !esDiaPasado;
+            
+            // Verificar si es feriado
+            const feriadoInfo = calendarioDataAgendar.feriados?.find(f => f.fecha === fechaStr);
+            const esFeriado = !!feriadoInfo;
+            
+            const esSeleccionable = !esFinDeSemana && !esDiaPasado && !esFeriado;
 
             if (fechaStr === hoyStrAgendar) {
                 dayDiv.classList.add('day-today');
@@ -935,6 +940,9 @@
                 } else if (calendarioDataAgendar.diasCompletos?.includes(fechaStr)) {
                     dayDiv.classList.add('day-lleno');
                 }
+            } else if (esFeriado) {
+                dayDiv.classList.add('day-feriado');
+                dayDiv.title = feriadoInfo.nombre;
             } else if (esFinDeSemana) {
                 dayDiv.classList.add('day-inabil');
             } else if (esDiaPasado) {
@@ -1136,7 +1144,7 @@
         
         // Establecer la URL del formulario
         const form = document.getElementById('formEditarAjuste');
-        form.action = '/dashboard/asesor-tecnico/ajustes/' + ajusteAsignadoId + '/editar/';
+        form.action = '/dashboard/coordinador-tecnico-pedagogico/ajustes/' + ajusteAsignadoId + '/editar/';
         
         // Limpiar campo de nueva categoría
         document.getElementById('nueva_categoria_ajuste_editar').value = '';

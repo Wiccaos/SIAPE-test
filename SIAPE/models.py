@@ -209,13 +209,13 @@ class Solicitudes(models.Model):
         limit_choices_to={'rol__nombre_rol': 'Encargado de Inclusión'},
         related_name='solicitudes_como_coordinadora'
     )
-    asesor_tecnico_asignado = models.ForeignKey(
+    coordinador_tecnico_pedagogico_asignado = models.ForeignKey(
         'PerfilUsuario',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         limit_choices_to={'rol__nombre_rol': 'Coordinador Técnico Pedagógico'},
-        related_name='solicitudes_como_asesor_tecnico'
+        related_name='solicitudes_como_coordinador_tecnico_pedagogico'
     )
     asesor_pedagogico_asignado = models.ForeignKey(
         'PerfilUsuario',

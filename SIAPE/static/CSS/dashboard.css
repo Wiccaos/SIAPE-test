@@ -761,6 +761,14 @@ body.dark-mode .detalle-card li {
     background-color: #f5f5f5;
 }
 
+/* Indicador de página actual "Página X de Y" */
+.pagination-info {
+    padding: 8px 15px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    color: #333;
+    font-size: 0.9em;
+}
 
 /* ==============================================
   NUEVOS ESTILOS - DETALLE DE CASO
@@ -904,6 +912,22 @@ body.dark-mode .detalle-card li {
     background-color: #fdecec;
     color: #dc3545;
     font-weight: bold;
+}
+
+.day-feriado {
+    background-color: #fff3cd;
+    color: #856404;
+    font-weight: bold;
+    cursor: not-allowed;
+    position: relative;
+}
+
+.day-feriado::after {
+    content: '🎉';
+    position: absolute;
+    font-size: 0.6em;
+    top: 2px;
+    right: 2px;
 }
 
 .day-inabil {
@@ -1889,6 +1913,11 @@ body.dark-mode .cal-day.day-lleno {
     color: #ff6b6b !important;
 }
 
+body.dark-mode .cal-day.day-feriado {
+    background-color: #4a3a1a !important;
+    color: #ffc107 !important;
+}
+
 body.dark-mode .cal-day.day-inabil {
     background-color: #1a1a1a !important;
     color: #666 !important;
@@ -2103,6 +2132,13 @@ body.dark-mode .pagination-page.active {
 
 body.dark-mode .pagination-btn.disabled {
     color: #666 !important;
+}
+
+/* Indicador de página "Página X de Y" en modo oscuro */
+body.dark-mode .pagination-info {
+    background: #2a2a2a !important;
+    color: #e0e0e0 !important;
+    border: 1px solid #4a4a4a;
 }
 
 /* KPI Icons */
@@ -2650,6 +2686,11 @@ body.dark-mode .cal-day.day-lleno {
     color: #ff6b6b !important;
 }
 
+body.dark-mode .cal-day.day-feriado {
+    background-color: #4a3a1a !important;
+    color: #ffc107 !important;
+}
+
 body.dark-mode .cal-day.day-inabil {
     background-color: #1a1a1a !important;
     color: #666 !important;
@@ -2864,6 +2905,13 @@ body.dark-mode .pagination-page.active {
 
 body.dark-mode .pagination-btn.disabled {
     color: #666 !important;
+}
+
+/* Indicador de página "Página X de Y" en modo oscuro */
+body.dark-mode .pagination-info {
+    background: #2a2a2a !important;
+    color: #e0e0e0 !important;
+    border: 1px solid #4a4a4a;
 }
 
 /* KPI Icons */

@@ -90,6 +90,22 @@
     font-weight: bold;
 }
 
+.day-feriado {
+    background-color: #fff3cd;
+    color: #856404;
+    font-weight: bold;
+    cursor: not-allowed;
+    position: relative;
+}
+
+.day-feriado::after {
+    content: '🎉';
+    position: absolute;
+    font-size: 0.6em;
+    top: 2px;
+    right: 2px;
+}
+
 .day-inabil {
     color: #ccc;
     background-color: #f9f9f9;
@@ -718,6 +734,11 @@ body.dark-mode .cal-day.day-disponible {
 body.dark-mode .cal-day.day-lleno {
     background-color: #4a1a1a !important;
     color: #ff6b6b !important;
+}
+
+body.dark-mode .cal-day.day-feriado {
+    background-color: #4a3a1a !important;
+    color: #ffc107 !important;
 }
 
 body.dark-mode .cal-day.day-inabil {

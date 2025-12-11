@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import logout, login
 from django.utils import timezone
+from django.urls import reverse
 from datetime import timedelta, datetime, time, date
 from django.db.models import Count, Q
 from django.views.decorators.http import require_POST
@@ -12,6 +13,7 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 import json
 import calendar  # Importar para el calendario mensual
 import logging
+import holidays  # Feriados de Chile
 
 # Django REST Framework
 from rest_framework import viewsets, mixins, status
@@ -46,7 +48,7 @@ ROL_DIRECTOR = 'Director de Carrera'
 ROL_DOCENTE = 'Docente'
 ROL_ADMIN = 'Administrador'
 ROL_COORDINADORA = 'Encargado de Inclusión'
-ROL_ASESORA_TECNICA = 'Coordinador Técnico Pedagógico'
+ROL_COORDINADOR_TECNICO_PEDAGOGICO = 'Coordinador Técnico Pedagógico'
 
 
 # ----------------------------------------------
@@ -206,6 +208,11 @@ def get_horarios_disponibles(request):
     # Validación extra: No permitir agendar fines de semana
     if selected_date.weekday() >= 5: # 5 = Sábado, 6 = Domingo
          return Response([], status=status.HTTP_200_OK) # Retorna lista vacía
+
+    # Validación: No permitir agendar en feriados chilenos
+    feriados_chile = holidays.Chile(years=selected_date.year)
+    if selected_date in feriados_chile:
+        return Response([], status=status.HTTP_200_OK)  # Retorna lista vacía si es feriado
 
     # 2. Definir todos los slots posibles (9:00 a 17:00, ya que 18:00 es el fin)
     possible_hours = range(9, 18)
@@ -377,16 +384,29 @@ def get_calendario_disponible(request):
     # 4. Definir los slots base y preparar la respuesta
     slots_base_por_hora = range(9, 18) # 9:00 a 17:00
     
+    # Cargar feriados de Chile para el año actual
+    feriados_chile = holidays.Chile(years=year)
+    
+    # Obtener lista de feriados del mes para enviar al frontend
+    feriados_mes = []
+    for dia in range(1, calendar.monthrange(year, month)[1] + 1):
+        fecha_dia = date(year, month, dia)
+        if fecha_dia in feriados_chile:
+            feriados_mes.append({
+                "fecha": fecha_dia.strftime('%Y-%m-%d'),
+                "nombre": feriados_chile.get(fecha_dia)
+            })
+    
     respuesta_api = {
         "fechasConDisponibilidad": [], # Días con al menos 1 hora libre
         "diasCompletos": [],           # Días sin horas libres
         "slotsDetallados": {},         # { "2025-11-13": ["09:00", "14:00"], ... }
-        "slotsNoDisponibles": {}       # { "2025-11-13": ["10:00", ...], ... }
+        "slotsNoDisponibles": {},      # { "2025-11-13": ["10:00", ...], ... }
+        "feriados": feriados_mes       # Lista de feriados del mes con nombre
     }
 
     # 5. Iterar por cada día del mes
     _, num_dias_mes = calendar.monthrange(year, month)
-    
 
     now = timezone.localtime(timezone.now())
     hoy_str = now.date().strftime('%Y-%m-%d')
@@ -395,9 +415,10 @@ def get_calendario_disponible(request):
         dia_actual_date = date(year, month, dia)
         dia_actual_str = dia_actual_date.strftime('%Y-%m-%d')
 
-        # Omitir fines de semana y días pasados (usar fecha actual en zona horaria de Chile)
+        # Omitir fines de semana, días pasados y feriados (usar fecha actual en zona horaria de Chile)
         hoy_chile = timezone.localtime(timezone.now()).date()
-        if dia_actual_date.weekday() >= 5 or dia_actual_date < hoy_chile:
+        es_feriado = dia_actual_date in feriados_chile
+        if dia_actual_date.weekday() >= 5 or dia_actual_date < hoy_chile or es_feriado:
             continue
 
         slots_libres = []
@@ -549,7 +570,7 @@ def seguimiento_caso_estudiante(request):
                         'estudiantes',
                         'estudiantes__carreras',
                         'coordinadora_asignada__usuario',
-                        'asesor_tecnico_asignado__usuario',
+                        'coordinador_tecnico_pedagogico_asignado__usuario',
                         'asesor_pedagogico_asignado__usuario'
                     ).prefetch_related(
                         'ajusteasignado_set__ajuste_razonable__categorias_ajustes',
@@ -601,7 +622,7 @@ def redireccionamiento_por_rol(request):
 
         if rol == ROL_COORDINADORA:
             return redirect('dashboard_encargado_inclusion')
-        elif rol == ROL_ASESORA_TECNICA:
+        elif rol == ROL_COORDINADOR_TECNICO_PEDAGOGICO:
             return redirect('dashboard_coordinador_tecnico_pedagogico')
         elif rol == ROL_ASESOR:
             return redirect('dashboard_asesor')
@@ -646,7 +667,7 @@ def casos_generales(request):
         rol_nombre = perfil.rol.nombre_rol
         ROLES_PERMITIDOS = [
             ROL_COORDINADORA,
-            ROL_ASESORA_TECNICA,
+            ROL_COORDINADOR_TECNICO_PEDAGOGICO,
             ROL_ASESOR,
             ROL_DIRECTOR,
             ROL_ADMIN
@@ -665,7 +686,7 @@ def casos_generales(request):
         'estudiantes', 
         'estudiantes__carreras',
         'coordinadora_asignada',
-        'asesor_tecnico_asignado',
+        'coordinador_tecnico_pedagogico_asignado',
         'asesor_pedagogico_asignado'
     ).prefetch_related(
         'ajusteasignado_set__ajuste_razonable__categorias_ajustes'
@@ -696,7 +717,7 @@ def casos_generales(request):
         if rol_nombre == ROL_COORDINADORA:
             # Encargado de Inclusión: Casos pendientes de entrevista o pendientes de formulación del caso
             filtros = Q(estado='pendiente_entrevista') | Q(estado='pendiente_formulacion_caso')
-        elif rol_nombre == ROL_ASESORA_TECNICA:
+        elif rol_nombre == ROL_COORDINADOR_TECNICO_PEDAGOGICO:
             # Coordinador Técnico Pedagógico: Casos pendientes de formulación de ajustes (que debe formular)
             filtros = Q(estado='pendiente_formulacion_ajustes')
         elif rol_nombre == ROL_ASESOR:
@@ -960,7 +981,7 @@ def gestion_usuarios_admin(request):
 @login_required
 def agregar_usuario_admin(request):
     if not _check_admin_permission(request):
-        messages.error(request, 'No tienes permisos para realizar esta acción.')
+        messages.error(request, 'No tienes permisos para realizar esta acción.', extra_tags='usuarios')
         return redirect('gestion_usuarios_admin')
 
     if request.method == 'POST':
@@ -972,22 +993,24 @@ def agregar_usuario_admin(request):
         rol_id = request.POST.get('rol_id')
         area_id = request.POST.get('area_id')
 
+        redirect_url = reverse('gestion_usuarios_admin') + '#seccion-usuarios'
+
         # Validar RUT
         es_valido, mensaje_error = validar_rut_chileno(rut)
         if not es_valido:
-            messages.error(request, mensaje_error)
-            return redirect('gestion_usuarios_admin')
+            messages.error(request, mensaje_error, extra_tags='usuarios')
+            return redirect(redirect_url)
         
         # Validar contraseña
         es_valida_password, mensaje_error_password = validar_contraseña(password)
         if not es_valida_password:
-            messages.error(request, mensaje_error_password)
-            return redirect('gestion_usuarios_admin')
+            messages.error(request, mensaje_error_password, extra_tags='usuarios')
+            return redirect(redirect_url)
 
         try:
             if Usuario.objects.filter(Q(email=email) | Q(rut=rut)).exists():
-                messages.error(request, f'Error: Ya existe un usuario con ese Email o RUT.')
-                return redirect('gestion_usuarios_admin')
+                messages.error(request, f'Error: Ya existe un usuario con ese Email o RUT.', extra_tags='usuarios')
+                return redirect(redirect_url)
             
             rol_obj = get_object_or_404(Roles, id=rol_id)
             area_obj = None
@@ -1007,19 +1030,21 @@ def agregar_usuario_admin(request):
                 rol=rol_obj,
                 area=area_obj
             )
-            messages.success(request, f'Usuario {email} creado y asignado con el rol de {rol_obj.nombre_rol}.')
+            messages.success(request, f'Usuario {email} creado y asignado con el rol de {rol_obj.nombre_rol}.', extra_tags='usuarios')
             
         except Exception as e:
-            messages.error(request, f'Error al crear el usuario: {str(e)}')
+            messages.error(request, f'Error al crear el usuario: {str(e)}', extra_tags='usuarios')
     
-    return redirect('gestion_usuarios_admin')
+    return redirect(reverse('gestion_usuarios_admin') + '#seccion-usuarios')
 
 
 @login_required
 def editar_usuario_admin(request, perfil_id):
     if not _check_admin_permission(request):
-        messages.error(request, 'No tienes permisos para realizar esta acción.')
+        messages.error(request, 'No tienes permisos para realizar esta acción.', extra_tags='usuarios')
         return redirect('gestion_usuarios_admin')
+
+    redirect_url = reverse('gestion_usuarios_admin') + '#seccion-usuarios'
 
     if request.method == 'POST':
         try:
@@ -1037,19 +1062,19 @@ def editar_usuario_admin(request, perfil_id):
             # Validar RUT
             es_valido, mensaje_error = validar_rut_chileno(rut)
             if not es_valido:
-                messages.error(request, mensaje_error)
-                return redirect('gestion_usuarios_admin')
+                messages.error(request, mensaje_error, extra_tags='usuarios')
+                return redirect(redirect_url)
 
             if rut != usuario.rut and Usuario.objects.filter(rut=rut).exclude(id=usuario.id).exists():
-                messages.error(request, f'Error: El RUT "{rut}" ya está en uso por otro usuario.')
-                return redirect('gestion_usuarios_admin')
+                messages.error(request, f'Error: El RUT "{rut}" ya está en uso por otro usuario.', extra_tags='usuarios')
+                return redirect(redirect_url)
             
             # Validar contraseña si se proporciona
             if password:
                 es_valida_password, mensaje_error_password = validar_contraseña(password)
                 if not es_valida_password:
-                    messages.error(request, mensaje_error_password)
-                    return redirect('gestion_usuarios_admin')
+                    messages.error(request, mensaje_error_password, extra_tags='usuarios')
+                    return redirect(redirect_url)
             
             usuario.first_name = first_name
             usuario.last_name = last_name
@@ -1068,12 +1093,12 @@ def editar_usuario_admin(request, perfil_id):
                  perfil.area = None
             perfil.save()
             
-            messages.success(request, f'Se actualizó correctamente al usuario {usuario.email}.')
+            messages.success(request, f'Se actualizó correctamente al usuario {usuario.email}.', extra_tags='usuarios')
             
         except Exception as e:
-            messages.error(request, f'Error al actualizar el usuario: {str(e)}')
+            messages.error(request, f'Error al actualizar el usuario: {str(e)}', extra_tags='usuarios')
             
-    return redirect('gestion_usuarios_admin')
+    return redirect(redirect_url)
 
 @login_required
 def gestion_institucional_admin(request):
@@ -1257,20 +1282,20 @@ def gestion_institucional_admin(request):
 @login_required
 def agregar_rol_admin(request):
     if not _check_admin_permission(request):
-        messages.error(request, 'No tienes permisos.')
+        messages.error(request, 'No tienes permisos.', extra_tags='roles')
         return redirect('gestion_usuarios_admin')
     if request.method == 'POST':
         nombre_rol = request.POST.get('nombre_rol')
         if nombre_rol and not Roles.objects.filter(nombre_rol=nombre_rol).exists():
             Roles.objects.create(nombre_rol=nombre_rol)
-            messages.success(request, f'Rol "{nombre_rol}" creado exitosamente.')
+            messages.success(request, f'Rol "{nombre_rol}" creado exitosamente.', extra_tags='roles')
         else:
-            messages.error(request, 'El nombre del rol no puede estar vacío o ya existe.')
-    return redirect('gestion_usuarios_admin')
+            messages.error(request, 'El nombre del rol no puede estar vacío o ya existe.', extra_tags='roles')
+    return redirect(reverse('gestion_usuarios_admin') + '#seccion-roles')
 @login_required
 def editar_rol_admin(request, rol_id):
     if not _check_admin_permission(request):
-        messages.error(request, 'No tienes permisos.')
+        messages.error(request, 'No tienes permisos.', extra_tags='roles')
         return redirect('gestion_usuarios_admin')
     rol = get_object_or_404(Roles, id=rol_id)
     if request.method == 'POST':
@@ -1278,10 +1303,10 @@ def editar_rol_admin(request, rol_id):
         if nombre_rol and not Roles.objects.filter(nombre_rol=nombre_rol).exclude(id=rol_id).exists():
             rol.nombre_rol = nombre_rol
             rol.save()
-            messages.success(request, f'Rol actualizado a "{nombre_rol}".')
+            messages.success(request, f'Rol actualizado a "{nombre_rol}".', extra_tags='roles')
         else:
-            messages.error(request, 'El nombre del rol no puede estar vacío o ya existe.')
-    return redirect('gestion_usuarios_admin')
+            messages.error(request, 'El nombre del rol no puede estar vacío o ya existe.', extra_tags='roles')
+    return redirect(reverse('gestion_usuarios_admin') + '#seccion-roles')
 
 @require_POST
 @login_required
@@ -1291,7 +1316,7 @@ def eliminar_rol_admin(request, rol_id):
     Verifica que no haya usuarios con ese rol antes de eliminar.
     """
     if not _check_admin_permission(request):
-        messages.error(request, 'No tienes permisos.')
+        messages.error(request, 'No tienes permisos.', extra_tags='roles')
         return redirect('gestion_usuarios_admin')
     
     try:
@@ -1309,25 +1334,26 @@ def eliminar_rol_admin(request, rol_id):
             messages.error(
                 request, 
                 f'No se puede eliminar el rol "{nombre_rol}" porque hay {usuarios_con_rol} usuario(s) asignado(s) a este rol. '
-                'Primero debe cambiar el rol de estos usuarios.'
+                'Primero debe cambiar el rol de estos usuarios.',
+                extra_tags='roles'
             )
         else:
             rol.delete()
-            messages.success(request, f'Rol "{nombre_rol}" eliminado exitosamente.')
+            messages.success(request, f'Rol "{nombre_rol}" eliminado exitosamente.', extra_tags='roles')
     
     except ValueError:
-        messages.error(request, 'ID de rol inválido.')
+        messages.error(request, 'ID de rol inválido.', extra_tags='roles')
     except Exception as e:
-        messages.error(request, f'Error al eliminar el rol: {str(e)}')
+        messages.error(request, f'Error al eliminar el rol: {str(e)}', extra_tags='roles')
     
-    return redirect('gestion_usuarios_admin')
+    return redirect(reverse('gestion_usuarios_admin') + '#seccion-roles')
 @login_required
 def agregar_area_admin(request):
     """
     Vista para agregar un nuevo área.
     """
     if not _check_admin_permission(request):
-        messages.error(request, 'No tienes permisos.')
+        messages.error(request, 'No tienes permisos.', extra_tags='areas')
         return redirect('gestion_institucional_admin')
     
     if request.method == 'POST':
@@ -1335,19 +1361,19 @@ def agregar_area_admin(request):
         
         # Validación de entrada
         if not nombre:
-            messages.error(request, 'El nombre del área no puede estar vacío.')
+            messages.error(request, 'El nombre del área no puede estar vacío.', extra_tags='areas')
         elif len(nombre) > 191:
-            messages.error(request, 'El nombre del área es demasiado largo (máximo 191 caracteres).')
+            messages.error(request, 'El nombre del área es demasiado largo (máximo 191 caracteres).', extra_tags='areas')
         elif Areas.objects.filter(nombre=nombre).exists():
-            messages.error(request, f'El área "{nombre}" ya existe.')
+            messages.error(request, f'El área "{nombre}" ya existe.', extra_tags='areas')
         else:
             try:
                 Areas.objects.create(nombre=nombre)
-                messages.success(request, f'Área "{nombre}" creada exitosamente.')
+                messages.success(request, f'Área "{nombre}" creada exitosamente.', extra_tags='areas')
             except Exception as e:
-                messages.error(request, f'Error al crear el área: {str(e)}')
+                messages.error(request, f'Error al crear el área: {str(e)}', extra_tags='areas')
     
-    return redirect('gestion_institucional_admin')
+    return redirect(reverse('gestion_institucional_admin') + '#seccion-areas')
 
 @login_required
 def editar_area_admin(request, area_id):
@@ -1355,7 +1381,7 @@ def editar_area_admin(request, area_id):
     Vista para editar un área existente.
     """
     if not _check_admin_permission(request):
-        messages.error(request, 'No tienes permisos.')
+        messages.error(request, 'No tienes permisos.', extra_tags='areas')
         return redirect('gestion_institucional_admin')
     
     try:
@@ -1371,24 +1397,24 @@ def editar_area_admin(request, area_id):
             
             # Validación de entrada
             if not nombre:
-                messages.error(request, 'El nombre del área no puede estar vacío.')
+                messages.error(request, 'El nombre del área no puede estar vacío.', extra_tags='areas')
             elif len(nombre) > 191:
-                messages.error(request, 'El nombre del área es demasiado largo (máximo 191 caracteres).')
+                messages.error(request, 'El nombre del área es demasiado largo (máximo 191 caracteres).', extra_tags='areas')
             elif Areas.objects.filter(nombre=nombre).exclude(id=area_id_int).exists():
-                messages.error(request, f'El área "{nombre}" ya existe.')
+                messages.error(request, f'El área "{nombre}" ya existe.', extra_tags='areas')
             else:
                 try:
                     area.nombre = nombre
                     area.save()
-                    messages.success(request, f'Área actualizada a "{nombre}".')
+                    messages.success(request, f'Área actualizada a "{nombre}".', extra_tags='areas')
                 except Exception as e:
-                    messages.error(request, f'Error al actualizar el área: {str(e)}')
+                    messages.error(request, f'Error al actualizar el área: {str(e)}', extra_tags='areas')
     except ValueError:
-        messages.error(request, 'ID de área inválido.')
+        messages.error(request, 'ID de área inválido.', extra_tags='areas')
     except Exception as e:
-        messages.error(request, f'Error: {str(e)}')
+        messages.error(request, f'Error: {str(e)}', extra_tags='areas')
     
-    return redirect('gestion_institucional_admin')
+    return redirect(reverse('gestion_institucional_admin') + '#seccion-areas')
 
 @require_POST
 @login_required
@@ -1398,7 +1424,7 @@ def eliminar_area_admin(request, area_id):
     Verifica que no haya carreras o usuarios asociados antes de eliminar.
     """
     if not _check_admin_permission(request):
-        messages.error(request, 'No tienes permisos.')
+        messages.error(request, 'No tienes permisos.', extra_tags='areas')
         return redirect('gestion_institucional_admin')
     
     try:
@@ -1420,22 +1446,22 @@ def eliminar_area_admin(request, area_id):
                 problemas.append(f'{carreras_asociadas} carrera(s)')
             if usuarios_asociados > 0:
                 problemas.append(f'{usuarios_asociados} usuario(s)')
-            messages.error(request, mensaje + ', '.join(problemas) + '.')
+            messages.error(request, mensaje + ', '.join(problemas) + '.', extra_tags='areas')
         else:
             area.delete()
-            messages.success(request, f'Área "{nombre_area}" eliminada exitosamente.')
+            messages.success(request, f'Área "{nombre_area}" eliminada exitosamente.', extra_tags='areas')
     
     except ValueError:
-        messages.error(request, 'ID de área inválido.')
+        messages.error(request, 'ID de área inválido.', extra_tags='areas')
     except Exception as e:
-        messages.error(request, f'Error al eliminar el área: {str(e)}')
+        messages.error(request, f'Error al eliminar el área: {str(e)}', extra_tags='areas')
     
-    return redirect('gestion_institucional_admin')
+    return redirect(reverse('gestion_institucional_admin') + '#seccion-areas')
 
 @login_required
 def agregar_carrera_admin(request):
     if not _check_admin_permission(request):
-        messages.error(request, 'No tienes permisos.')
+        messages.error(request, 'No tienes permisos.', extra_tags='carreras')
         return redirect('gestion_institucional_admin')
     if request.method == 'POST':
         try:
@@ -1447,14 +1473,14 @@ def agregar_carrera_admin(request):
             if director_id:
                 director = get_object_or_404(PerfilUsuario, id=director_id, rol__nombre_rol=ROL_DIRECTOR)
             Carreras.objects.create(nombre=nombre, area=area, director=director)
-            messages.success(request, f'Carrera "{nombre}" creada exitosamente.')
+            messages.success(request, f'Carrera "{nombre}" creada exitosamente.', extra_tags='carreras')
         except Exception as e:
-            messages.error(request, f'Error al crear la carrera: {str(e)}')
-    return redirect('gestion_institucional_admin')
+            messages.error(request, f'Error al crear la carrera: {str(e)}', extra_tags='carreras')
+    return redirect(reverse('gestion_institucional_admin') + '#seccion-carreras')
 @login_required
 def editar_carrera_admin(request, carrera_id):
     if not _check_admin_permission(request):
-        messages.error(request, 'No tienes permisos.')
+        messages.error(request, 'No tienes permisos.', extra_tags='carreras')
         return redirect('gestion_institucional_admin')
     carrera = get_object_or_404(Carreras, id=carrera_id)
     if request.method == 'POST':
@@ -1470,10 +1496,10 @@ def editar_carrera_admin(request, carrera_id):
             carrera.area = area
             carrera.director = director
             carrera.save()
-            messages.success(request, f'Carrera "{nombre}" actualizada exitosamente.')
+            messages.success(request, f'Carrera "{nombre}" actualizada exitosamente.', extra_tags='carreras')
         except Exception as e:
-            messages.error(request, f'Error al actualizar la carrera: {str(e)}')
-    return redirect('gestion_institucional_admin')
+            messages.error(request, f'Error al actualizar la carrera: {str(e)}', extra_tags='carreras')
+    return redirect(reverse('gestion_institucional_admin') + '#seccion-carreras')
 
 @require_POST
 @login_required
@@ -1483,7 +1509,7 @@ def eliminar_carrera_admin(request, carrera_id):
     Verifica que no haya estudiantes o asignaturas asociadas antes de eliminar.
     """
     if not _check_admin_permission(request):
-        messages.error(request, 'No tienes permisos.')
+        messages.error(request, 'No tienes permisos.', extra_tags='carreras')
         return redirect('gestion_institucional_admin')
     
     try:
@@ -1505,22 +1531,22 @@ def eliminar_carrera_admin(request, carrera_id):
                 problemas.append(f'{estudiantes_asociados} estudiante(s)')
             if asignaturas_asociadas > 0:
                 problemas.append(f'{asignaturas_asociadas} asignatura(s)')
-            messages.error(request, mensaje + ', '.join(problemas) + '.')
+            messages.error(request, mensaje + ', '.join(problemas) + '.', extra_tags='carreras')
         else:
             carrera.delete()
-            messages.success(request, f'Carrera "{nombre_carrera}" eliminada exitosamente.')
+            messages.success(request, f'Carrera "{nombre_carrera}" eliminada exitosamente.', extra_tags='carreras')
     
     except ValueError:
-        messages.error(request, 'ID de carrera inválido.')
+        messages.error(request, 'ID de carrera inválido.', extra_tags='carreras')
     except Exception as e:
-        messages.error(request, f'Error al eliminar la carrera: {str(e)}')
+        messages.error(request, f'Error al eliminar la carrera: {str(e)}', extra_tags='carreras')
     
-    return redirect('gestion_institucional_admin')
+    return redirect(reverse('gestion_institucional_admin') + '#seccion-carreras')
 
 @login_required
 def agregar_asignatura_admin(request):
     if not _check_admin_permission(request):
-        messages.error(request, 'No tienes permisos.')
+        messages.error(request, 'No tienes permisos.', extra_tags='asignaturas')
         return redirect('gestion_institucional_admin')
     if request.method == 'POST':
         try:
@@ -1531,14 +1557,14 @@ def agregar_asignatura_admin(request):
             carrera = get_object_or_404(Carreras, id=carrera_id)
             docente = get_object_or_404(PerfilUsuario, id=docente_id, rol__nombre_rol=ROL_DOCENTE)
             Asignaturas.objects.create(nombre=nombre, seccion=seccion, carreras=carrera, docente=docente)
-            messages.success(request, f'Asignatura "{nombre} - {seccion}" creada y asignada a {carrera.nombre}.')
+            messages.success(request, f'Asignatura "{nombre} - {seccion}" creada y asignada a {carrera.nombre}.', extra_tags='asignaturas')
         except Exception as e:
-            messages.error(request, f'Error al crear la asignatura: {str(e)}')
-    return redirect('gestion_institucional_admin')
+            messages.error(request, f'Error al crear la asignatura: {str(e)}', extra_tags='asignaturas')
+    return redirect(reverse('gestion_institucional_admin') + '#seccion-asignaturas')
 @login_required
 def editar_asignatura_admin(request, asignatura_id):
     if not _check_admin_permission(request):
-        messages.error(request, 'No tienes permisos.')
+        messages.error(request, 'No tienes permisos.', extra_tags='asignaturas')
         return redirect('gestion_institucional_admin')
     asignatura = get_object_or_404(Asignaturas, id=asignatura_id)
     if request.method == 'POST':
@@ -1554,10 +1580,10 @@ def editar_asignatura_admin(request, asignatura_id):
             asignatura.carreras = carrera
             asignatura.docente = docente
             asignatura.save()
-            messages.success(request, f'Asignatura "{nombre} - {seccion}" actualizada.')
+            messages.success(request, f'Asignatura "{nombre} - {seccion}" actualizada.', extra_tags='asignaturas')
         except Exception as e:
-            messages.error(request, f'Error al actualizar la asignatura: {str(e)}')
-    return redirect('gestion_institucional_admin')
+            messages.error(request, f'Error al actualizar la asignatura: {str(e)}', extra_tags='asignaturas')
+    return redirect(reverse('gestion_institucional_admin') + '#seccion-asignaturas')
 
 @require_POST
 @login_required
@@ -1567,7 +1593,7 @@ def eliminar_asignatura_admin(request, asignatura_id):
     Verifica que no haya estudiantes cursando la asignatura o solicitudes asociadas antes de eliminar.
     """
     if not _check_admin_permission(request):
-        messages.error(request, 'No tienes permisos.')
+        messages.error(request, 'No tienes permisos.', extra_tags='asignaturas')
         return redirect('gestion_institucional_admin')
     
     try:
@@ -1591,17 +1617,17 @@ def eliminar_asignatura_admin(request, asignatura_id):
                 problemas.append(f'{estudiantes_cursando} estudiante(s) cursándola')
             if solicitudes_asociadas > 0:
                 problemas.append(f'{solicitudes_asociadas} solicitud(es)')
-            messages.error(request, mensaje + ', '.join(problemas) + '.')
+            messages.error(request, mensaje + ', '.join(problemas) + '.', extra_tags='asignaturas')
         else:
             asignatura.delete()
-            messages.success(request, f'Asignatura "{nombre_asignatura}" eliminada exitosamente.')
+            messages.success(request, f'Asignatura "{nombre_asignatura}" eliminada exitosamente.', extra_tags='asignaturas')
     
     except ValueError:
-        messages.error(request, 'ID de asignatura inválido.')
+        messages.error(request, 'ID de asignatura inválido.', extra_tags='asignaturas')
     except Exception as e:
-        messages.error(request, f'Error al eliminar la asignatura: {str(e)}')
+        messages.error(request, f'Error al eliminar la asignatura: {str(e)}', extra_tags='asignaturas')
     
-    return redirect('gestion_institucional_admin')
+    return redirect(reverse('gestion_institucional_admin') + '#seccion-asignaturas')
 
 # --- VISTA COORDINADORA DE INCLUSIÓN ---
 logger = logging.getLogger(__name__)
@@ -1672,7 +1698,7 @@ def dashboard_encargado_inclusion(request):
     # KPI 4: Casos devueltos desde Coordinador Técnico Pedagógico
     # Casos que están en 'pendiente_formulacion_caso' y que tienen ajustes asignados
     # (lo que indica que fueron formulados por la asesora técnica y luego devueltos)
-    kpi_casos_devueltos_asesor_tecnico = Solicitudes.objects.filter(
+    kpi_casos_devueltos_coordinador_tecnico_pedagogico = Solicitudes.objects.filter(
         estado='pendiente_formulacion_caso',
         ajusteasignado__isnull=False
     ).distinct().count()
@@ -1684,7 +1710,7 @@ def dashboard_encargado_inclusion(request):
             'citas_hoy': kpi_citas_hoy,
             'citas_canceladas': kpi_citas_canceladas,
             'pendientes_formulacion_caso': kpi_pendientes_formulacion_caso,
-            'casos_devueltos_asesor_tecnico': kpi_casos_devueltos_asesor_tecnico,
+            'casos_devueltos_coordinador_tecnico_pedagogico': kpi_casos_devueltos_coordinador_tecnico_pedagogico,
         },
         'citas_del_dia_list': citas_hoy_qs, # Esta es la lista para la sección principal
     }
@@ -1736,7 +1762,7 @@ def detalle_casos_encargado_inclusion(request, solicitud_id):
         perfil = request.user.perfil
         ROLES_PERMITIDOS = [
             ROL_COORDINADORA,
-            ROL_ASESORA_TECNICA,
+            ROL_COORDINADOR_TECNICO_PEDAGOGICO,
             ROL_ASESOR,
             ROL_DIRECTOR,
             ROL_ADMIN
@@ -1760,27 +1786,27 @@ def detalle_casos_encargado_inclusion(request, solicitud_id):
             perfil = request.user.perfil
             rol = perfil.rol.nombre_rol if perfil.rol else None
             
-            if rol == 'Encargado de Inclusión':
+            if rol == ROL_COORDINADORA:
                 tiene_acceso = solicitud.coordinadora_asignada == perfil
-            elif rol == 'Coordinador Técnico Pedagógico':
+            elif rol == ROL_COORDINADOR_TECNICO_PEDAGOGICO:
                 # Puede ver si está asignado O si la solicitud está en estado que requiere su intervención
                 tiene_acceso = (
-                    solicitud.asesor_tecnico_asignado == perfil or
+                    solicitud.coordinador_tecnico_pedagogico_asignado == perfil or
                     solicitud.estado == 'pendiente_formulacion_ajustes'
                 )
-            elif rol == 'Asesor Pedagógico':
+            elif rol == ROL_ASESOR:
                 # Puede ver si está asignado O si la solicitud está en estado que requiere su intervención
                 tiene_acceso = (
                     solicitud.asesor_pedagogico_asignado == perfil or
                     solicitud.estado == 'pendiente_preaprobacion'
                 )
-            elif rol == 'Director de Carrera':
+            elif rol == ROL_DIRECTOR:
                 # Director puede ver solicitudes de estudiantes de sus carreras
                 carreras_dirigidas = Carreras.objects.filter(director=perfil)
                 tiene_acceso = solicitud.estudiantes.carreras in carreras_dirigidas
-            elif rol == 'Administrador':
+            elif rol == ROL_ADMIN:
                 tiene_acceso = True
-            elif rol == 'Docente':
+            elif rol == ROL_DOCENTE:
                 # Docente puede ver casos de estudiantes en sus asignaturas
                 mis_asignaturas = Asignaturas.objects.filter(docente=perfil)
                 tiene_acceso = solicitud.asignaturas_solicitadas.filter(id__in=mis_asignaturas).exists()
@@ -1830,16 +1856,16 @@ def detalle_casos_encargado_inclusion(request, solicitud_id):
     
     # Acciones de Encargado de Inclusión
     puede_formular_caso = rol_nombre == ROL_COORDINADORA and solicitud.estado == 'pendiente_formulacion_caso'
-    puede_enviar_asesor_tecnico = rol_nombre == ROL_COORDINADORA and solicitud.estado == 'pendiente_formulacion_caso'
+    puede_enviar_coordinador_tecnico_pedagogico = rol_nombre == ROL_COORDINADORA and solicitud.estado == 'pendiente_formulacion_caso'
     
     # Acciones de Coordinador Técnico Pedagógico
-    puede_formular_ajustes = rol_nombre == ROL_ASESORA_TECNICA and solicitud.estado == 'pendiente_formulacion_ajustes'
-    puede_enviar_asesor_pedagogico = rol_nombre == ROL_ASESORA_TECNICA and solicitud.estado == 'pendiente_formulacion_ajustes'
-    puede_devolver_a_coordinadora = rol_nombre == ROL_ASESORA_TECNICA and solicitud.estado == 'pendiente_formulacion_ajustes'
+    puede_formular_ajustes = rol_nombre == ROL_COORDINADOR_TECNICO_PEDAGOGICO and solicitud.estado == 'pendiente_formulacion_ajustes'
+    puede_enviar_asesor_pedagogico = rol_nombre == ROL_COORDINADOR_TECNICO_PEDAGOGICO and solicitud.estado == 'pendiente_formulacion_ajustes'
+    puede_devolver_a_encargado_inclusion = rol_nombre == ROL_COORDINADOR_TECNICO_PEDAGOGICO and solicitud.estado == 'pendiente_formulacion_ajustes'
     
     # Acciones de Asesor Pedagógico
     puede_enviar_a_director = rol_nombre == ROL_ASESOR and solicitud.estado == 'pendiente_preaprobacion'
-    puede_devolver_a_asesor_tecnico = rol_nombre == ROL_ASESOR and solicitud.estado == 'pendiente_preaprobacion'
+    puede_devolver_a_coordinador_tecnico_pedagogico = rol_nombre == ROL_ASESOR and solicitud.estado == 'pendiente_preaprobacion'
     puede_editar_ajustes_asesor = rol_nombre == ROL_ASESOR and solicitud.estado == 'pendiente_preaprobacion'  # Asesora Pedagógica puede editar ajustes antes de enviar a Director
     
     # Acciones de Director
@@ -1857,12 +1883,12 @@ def detalle_casos_encargado_inclusion(request, solicitud_id):
         'puede_editar_descripcion': puede_editar_descripcion,
         'puede_agendar_cita': puede_agendar_cita,
         'puede_formular_caso': puede_formular_caso,
-        'puede_enviar_asesor_tecnico': puede_enviar_asesor_tecnico,
+        'puede_enviar_coordinador_tecnico_pedagogico': puede_enviar_coordinador_tecnico_pedagogico,
         'puede_formular_ajustes': puede_formular_ajustes,
         'puede_enviar_asesor_pedagogico': puede_enviar_asesor_pedagogico,
-        'puede_devolver_a_coordinadora': puede_devolver_a_coordinadora,
+        'puede_devolver_a_encargado_inclusion': puede_devolver_a_encargado_inclusion,
         'puede_enviar_a_director': puede_enviar_a_director,
-        'puede_devolver_a_asesor_tecnico': puede_devolver_a_asesor_tecnico,
+        'puede_devolver_a_coordinador_tecnico_pedagogico': puede_devolver_a_coordinador_tecnico_pedagogico,
         'puede_editar_ajustes_asesor': puede_editar_ajustes_asesor,
         'puede_aprobar': puede_aprobar,
         'puede_rechazar': puede_rechazar,
@@ -1872,7 +1898,7 @@ def detalle_casos_encargado_inclusion(request, solicitud_id):
     return render(request, 'SIAPE/detalle_casos_encargado_inclusion.html', context)
 
 @login_required
-def detalle_casos_asesor_tecnico(request, solicitud_id):
+def detalle_casos_coordinador_tecnico_pedagogico(request, solicitud_id):
     """
     Vista para mostrar el detalle de un caso para el Coordinador Técnico Pedagógico.
     Es un wrapper que redirige a la misma vista pero con un contexto diferente.
@@ -1880,7 +1906,7 @@ def detalle_casos_asesor_tecnico(request, solicitud_id):
     # Verificar que el usuario es Coordinador Técnico Pedagógico
     try:
         perfil = request.user.perfil
-        if perfil.rol.nombre_rol != ROL_ASESORA_TECNICA:
+        if perfil.rol.nombre_rol != ROL_COORDINADOR_TECNICO_PEDAGOGICO:
             messages.error(request, 'No tienes permisos para acceder a esta página.')
             return redirect('home')
     except AttributeError:
@@ -1893,14 +1919,14 @@ def detalle_casos_asesor_tecnico(request, solicitud_id):
 
 @require_POST
 @login_required
-def formular_ajuste_asesor_tecnico(request, solicitud_id):
+def formular_ajuste_coordinador_tecnico_pedagogico(request, solicitud_id):
     """
     Vista para que el Coordinador Técnico Pedagógico pueda crear y asignar ajustes a un caso.
     """
     # 1. --- Verificación de Permisos ---
     try:
         perfil = request.user.perfil
-        if perfil.rol.nombre_rol != ROL_ASESORA_TECNICA:
+        if perfil.rol.nombre_rol != ROL_COORDINADOR_TECNICO_PEDAGOGICO:
             messages.error(request, 'No tienes permisos para realizar esta acción.')
             return redirect('home')
     except AttributeError:
@@ -1971,8 +1997,8 @@ def formular_ajuste_asesor_tecnico(request, solicitud_id):
         )
 
         # 8. --- Asignar Coordinador Técnico Pedagógico al caso si no está asignado ---
-        if not solicitud.asesor_tecnico_asignado:
-            solicitud.asesor_tecnico_asignado = perfil
+        if not solicitud.coordinador_tecnico_pedagogico_asignado:
+            solicitud.coordinador_tecnico_pedagogico_asignado = perfil
             solicitud.save()
 
         messages.success(request, 'Ajuste formulado y asignado exitosamente.')
@@ -1982,18 +2008,18 @@ def formular_ajuste_asesor_tecnico(request, solicitud_id):
         messages.error(request, f'Error al formular el ajuste: {str(e)}')
 
     # 9. --- Redirigir de vuelta al detalle ---
-    return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+    return redirect('detalle_casos_coordinador_tecnico_pedagogico', solicitud_id=solicitud_id)
 
 @require_POST
 @login_required
-def editar_ajuste_asesor_tecnico(request, ajuste_asignado_id):
+def editar_ajuste_coordinador_tecnico_pedagogico(request, ajuste_asignado_id):
     """
     Vista para que el Coordinador Técnico Pedagógico pueda editar un ajuste ya asignado.
     """
     # 1. --- Verificación de Permisos ---
     try:
         perfil = request.user.perfil
-        if perfil.rol.nombre_rol != ROL_ASESORA_TECNICA:
+        if perfil.rol.nombre_rol != ROL_COORDINADOR_TECNICO_PEDAGOGICO:
             messages.error(request, 'No tienes permisos para realizar esta acción.')
             return redirect('home')
     except AttributeError:
@@ -2008,7 +2034,7 @@ def editar_ajuste_asesor_tecnico(request, ajuste_asignado_id):
     # Verificar que el caso está en el estado correcto
     if solicitud.estado != 'pendiente_formulacion_ajustes':
         messages.error(request, 'Solo se pueden editar ajustes de casos en estado de formulación de ajustes.')
-        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud.id)
+        return redirect('detalle_casos_coordinador_tecnico_pedagogico', solicitud_id=solicitud.id)
 
     # 3. --- Obtener Datos del Formulario ---
     descripcion = request.POST.get('descripcion', '').strip()
@@ -2018,29 +2044,29 @@ def editar_ajuste_asesor_tecnico(request, ajuste_asignado_id):
     # 4. --- Validaciones ---
     if not descripcion:
         messages.error(request, 'La descripción del ajuste es requerida.')
-        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud.id)
+        return redirect('detalle_casos_coordinador_tecnico_pedagogico', solicitud_id=solicitud.id)
 
     # Verificar si se seleccionó "nueva" o si hay una categoría seleccionada
     crear_nueva_categoria = categoria_id == 'nueva' or (not categoria_id and nueva_categoria)
     
     if not categoria_id and not nueva_categoria:
         messages.error(request, 'Debe seleccionar una categoría o crear una nueva.')
-        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud.id)
+        return redirect('detalle_casos_coordinador_tecnico_pedagogico', solicitud_id=solicitud.id)
 
     if categoria_id and categoria_id != 'nueva' and nueva_categoria:
         messages.error(request, 'No puede seleccionar una categoría existente y crear una nueva a la vez.')
-        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud.id)
+        return redirect('detalle_casos_coordinador_tecnico_pedagogico', solicitud_id=solicitud.id)
 
     if crear_nueva_categoria and not nueva_categoria:
         messages.error(request, 'Debe proporcionar el nombre de la nueva categoría.')
-        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud.id)
+        return redirect('detalle_casos_coordinador_tecnico_pedagogico', solicitud_id=solicitud.id)
 
     try:
         # 5. --- Obtener o Crear Categoría ---
         if crear_nueva_categoria:
             if not nueva_categoria:
                 messages.error(request, 'Debe proporcionar el nombre de la nueva categoría.')
-                return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud.id)
+                return redirect('detalle_casos_coordinador_tecnico_pedagogico', solicitud_id=solicitud.id)
             categoria, created = CategoriasAjustes.objects.get_or_create(
                 nombre_categoria=nueva_categoria.strip().capitalize()
             )
@@ -2049,7 +2075,7 @@ def editar_ajuste_asesor_tecnico(request, ajuste_asignado_id):
         else:
             if not categoria_id or categoria_id == 'nueva':
                 messages.error(request, 'Debe seleccionar una categoría válida.')
-                return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud.id)
+                return redirect('detalle_casos_coordinador_tecnico_pedagogico', solicitud_id=solicitud.id)
             categoria = get_object_or_404(CategoriasAjustes, id=categoria_id)
 
         # 6. --- Actualizar Ajuste Razonable ---
@@ -2065,18 +2091,18 @@ def editar_ajuste_asesor_tecnico(request, ajuste_asignado_id):
         messages.error(request, f'Error al editar el ajuste: {str(e)}')
 
     # 7. --- Redirigir de vuelta al detalle ---
-    return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud.id)
+    return redirect('detalle_casos_coordinador_tecnico_pedagogico', solicitud_id=solicitud.id)
 
 @require_POST
 @login_required
-def eliminar_ajuste_asesor_tecnico(request, ajuste_asignado_id):
+def eliminar_ajuste_coordinador_tecnico_pedagogico(request, ajuste_asignado_id):
     """
     Vista para que el Coordinador Técnico Pedagógico pueda eliminar un ajuste asignado.
     """
     # 1. --- Verificación de Permisos ---
     try:
         perfil = request.user.perfil
-        if perfil.rol.nombre_rol != ROL_ASESORA_TECNICA:
+        if perfil.rol.nombre_rol != ROL_COORDINADOR_TECNICO_PEDAGOGICO:
             messages.error(request, 'No tienes permisos para realizar esta acción.')
             return redirect('home')
     except AttributeError:
@@ -2091,7 +2117,7 @@ def eliminar_ajuste_asesor_tecnico(request, ajuste_asignado_id):
     # Verificar que el caso está en el estado correcto
     if solicitud.estado != 'pendiente_formulacion_ajustes':
         messages.error(request, 'Solo se pueden eliminar ajustes de casos en estado de formulación de ajustes.')
-        return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud.id)
+        return redirect('detalle_casos_coordinador_tecnico_pedagogico', solicitud_id=solicitud.id)
 
     try:
         # 3. --- Eliminar el Ajuste Asignado y el Ajuste Razonable asociado ---
@@ -2109,11 +2135,11 @@ def eliminar_ajuste_asesor_tecnico(request, ajuste_asignado_id):
         messages.error(request, f'Error al eliminar el ajuste: {str(e)}')
 
     # 4. --- Redirigir de vuelta al detalle ---
-    return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+    return redirect('detalle_casos_coordinador_tecnico_pedagogico', solicitud_id=solicitud_id)
 
 @require_POST
 @login_required
-def enviar_a_asesor_tecnico(request, solicitud_id):
+def enviar_a_coordinador_tecnico_pedagogico(request, solicitud_id):
     """
     Vista para que el Encargado de Inclusión envíe el caso al Coordinador Técnico Pedagógico.
     Cambia el estado del caso de 'pendiente_formulacion_caso' a 'pendiente_formulacion_ajustes'.
@@ -2140,7 +2166,7 @@ def enviar_a_asesor_tecnico(request, solicitud_id):
     try:
         # 4. --- Cambiar el estado del caso ---
         solicitud.estado = 'pendiente_formulacion_ajustes'
-        # Nota: No asignamos asesor_tecnico_asignado aquí porque cualquier Coordinador Técnico Pedagógico
+        # Nota: No asignamos coordinador_tecnico_pedagogico_asignado aquí porque cualquier Coordinador Técnico Pedagógico
         # puede trabajar en casos pendientes. Se asignará automáticamente cuando formulen el primer ajuste.
         solicitud.save()
         
@@ -2163,7 +2189,7 @@ def enviar_a_asesor_pedagogico(request, solicitud_id):
     # 1. --- Verificación de Permisos ---
     try:
         perfil = request.user.perfil
-        if perfil.rol.nombre_rol != ROL_ASESORA_TECNICA:
+        if perfil.rol.nombre_rol != ROL_COORDINADOR_TECNICO_PEDAGOGICO:
             messages.error(request, 'No tienes permisos para realizar esta acción.')
             return redirect('home')
     except AttributeError:
@@ -2196,11 +2222,11 @@ def enviar_a_asesor_pedagogico(request, solicitud_id):
         messages.error(request, f'Error al enviar el caso: {str(e)}')
 
     # 5. --- Redirigir de vuelta al detalle ---
-    return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+    return redirect('detalle_casos_coordinador_tecnico_pedagogico', solicitud_id=solicitud_id)
 
 @require_POST
 @login_required
-def devolver_a_coordinadora(request, solicitud_id):
+def devolver_a_encargado_inclusion(request, solicitud_id):
     """
     Vista para que el Coordinador Técnico Pedagógico devuelva el caso al Encargado de Inclusión.
     Cambia el estado del caso de 'pendiente_formulacion_ajustes' a 'pendiente_formulacion_caso'.
@@ -2208,7 +2234,7 @@ def devolver_a_coordinadora(request, solicitud_id):
     # 1. --- Verificación de Permisos ---
     try:
         perfil = request.user.perfil
-        if perfil.rol.nombre_rol != ROL_ASESORA_TECNICA:
+        if perfil.rol.nombre_rol != ROL_COORDINADOR_TECNICO_PEDAGOGICO:
             messages.error(request, 'No tienes permisos para realizar esta acción.')
             return redirect('home')
     except AttributeError:
@@ -2236,7 +2262,7 @@ def devolver_a_coordinadora(request, solicitud_id):
         messages.error(request, f'Error al devolver el caso: {str(e)}')
     
     # 5. --- Redirigir de vuelta al detalle ---
-    return redirect('detalle_casos_asesor_tecnico', solicitud_id=solicitud_id)
+    return redirect('detalle_casos_coordinador_tecnico_pedagogico', solicitud_id=solicitud_id)
 
 @require_POST
 @login_required
@@ -2280,7 +2306,7 @@ def enviar_a_director(request, solicitud_id):
 
 @require_POST
 @login_required
-def devolver_a_asesor_tecnico(request, solicitud_id):
+def devolver_a_coordinador_tecnico_pedagogico(request, solicitud_id):
     """
     Vista para que el Asesor Pedagógico devuelva el caso al Asesor Técnico Pedagógico.
     Cambia el estado del caso de 'pendiente_preaprobacion' a 'pendiente_formulacion_ajustes'.
@@ -2666,7 +2692,7 @@ def actualizar_descripcion_caso(request, solicitud_id):
     try:
         perfil = request.user.perfil
         rol_nombre = perfil.rol.nombre_rol if perfil else None
-        if rol_nombre == ROL_ASESORA_TECNICA:
+        if rol_nombre == ROL_COORDINADOR_TECNICO_PEDAGOGICO:
             return redirect('detalle_caso', solicitud_id=solicitud_id)
         elif rol_nombre == ROL_COORDINADORA:
             return redirect('detalle_caso', solicitud_id=solicitud_id)
@@ -4213,7 +4239,7 @@ def dashboard_coordinador_tecnico_pedagogico(request):
     # 1. --- Verificación de Permisos ---
     try:
         perfil = request.user.perfil
-        if perfil.rol.nombre_rol != ROL_ASESORA_TECNICA:
+        if perfil.rol.nombre_rol != ROL_COORDINADOR_TECNICO_PEDAGOGICO:
             messages.error(request, 'No tienes permisos para acceder a este panel.')
             return redirect('home')
     except AttributeError:
@@ -4233,7 +4259,7 @@ def dashboard_coordinador_tecnico_pedagogico(request):
     # 3. --- Obtener Datos para KPIs ---
     
     # Base de solicitudes para todas las asesoras técnicas (filtramos por rol)
-    todas_las_asesoras_tecnicas = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_ASESORA_TECNICA)
+    todas_las_asesoras_tecnicas = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADOR_TECNICO_PEDAGOGICO)
     
     # KPI 1: Casos nuevos (pendiente_formulacion_ajustes esta semana)
     # Casos que cambiaron a pendiente_formulacion_ajustes esta semana
@@ -4818,7 +4844,7 @@ class SolicitudesViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixin
             
             elif rol == 'Coordinador Técnico Pedagógico':
                 # Ve solicitudes asignadas a él
-                return queryset.filter(asesor_tecnico_asignado=perfil)
+                return queryset.filter(coordinador_tecnico_pedagogico_asignado=perfil)
             
             elif rol == 'Asesor Pedagógico':
                 # Ve solicitudes asignadas a él
@@ -4860,7 +4886,7 @@ class EvidenciasViewSet(viewsets.ModelViewSet):
             if rol == 'Encargado de Inclusión':
                 solicitudes_accesibles = Solicitudes.objects.filter(coordinadora_asignada=perfil)
             elif rol == 'Coordinador Técnico Pedagógico':
-                solicitudes_accesibles = Solicitudes.objects.filter(asesor_tecnico_asignado=perfil)
+                solicitudes_accesibles = Solicitudes.objects.filter(coordinador_tecnico_pedagogico_asignado=perfil)
             elif rol == 'Asesor Pedagógico':
                 solicitudes_accesibles = Solicitudes.objects.filter(asesor_pedagogico_asignado=perfil)
             elif rol == 'Director de Carrera':
@@ -4971,7 +4997,7 @@ class EntrevistasViewSet(viewsets.ModelViewSet):
             solicitudes_accesibles = Solicitudes.objects.none()
             
             if rol == 'Coordinador Técnico Pedagógico':
-                solicitudes_accesibles = Solicitudes.objects.filter(asesor_tecnico_asignado=perfil)
+                solicitudes_accesibles = Solicitudes.objects.filter(coordinador_tecnico_pedagogico_asignado=perfil)
             elif rol == 'Asesor Pedagógico':
                 solicitudes_accesibles = Solicitudes.objects.filter(asesor_pedagogico_asignado=perfil)
             elif rol == 'Director de Carrera':
@@ -5012,7 +5038,7 @@ class AjusteAsignadoViewSet(viewsets.ModelViewSet):
             if rol == 'Encargado de Inclusión':
                 solicitudes_accesibles = Solicitudes.objects.filter(coordinadora_asignada=perfil)
             elif rol == 'Coordinador Técnico Pedagógico':
-                solicitudes_accesibles = Solicitudes.objects.filter(asesor_tecnico_asignado=perfil)
+                solicitudes_accesibles = Solicitudes.objects.filter(coordinador_tecnico_pedagogico_asignado=perfil)
             elif rol == 'Asesor Pedagógico':
                 solicitudes_accesibles = Solicitudes.objects.filter(asesor_pedagogico_asignado=perfil)
             elif rol == 'Director de Carrera':

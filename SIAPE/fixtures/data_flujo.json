@@ -385,7 +385,7 @@
       "estudiantes": 1,
       "estado": "aprobado",
       "coordinadora_asignada": 2,
-      "asesor_tecnico_asignado": 3,
+      "coordinador_tecnico_pedagogico_asignado": 3,
       "asesor_pedagogico_asignado": 4,
       "created_at": "2025-03-10T10:00:00Z",
       "updated_at": "2025-03-20T12:00:00Z"
@@ -401,7 +401,7 @@
       "estudiantes": 2,
       "estado": "rechazado",
       "coordinadora_asignada": 2,
-      "asesor_tecnico_asignado": 3,
+      "coordinador_tecnico_pedagogico_asignado": 3,
       "asesor_pedagogico_asignado": 4,
       "created_at": "2025-04-05T14:30:00Z",
       "updated_at": "2025-04-15T10:00:00Z"
@@ -417,7 +417,7 @@
       "estudiantes": 3,
       "estado": "pendiente_entrevista",
       "coordinadora_asignada": 2,
-      "asesor_tecnico_asignado": null,
+      "coordinador_tecnico_pedagogico_asignado": null,
       "asesor_pedagogico_asignado": null,
       "created_at": "2025-11-26T09:00:00Z",
       "updated_at": "2025-11-26T09:00:00Z"
@@ -433,7 +433,7 @@
       "estudiantes": 4,
       "estado": "pendiente_entrevista",
       "coordinadora_asignada": 2,
-      "asesor_tecnico_asignado": null,
+      "coordinador_tecnico_pedagogico_asignado": null,
       "asesor_pedagogico_asignado": null,
       "created_at": "2025-11-25T10:00:00Z",
       "updated_at": "2025-11-25T10:00:00Z"
@@ -449,7 +449,7 @@
       "estudiantes": 5,
       "estado": "pendiente_formulacion_caso",
       "coordinadora_asignada": 2,
-      "asesor_tecnico_asignado": null,
+      "coordinador_tecnico_pedagogico_asignado": null,
       "asesor_pedagogico_asignado": null,
       "created_at": "2025-11-20T11:00:00Z",
       "updated_at": "2025-11-24T16:00:00Z"
@@ -465,7 +465,7 @@
       "estudiantes": 6,
       "estado": "pendiente_formulacion_ajustes",
       "coordinadora_asignada": 2,
-      "asesor_tecnico_asignado": 3,
+      "coordinador_tecnico_pedagogico_asignado": 3,
       "asesor_pedagogico_asignado": null,
       "created_at": "2025-11-15T11:00:00Z",
       "updated_at": "2025-11-18T10:00:00Z"
@@ -481,7 +481,7 @@
       "estudiantes": 7,
       "estado": "pendiente_preaprobacion",
       "coordinadora_asignada": 2,
-      "asesor_tecnico_asignado": 3,
+      "coordinador_tecnico_pedagogico_asignado": 3,
       "asesor_pedagogico_asignado": 4,
       "created_at": "2025-11-10T09:00:00Z",
       "updated_at": "2025-11-22T14:00:00Z"
@@ -497,7 +497,7 @@
       "estudiantes": 8,
       "estado": "pendiente_aprobacion",
       "coordinadora_asignada": 2,
-      "asesor_tecnico_asignado": 3,
+      "coordinador_tecnico_pedagogico_asignado": 3,
       "asesor_pedagogico_asignado": 4,
       "created_at": "2025-11-05T15:00:00Z",
       "updated_at": "2025-11-25T09:30:00Z"

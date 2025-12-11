@@ -192,7 +192,7 @@ class SolicitudesSerializer(serializers.ModelSerializer):
     descripcion = serializers.CharField(read_only=True)
     created_at = serializers.CharField(read_only=True)
     coordinadora_asignada = serializers.StringRelatedField(read_only=True)
-    asesor_tecnico_asignado = serializers.StringRelatedField(read_only=True)
+    coordinador_tecnico_pedagogico_asignado = serializers.StringRelatedField(read_only=True)
     asesor_pedagogico_asignado = serializers.StringRelatedField(read_only=True)
 
     class Meta:
@@ -204,7 +204,7 @@ class SolicitudesSerializer(serializers.ModelSerializer):
             'estudiante',
             'created_at',
             'coordinadora_asignada',
-            'asesor_tecnico_asignado',
+            'coordinador_tecnico_pedagogico_asignado',
             'asesor_pedagogico_asignado',
         ]
 

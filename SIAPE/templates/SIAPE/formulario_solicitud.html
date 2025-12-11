@@ -668,7 +668,12 @@
                 const esFinDeSemana = diaSemana === 0 || diaSemana === 6;
                 const hoyDate = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
                 const esDiaPasado = fechaDate < hoyDate;
-                const esSeleccionable = !esFinDeSemana && !esDiaPasado;
+                
+                // Verificar si es feriado
+                const feriadoInfo = calendarioData.feriados?.find(f => f.fecha === fechaStr);
+                const esFeriado = !!feriadoInfo;
+                
+                const esSeleccionable = !esFinDeSemana && !esDiaPasado && !esFeriado;
 
                 if (fechaStr === hoyStr) {
                     dayDiv.classList.add('day-today');
@@ -681,6 +686,10 @@
                     } else if (calendarioData.diasCompletos?.includes(fechaStr)) {
                         dayDiv.classList.add('day-lleno');
                     }
+                } else if (esFeriado) {
+                    // Feriados no disponibles
+                    dayDiv.classList.add('day-feriado');
+                    dayDiv.title = feriadoInfo.nombre; // Mostrar nombre del feriado al pasar el mouse
                 } else if (esFinDeSemana) {
                     // Fines de semana no disponibles
                     dayDiv.classList.add('day-inabil');

@@ -46,19 +46,49 @@ textarea,
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
+a.header-logo,
 .header-logo {
     display: flex;
     align-items: center;
     gap: 15px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+a.header-logo:hover {
+    opacity: 0.85;
 }
 .header-logo img {
     height: 40px;
     display: block;
 }
+.header-logo .logo-dark {
+    display: none;
+}
+.header-logo .logo-separator {
+    width: 1px;
+    height: 30px;
+    background-color: #ccc;
+    margin: 0 5px;
+}
+.header-logo .logo-icon {
+    width: 40px;
+    height: 40px;
+    background-color: #8B0000;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.header-logo .logo-icon i {
+    color: #ffffff;
+    font-size: 1.4rem;
+}
 .header-logo span {
-    font-size: 1.2rem;
+    font-size: 1.4rem;
     font-weight: bold;
-    color: #555;
+    color: #8B0000;
+    letter-spacing: 1px;
 }
 
 .header-user {
@@ -419,6 +449,26 @@ body.dark-mode .header-logout-link {
     background-color: #1e1e1e !important;
     border-color: #4a4a4a !important;
     color: #ffffff !important;
+}
+
+body.dark-mode .header-logo span {
+    color: #e0e0e0 !important;
+}
+
+body.dark-mode .header-logo .logo-light {
+    display: none !important;
+}
+
+body.dark-mode .header-logo .logo-dark {
+    display: block !important;
+}
+
+body.dark-mode .header-logo .logo-separator {
+    background-color: #4a4a4a !important;
+}
+
+body.dark-mode .header-logo .logo-icon {
+    background-color: #a02020 !important;
 }
 
 body.dark-mode .nav-item:hover,

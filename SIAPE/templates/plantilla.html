@@ -19,10 +19,15 @@
     <header class="app-header">
         
         <!-- Icono y Nombre de la App -->
-        <div class="header-logo">
-            <img src="{% static 'images/logo-inacap-negro.png' %}" alt="Logo Inacap">
-            <span>Sistema de Apoyos Personalizados</span>
-        </div>
+        <a href="{% if user.is_authenticated %}{% if user.perfil.rol.nombre_rol == 'Administrador' %}{% url 'dashboard_admin' %}{% elif user.perfil.rol.nombre_rol == 'Docente' %}{% url 'dashboard_docente' %}{% elif user.perfil.rol.nombre_rol == 'Encargado de Inclusión' %}{% url 'dashboard_encargado_inclusion' %}{% elif user.perfil.rol.nombre_rol == 'Director de Carrera' %}{% url 'dashboard_director' %}{% elif user.perfil.rol.nombre_rol == 'Coordinador Técnico Pedagógico' %}{% url 'dashboard_coordinador_tecnico_pedagogico' %}{% elif user.perfil.rol.nombre_rol == 'Asesor Pedagógico' %}{% url 'dashboard_asesor' %}{% else %}{% url 'index' %}{% endif %}{% else %}{% url 'index' %}{% endif %}" class="header-logo">
+            <img src="{% static 'images/logo-inacap-negro.png' %}" alt="Logo Inacap" class="logo-inacap logo-light">
+            <img src="{% static 'images/logo-blanco.png' %}" alt="Logo Inacap" class="logo-inacap logo-dark">
+            <div class="logo-separator"></div>
+            <div class="logo-icon">
+                <i class="fas fa-graduation-cap"></i>
+            </div>
+            <span>SIAPE</span>
+        </a>
         
         <!-- Información del Usuario (Dinámico) -->
         <div class="header-user">

@@ -94,7 +94,7 @@ urlpatterns = [
     path('dashboard/encargado-inclusion/horarios-bloqueados/<int:horario_id>/eliminar/', views.eliminar_horario_bloqueado, name='eliminar_horario_bloqueado'),
     path('dashboard/encargado-inclusion/citas/<int:entrevista_id>/cancelar/', views.cancelar_cita_dashboard, name='cancelar_cita_dashboard'),
     path('dashboard/encargado-inclusion/casos/<int:solicitud_id>/actualizar-descripcion/', views.actualizar_descripcion_caso, name='actualizar_descripcion_caso'),
-    path('dashboard/encargado-inclusion/casos/<int:solicitud_id>/enviar-asesor-tecnico/', views.enviar_a_asesor_tecnico, name='enviar_a_asesor_tecnico'),
+    path('dashboard/encargado-inclusion/casos/<int:solicitud_id>/enviar-coordinador-tecnico-pedagogico/', views.enviar_a_coordinador_tecnico_pedagogico, name='enviar_a_coordinador_tecnico_pedagogico'),
     path('dashboard/encargado-inclusion/confirmar-cita/<int:entrevista_id>/', 
          views.confirmar_cita_coordinadora, 
          name='encargado_inclusion_confirmar_cita'),
@@ -110,18 +110,18 @@ urlpatterns = [
     path('dashboard/director/', views.dashboard_director, name='dashboard_director'),
 
     # URLs de Coordinador Técnico Pedagógico
-    path('dashboard/asesor-tecnico/', views.dashboard_coordinador_tecnico_pedagogico, name='dashboard_coordinador_tecnico_pedagogico'),
-    path('dashboard/asesor-tecnico/casos/<int:solicitud_id>/', views.detalle_casos_asesor_tecnico, name='detalle_casos_asesor_tecnico'),
-    path('dashboard/asesor-tecnico/casos/<int:solicitud_id>/formular-ajuste/', views.formular_ajuste_asesor_tecnico, name='formular_ajuste_asesor_tecnico'),
-    path('dashboard/asesor-tecnico/ajustes/<int:ajuste_asignado_id>/editar/', views.editar_ajuste_asesor_tecnico, name='editar_ajuste_asesor_tecnico'),
-    path('dashboard/asesor-tecnico/ajustes/<int:ajuste_asignado_id>/eliminar/', views.eliminar_ajuste_asesor_tecnico, name='eliminar_ajuste_asesor_tecnico'),
-    path('dashboard/asesor-tecnico/casos/<int:solicitud_id>/enviar-asesor-pedagogico/', views.enviar_a_asesor_pedagogico, name='enviar_a_asesor_pedagogico'),
-    path('dashboard/asesor-tecnico/casos/<int:solicitud_id>/devolver-coordinadora/', views.devolver_a_coordinadora, name='devolver_a_coordinadora'),
+    path('dashboard/coordinador-tecnico-pedagogico/', views.dashboard_coordinador_tecnico_pedagogico, name='dashboard_coordinador_tecnico_pedagogico'),
+    path('dashboard/coordinador-tecnico-pedagogico/casos/<int:solicitud_id>/', views.detalle_casos_coordinador_tecnico_pedagogico, name='detalle_casos_coordinador_tecnico_pedagogico'),
+    path('dashboard/coordinador-tecnico-pedagogico/casos/<int:solicitud_id>/formular-ajuste/', views.formular_ajuste_coordinador_tecnico_pedagogico, name='formular_ajuste_coordinador_tecnico_pedagogico'),
+    path('dashboard/coordinador-tecnico-pedagogico/ajustes/<int:ajuste_asignado_id>/editar/', views.editar_ajuste_coordinador_tecnico_pedagogico, name='editar_ajuste_coordinador_tecnico_pedagogico'),
+    path('dashboard/coordinador-tecnico-pedagogico/ajustes/<int:ajuste_asignado_id>/eliminar/', views.eliminar_ajuste_coordinador_tecnico_pedagogico, name='eliminar_ajuste_coordinador_tecnico_pedagogico'),
+    path('dashboard/coordinador-tecnico-pedagogico/casos/<int:solicitud_id>/enviar-asesor-pedagogico/', views.enviar_a_asesor_pedagogico, name='enviar_a_asesor_pedagogico'),
+    path('dashboard/coordinador-tecnico-pedagogico/casos/<int:solicitud_id>/devolver-encargado-inclusion/', views.devolver_a_encargado_inclusion, name='devolver_a_encargado_inclusion'),
     
     # URLs de Asesor Pedagógico
     path('dashboard/asesor/', views.dashboard_asesor, name='dashboard_asesor'),
     path('dashboard/asesor/casos/<int:solicitud_id>/enviar-director/', views.enviar_a_director, name='enviar_a_director'),
-    path('dashboard/asesor/casos/<int:solicitud_id>/devolver-asesor-tecnico/', views.devolver_a_asesor_tecnico, name='devolver_a_asesor_tecnico'),
+    path('dashboard/asesor/casos/<int:solicitud_id>/devolver-coordinador-tecnico-pedagogico/', views.devolver_a_coordinador_tecnico_pedagogico, name='devolver_a_coordinador_tecnico_pedagogico'),
     path('dashboard/asesor/ajustes/<int:ajuste_asignado_id>/editar/', views.editar_ajuste_asesor, name='editar_ajuste_asesor'),
     path('dashboard/asesor/ajustes/<int:ajuste_asignado_id>/eliminar/', views.eliminar_ajuste_asesor, name='eliminar_ajuste_asesor'),
     

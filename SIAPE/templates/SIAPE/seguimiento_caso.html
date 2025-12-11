@@ -90,10 +90,10 @@
         </div>
         {% endif %}
         
-        {% if solicitud.asesor_tecnico_asignado %}
+        {% if solicitud.coordinador_tecnico_pedagogico_asignado %}
         <div class="info-row">
             <span class="info-label">Coordinador Técnico Pedagógico:</span>
-            <span class="info-value">{{ solicitud.asesor_tecnico_asignado.usuario.first_name }} {{ solicitud.asesor_tecnico_asignado.usuario.last_name }}</span>
+            <span class="info-value">{{ solicitud.coordinador_tecnico_pedagogico_asignado.usuario.first_name }} {{ solicitud.coordinador_tecnico_pedagogico_asignado.usuario.last_name }}</span>
         </div>
         {% endif %}
         
