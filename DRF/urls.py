@@ -133,6 +133,16 @@ urlpatterns = [
     path('dashboard/director/carreras/', views.carreras_director, name='carreras_director'),
     path('dashboard/director/carreras/<int:carrera_id>/estudiantes/', views.estudiantes_por_carrera_director, name='estudiantes_carrera_director'),
     path('dashboard/director/estadisticas/', views.estadisticas_director, name='estadisticas_director'),
+    path('estadisticas-director/', views.estadisticas_director, name='estadisticas_director'),
+    
+    # Exportación y revisión masiva
+    path('procesar-revision-director/<int:solicitud_id>/', views.procesar_revision_director, name='procesar_revision_director'),
+    path('exportar-ficha-pdf/<int:solicitud_id>/', views.exportar_ficha_pdf, name='exportar_ficha_pdf'),
+    path('exportar-ficha-excel/<int:solicitud_id>/', views.exportar_ficha_excel, name='exportar_ficha_excel'),
+
+    # Exportaciones de KPI (Nuevas)
+    path('exportar-kpi-pdf/', views.exportar_reporte_estadistico_pdf, name='exportar_kpi_pdf'),
+    path('exportar-kpi-excel/', views.exportar_reporte_estadistico_excel, name='exportar_kpi_excel'),
     
     # URLs de Carga Masiva (Director)
     path('dashboard/director/carga-masiva/', views.gestion_carga_masiva_director, name='gestion_carga_masiva_director'),
