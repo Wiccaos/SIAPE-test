@@ -73,20 +73,6 @@ urlpatterns = [
     path('dashboard/admin/areas/editar/<int:area_id>/', views.editar_area_admin, name='editar_area_admin'),
     path('dashboard/admin/areas/eliminar/<int:area_id>/', views.eliminar_area_admin, name='eliminar_area_admin'),
 
-    # # URLs de Asesor Pedagógico
-    path('dashboard/asesor/', views.dashboard_asesor, name='dashboard_asesor'),
-    # path('dashboard/asesor/casos/', views.casos_asesor, name='casos_asesor'),
-    # path('dashboard/asesor/casos/<int:solicitud_id>/', views.detalle_caso_asesor, name='detalle_caso_asesor'),
-    # path('dashboard/asesor/panel-control/', views.panel_control_asesor, name='panel_control_asesor'),
-    # path('dashboard/asesor/asignar-caso/<int:solicitud_id>/', views.asignar_caso_asesor, name='asignar_caso_asesor'),
-    # path('dashboard/asesor/agendar-cita/', views.agendar_cita_asesor, name='agendar_cita_asesor'),
-    # path('dashboard/asesor/registrar-ajuste/', views.registrar_ajuste_razonable, name='registrar_ajuste_razonable'),
-    # path('dashboard/asesor/confirmar-cita/<int:entrevista_id>/', views.confirmar_cita_asesor, name='confirmar_cita_asesor'),
-    # path('dashboard/asesor/editar-notas-cita/<int:entrevista_id>/', views.editar_notas_cita, name='editar_notas_cita'),
-    # path('dashboard/asesor/reagendar-cita/<int:entrevista_id>/', views.reagendar_cita_asesor, name='reagendar_cita_asesor'),
-    # path('dashboard/asesor/aprobar-solicitud/<int:solicitud_id>/', views.aprobar_solicitud_asesor, name='aprobar_solicitud_asesor'),
-    # path('dashboard/asesor/rechazar-solicitud/<int:solicitud_id>/', views.rechazar_solicitud_asesor, name='rechazar_solicitud_asesor'),
-
 
     # URLs de Docente
     path('dashboard/docente/', views.dashboard_docente, name='dashboard_docente'),
@@ -96,29 +82,29 @@ urlpatterns = [
     path('dashboard/docente/alumno/<int:estudiante_id>/', views.detalle_ajuste_docente, name='detalle_ajuste_docente'),
     path('dashboard/docente/alumno/<int:estudiante_id>/', views.detalle_ajuste_docente, name='detalle_ajuste_docente'),
 
-    # URLs de Encargado de Inclusión (Coordinadora)
-    path('dashboard/coordinador/', views.dashboard_encargado_inclusion, name='dashboard_encargado_inclusion'),
+    # URLs de Encargado de Inclusión
+    path('dashboard/encargado-inclusion/', views.dashboard_encargado_inclusion, name='dashboard_encargado_inclusion'),
     path('dashboard/casos-generales/', views.casos_generales, name='casos_generales'),
     # URL genérica para ver casos (funciona para todos los roles)
-    path('casos/<int:solicitud_id>/', views.detalle_casos_encargado_inclusion, name='detalle_caso'),
+    path('dashboard/casos/<int:solicitud_id>/', views.detalle_casos_encargado_inclusion, name='detalle_caso'),
     # URLs específicas por rol (mantener para compatibilidad)
-    path('dashboard/coordinador/casos/<int:solicitud_id>/', views.detalle_casos_encargado_inclusion, name='detalle_casos_encargado_inclusion'),
-    path('dashboard/coordinador/panel-control/', views.panel_control_encargado_inclusion, name='panel_control_encargado_inclusion'),
-    path('dashboard/coordinador/horarios-bloqueados/', views.gestionar_horarios_bloqueados, name='gestionar_horarios_bloqueados'),
-    path('dashboard/coordinador/horarios-bloqueados/<int:horario_id>/eliminar/', views.eliminar_horario_bloqueado, name='eliminar_horario_bloqueado'),
-    path('dashboard/coordinador/citas/<int:entrevista_id>/cancelar/', views.cancelar_cita_dashboard, name='cancelar_cita_dashboard'),
-    path('dashboard/coordinador/casos/<int:solicitud_id>/actualizar-descripcion/', views.actualizar_descripcion_caso, name='actualizar_descripcion_caso'),
-    path('dashboard/coordinador/casos/<int:solicitud_id>/enviar-asesor-tecnico/', views.enviar_a_asesor_tecnico, name='enviar_a_asesor_tecnico'),
-    path('dashboard/coordinador/confirmar-cita/<int:entrevista_id>/', 
+    path('dashboard/encargado-inclusion/casos/<int:solicitud_id>/', views.detalle_casos_encargado_inclusion, name='detalle_casos_encargado_inclusion'),
+    path('dashboard/encargado-inclusion/panel-control/', views.panel_control_encargado_inclusion, name='panel_control_encargado_inclusion'),
+    path('dashboard/encargado-inclusion/horarios-bloqueados/', views.gestionar_horarios_bloqueados, name='gestionar_horarios_bloqueados'),
+    path('dashboard/encargado-inclusion/horarios-bloqueados/<int:horario_id>/eliminar/', views.eliminar_horario_bloqueado, name='eliminar_horario_bloqueado'),
+    path('dashboard/encargado-inclusion/citas/<int:entrevista_id>/cancelar/', views.cancelar_cita_dashboard, name='cancelar_cita_dashboard'),
+    path('dashboard/encargado-inclusion/casos/<int:solicitud_id>/actualizar-descripcion/', views.actualizar_descripcion_caso, name='actualizar_descripcion_caso'),
+    path('dashboard/encargado-inclusion/casos/<int:solicitud_id>/enviar-asesor-tecnico/', views.enviar_a_asesor_tecnico, name='enviar_a_asesor_tecnico'),
+    path('dashboard/encargado-inclusion/confirmar-cita/<int:entrevista_id>/', 
          views.confirmar_cita_coordinadora, 
-         name='coordinadora_confirmar_cita'),
-    path('dashboard/coordinador/editar-notas-cita/<int:entrevista_id>/', 
+         name='encargado_inclusion_confirmar_cita'),
+    path('dashboard/encargado-inclusion/editar-notas-cita/<int:entrevista_id>/', 
          views.editar_notas_cita_coordinadora, 
-         name='coordinadora_editar_notas_cita'),
-    path('dashboard/coordinador/agendar-cita/', views.agendar_cita_coordinadora, name='agendar_cita_coordinadora'),
-    path('dashboard/coordinador/reagendar-cita/<int:entrevista_id>/', 
+         name='encargado_inclusion_editar_notas_cita'),
+    path('dashboard/encargado-inclusion/agendar-cita/', views.agendar_cita_coordinadora, name='agendar_cita_encargado_inclusion'),
+    path('dashboard/encargado-inclusion/reagendar-cita/<int:entrevista_id>/', 
          views.reagendar_cita_coordinadora, 
-         name='coordinadora_reagendar_cita'),
+         name='encargado_inclusion_reagendar_cita'),
 
     # URLs de Director de Carrera
     path('dashboard/director/', views.dashboard_director, name='dashboard_director'),
@@ -133,6 +119,7 @@ urlpatterns = [
     path('dashboard/asesor-tecnico/casos/<int:solicitud_id>/devolver-coordinadora/', views.devolver_a_coordinadora, name='devolver_a_coordinadora'),
     
     # URLs de Asesor Pedagógico
+    path('dashboard/asesor/', views.dashboard_asesor, name='dashboard_asesor'),
     path('dashboard/asesor/casos/<int:solicitud_id>/enviar-director/', views.enviar_a_director, name='enviar_a_director'),
     path('dashboard/asesor/casos/<int:solicitud_id>/devolver-asesor-tecnico/', views.devolver_a_asesor_tecnico, name='devolver_a_asesor_tecnico'),
     path('dashboard/asesor/ajustes/<int:ajuste_asignado_id>/editar/', views.editar_ajuste_asesor, name='editar_ajuste_asesor'),

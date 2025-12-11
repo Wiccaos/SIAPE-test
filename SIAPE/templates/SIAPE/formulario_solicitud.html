@@ -8,6 +8,7 @@
   Bloque para los estilos CSS específicos de esta página.
 {% endcomment %}
 {% block extra_head %}
+    <script src="{% static 'JS/rut_validator.js' %}"></script>
     <!-- 
       Asegúrate de que base.css se cargue primero (desde plantilla.html)
       y que formulario.css contenga los estilos del calendario.
@@ -246,6 +247,15 @@
                 return;
             }
             
+            // Validar RUT antes de buscar
+            const validacion = validarRUTChileno(rut);
+            if (!validacion.esValido) {
+                mostrarEstadoRut(`<i class="fas fa-exclamation-triangle"></i> ${validacion.mensajeError}`, 'error');
+                rutInput.classList.add('error');
+                return;
+            }
+            
+            rutInput.classList.remove('error');
             mostrarEstadoRut('<i class="fas fa-spinner fa-spin"></i> Buscando...', 'loading');
             btnBuscarRut.disabled = true;
             
@@ -253,7 +263,15 @@
                 const response = await fetch(`/api/buscar-estudiante/?rut=${encodeURIComponent(rut)}`);
                 const data = await response.json();
                 
-                if (data.encontrado) {
+                if (response.status === 404 || data.error) {
+                    // RUT válido pero no encontrado en el sistema
+                    estudianteEncontrado = null;
+                    mostrarNoEncontrado();
+                    mostrarEstadoRut(
+                        '<i class="fas fa-times-circle"></i> RUT no encontrado en el sistema.',
+                        'error'
+                    );
+                } else if (data.encontrado) {
                     estudianteEncontrado = data.estudiante;
                     
                     // Mostrar datos en modo verificación
@@ -265,12 +283,9 @@
                     );
                 } else {
                     estudianteEncontrado = null;
-                    
-                    // Mostrar mensaje de no encontrado
                     mostrarNoEncontrado();
-                    
                     mostrarEstadoRut(
-                        '<i class="fas fa-times-circle"></i> RUT no registrado en el sistema.',
+                        '<i class="fas fa-times-circle"></i> RUT no encontrado en el sistema.',
                         'error'
                     );
                 }

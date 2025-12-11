@@ -7,6 +7,8 @@
 
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+    <script src="{% static 'JS/rut_validator.js' %}"></script>
+    <script src="{% static 'JS/password_validator.js' %}"></script>
 {% endblock %}
 
 {% block content %}
@@ -327,6 +329,10 @@
             <div class="form-group">
                 <label for="password">Contraseña Temporal:</label>
                 <input type="password" name="password" id="password" required>
+                <small id="password-error" class="password-error-message" style="display: none; color: #dc3545; margin-top: 0.25rem;"></small>
+                <small class="form-hint" style="display: block; margin-top: 0.25rem; color: #666; font-size: 0.875rem;">
+                    Mínimo 8 caracteres, debe incluir letras y números.
+                </small>
             </div>
             
             <div class="form-group">
@@ -393,7 +399,11 @@
             <div class="form-group">
                 <label for="editar_password">Nueva Contraseña:</label>
                 <input type="password" name="password" id="editar_password">
+                <small id="editar_password-error" class="password-error-message" style="display: none; color: #dc3545; margin-top: 0.25rem;"></small>
                 <small class="nota-cambio-pass">Dejar en blanco para no cambiar la contraseña actual.</small>
+                <small class="form-hint" style="display: block; margin-top: 0.25rem; color: #666; font-size: 0.875rem;">
+                    Si desea cambiar la contraseña: mínimo 8 caracteres, debe incluir letras y números.
+                </small>
             </div>
             
             <div class="form-group">
@@ -561,6 +571,67 @@
             modal.style.display = 'none';
         }
     }
+
+    // Validación de RUT en formularios
+    document.addEventListener('DOMContentLoaded', function() {
+        // Validar RUT en formulario de agregar usuario
+        const formAgregar = document.querySelector('#modalAgregar form');
+        const rutInputAgregar = document.getElementById('rut');
+        
+        if (formAgregar && rutInputAgregar) {
+            formAgregar.addEventListener('submit', function(e) {
+                const rut = rutInputAgregar.value.trim();
+                if (rut) {
+                    const validacion = validarRUTChileno(rut);
+                    if (!validacion.esValido) {
+                        e.preventDefault();
+                        alert('Error: ' + validacion.mensajeError);
+                        rutInputAgregar.focus();
+                        return false;
+                    }
+                }
+            });
+            
+            // Validación en tiempo real
+            agregarValidacionRUT(rutInputAgregar, null);
+        }
+        
+        // Validar RUT en formulario de editar usuario
+        const formEditar = document.getElementById('formEditar');
+        const rutInputEditar = document.getElementById('editar_rut');
+        
+        if (formEditar && rutInputEditar) {
+            formEditar.addEventListener('submit', function(e) {
+                const rut = rutInputEditar.value.trim();
+                if (rut) {
+                    const validacion = validarRUTChileno(rut);
+                    if (!validacion.esValido) {
+                        e.preventDefault();
+                        alert('Error: ' + validacion.mensajeError);
+                        rutInputEditar.focus();
+                        return false;
+                    }
+                }
+            });
+            
+            // Validación en tiempo real
+            agregarValidacionRUT(rutInputEditar, null);
+        }
+        
+        // Validación de contraseña en formulario de agregar usuario
+        const passwordInput = document.getElementById('password');
+        const passwordError = document.getElementById('password-error');
+        if (passwordInput && passwordError) {
+            agregarValidacionPassword(passwordInput, passwordError);
+        }
+        
+        // Validación de contraseña en formulario de editar usuario
+        const editarPasswordInput = document.getElementById('editar_password');
+        const editarPasswordError = document.getElementById('editar_password-error');
+        if (editarPasswordInput && editarPasswordError) {
+            agregarValidacionPassword(editarPasswordInput, editarPasswordError);
+        }
+    });
 </script>
 
 {% endblock %}

@@ -525,7 +525,7 @@
                 <h4><i class="fas fa-calendar-plus"></i> Agendar Nueva Cita</h4>
                 <button class="close" onclick="cerrarModalAgendar()">&times;</button>
             </div>
-            <form method="post" action="{% url 'agendar_cita_coordinadora' %}">
+            <form method="post" action="{% url 'agendar_cita_encargado_inclusion' %}">
                 {% csrf_token %}
                 <input type="hidden" name="solicitud_id" id="agendar_solicitud_id">
                 

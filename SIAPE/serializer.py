@@ -4,6 +4,7 @@ from .models import (
     Carreras, Estudiantes, Solicitudes, Evidencias, Asignaturas, 
     AsignaturasEnCurso, Entrevistas, AjusteRazonable, AjusteAsignado
 )
+from .validators import validar_contraseña
 from datetime import datetime, timedelta, time
 from django.utils import timezone
 
@@ -16,7 +17,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(label='Email')
     rut = serializers.CharField(label='RUT')
     numero = serializers.CharField(label='Número Telefónico', required=False, allow_blank=True)
-    password = serializers.CharField(label='Contraseña')
+    password = serializers.CharField(label='Contraseña', write_only=True)
 
     class Meta:
         model = Usuario
@@ -29,6 +30,13 @@ class UsuarioSerializer(serializers.ModelSerializer):
             'numero',
             'password',
         ]
+
+    def validate_password(self, value):
+        """Validar la contraseña según los requisitos del sistema"""
+        es_valida, mensaje_error = validar_contraseña(value)
+        if not es_valida:
+            raise serializers.ValidationError(mensaje_error)
+        return value
 
     def create(self, validated_data):
         """ Crear usuario con contraseña hasheada """

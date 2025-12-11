@@ -6,6 +6,7 @@
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
 <link rel="stylesheet" href="{% static 'CSS/seguimiento.css' %}">
+<script src="{% static 'JS/rut_validator.js' %}"></script>
 {% endblock %}
 
 {% block content %}
@@ -22,11 +23,12 @@
         </div>
         {% endif %}
         
-        <form method="POST">
+        <form method="POST" id="formSeguimiento">
             {% csrf_token %}
             <div class="form-group">
                 <label for="rut"><i class="fas fa-id-card"></i> RUT del Estudiante</label>
                 <input type="text" id="rut" name="rut" placeholder="12345678-9" required>
+                <div id="rut-error-message" class="error-message" style="display: none; margin-top: 0.5rem; color: #dc3545; font-size: 0.875rem;"></div>
             </div>
             
             <div class="form-group">
@@ -173,5 +175,35 @@
         </a>
     </div>
 </div>
+
+<script>
+    // Validación de RUT en formulario de seguimiento
+    document.addEventListener('DOMContentLoaded', function() {
+        const formSeguimiento = document.getElementById('formSeguimiento');
+        const rutInput = document.getElementById('rut');
+        const rutErrorMessage = document.getElementById('rut-error-message');
+        
+        if (formSeguimiento && rutInput) {
+            // Validación al enviar el formulario
+            formSeguimiento.addEventListener('submit', function(e) {
+                const rut = rutInput.value.trim();
+                if (rut) {
+                    const validacion = validarRUTChileno(rut);
+                    if (!validacion.esValido) {
+                        e.preventDefault();
+                        rutErrorMessage.textContent = validacion.mensajeError;
+                        rutErrorMessage.style.display = 'block';
+                        rutInput.classList.add('error');
+                        rutInput.focus();
+                        return false;
+                    }
+                }
+            });
+            
+            // Validación en tiempo real
+            agregarValidacionRUT(rutInput, rutErrorMessage);
+        }
+    });
+</script>
 {% endblock %}
 

@@ -28,6 +28,7 @@ from .serializer import (
     EstudiantesSerializer, SolicitudesSerializer, EvidenciasSerializer, AsignaturasSerializer, AsignaturasEnCursoSerializer, 
     AjusteRazonableSerializer, AjusteAsignadoSerializer, EntrevistasSerializer, PublicaSolicitudSerializer
 )
+from .validators import validar_rut_chileno, validar_contraseña
 from .models import(
     Usuario, PerfilUsuario, Roles, Areas, CategoriasAjustes, Carreras, Estudiantes, Solicitudes, Evidencias,
     Asignaturas, AsignaturasEnCurso, Entrevistas, AjusteRazonable, AjusteAsignado, HorarioBloqueado
@@ -96,6 +97,14 @@ def buscar_estudiante_por_rut(request):
             status=status.HTTP_400_BAD_REQUEST
         )
     
+    # Validar RUT
+    es_valido, mensaje_error = validar_rut_chileno(rut)
+    if not es_valido:
+        return Response(
+            {'error': mensaje_error},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
     # Normalizar el RUT (remover puntos y espacios, mantener guión)
     rut_normalizado = re.sub(r'[.\s]', '', rut).upper()
     
@@ -106,8 +115,8 @@ def buscar_estudiante_por_rut(request):
     
     if not estudiante:
         return Response(
-            {'encontrado': False, 'message': 'Estudiante no encontrado en el sistema'},
-            status=status.HTTP_200_OK
+            {'error': 'RUT no encontrado en el sistema'},
+            status=status.HTTP_404_NOT_FOUND
         )
     
     # Obtener asignaturas activas del estudiante
@@ -493,6 +502,18 @@ def seguimiento_caso_estudiante(request):
         numero_seguimiento = request.POST.get('numero_seguimiento', '').strip()
         
         if rut and numero_seguimiento:
+            # Validar RUT
+            es_valido, mensaje_error = validar_rut_chileno(rut)
+            if not es_valido:
+                error = mensaje_error
+                context = {
+                    'solicitud': None,
+                    'ajustes_aprobados': [],
+                    'entrevistas': [],
+                    'error': error
+                }
+                return render(request, 'SIAPE/seguimiento_caso.html', context)
+            
             # Validar que el número de seguimiento sea un número válido
             try:
                 solicitud_id = int(numero_seguimiento)
@@ -508,6 +529,15 @@ def seguimiento_caso_estudiante(request):
             
             # Buscar estudiante por RUT
             estudiante = Estudiantes.objects.filter(rut=rut).first()
+            if not estudiante:
+                error = 'RUT no encontrado en el sistema'
+                context = {
+                    'solicitud': None,
+                    'ajustes_aprobados': [],
+                    'entrevistas': [],
+                    'error': error
+                }
+                return render(request, 'SIAPE/seguimiento_caso.html', context)
             
             if estudiante:
                 # Buscar la solicitud por ID y verificar que pertenezca al estudiante
@@ -935,12 +965,24 @@ def agregar_usuario_admin(request):
 
     if request.method == 'POST':
         email = request.POST.get('email')
-        rut = request.POST.get('rut')
+        rut = request.POST.get('rut', '').strip()
         first_name = request.POST.get('first_name')
         last_name = request.POST.get('last_name')
         password = request.POST.get('password')
         rol_id = request.POST.get('rol_id')
         area_id = request.POST.get('area_id')
+
+        # Validar RUT
+        es_valido, mensaje_error = validar_rut_chileno(rut)
+        if not es_valido:
+            messages.error(request, mensaje_error)
+            return redirect('gestion_usuarios_admin')
+        
+        # Validar contraseña
+        es_valida_password, mensaje_error_password = validar_contraseña(password)
+        if not es_valida_password:
+            messages.error(request, mensaje_error_password)
+            return redirect('gestion_usuarios_admin')
 
         try:
             if Usuario.objects.filter(Q(email=email) | Q(rut=rut)).exists():
@@ -984,7 +1026,7 @@ def editar_usuario_admin(request, perfil_id):
             perfil = get_object_or_404(PerfilUsuario.objects.select_related('usuario'), id=perfil_id)
             usuario = perfil.usuario
             
-            rut = request.POST.get('rut')
+            rut = request.POST.get('rut', '').strip()
             first_name = request.POST.get('first_name')
             last_name = request.POST.get('last_name')
             password = request.POST.get('password') 
@@ -992,9 +1034,22 @@ def editar_usuario_admin(request, perfil_id):
             nuevo_rol_id = request.POST.get('rol_id')
             nuevo_area_id = request.POST.get('area_id')
 
+            # Validar RUT
+            es_valido, mensaje_error = validar_rut_chileno(rut)
+            if not es_valido:
+                messages.error(request, mensaje_error)
+                return redirect('gestion_usuarios_admin')
+
             if rut != usuario.rut and Usuario.objects.filter(rut=rut).exclude(id=usuario.id).exists():
                 messages.error(request, f'Error: El RUT "{rut}" ya está en uso por otro usuario.')
                 return redirect('gestion_usuarios_admin')
+            
+            # Validar contraseña si se proporciona
+            if password:
+                es_valida_password, mensaje_error_password = validar_contraseña(password)
+                if not es_valida_password:
+                    messages.error(request, mensaje_error_password)
+                    return redirect('gestion_usuarios_admin')
             
             usuario.first_name = first_name
             usuario.last_name = last_name
@@ -1667,7 +1722,7 @@ def cancelar_cita_dashboard(request, entrevista_id):
         messages.error(request, f'Error al cancelar la cita: {str(e)}')
         
     # 3. Redirigir siempre al dashboard
-    return redirect('dashboard_coordinadora')
+    return redirect('dashboard_encargado_inclusion')
 
 @login_required
 def detalle_casos_encargado_inclusion(request, solicitud_id):
@@ -2941,27 +2996,63 @@ def agendar_cita_coordinadora(request):
     # 2. Lógica de la Acción
     if request.method == 'POST':
         solicitud_id = request.POST.get('solicitud_id')
-        fecha_str = request.POST.get('fecha_agendar')  # Formato: YYYY-MM-DD
-        hora_str = request.POST.get('hora_agendar')    # Formato: HH:MM
+        # Obtener valores y asegurarse de que sean strings (no listas)
+        fecha_raw = request.POST.get('fecha_agendar', '')
+        hora_raw = request.POST.get('hora_agendar', '')
+        fecha_str = fecha_raw.strip() if fecha_raw else ''
+        hora_str = hora_raw.strip() if hora_raw else ''
         modalidad = request.POST.get('modalidad', '')
         notas = request.POST.get('notas', '')
         
+        # Si llegaron como listas, tomar el primer elemento
+        if isinstance(fecha_str, list):
+            fecha_str = fecha_str[0].strip() if fecha_str else ''
+        if isinstance(hora_str, list):
+            hora_str = hora_str[0].strip() if hora_str else ''
+        
         try:
+            if not solicitud_id:
+                messages.error(request, 'ID de solicitud no proporcionado.')
+                return redirect('casos_generales')
+            
             solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
             
+            # Validar que fecha_str y hora_str sean strings válidos y no vacíos
             if not fecha_str or not hora_str:
                 messages.error(request, 'Debe seleccionar una fecha y un horario.')
                 return redirect('detalle_caso', solicitud_id=solicitud_id)
             
+            # Asegurarse de que son strings
+            fecha_str = str(fecha_str)
+            hora_str = str(hora_str)
+            
             # Parsear fecha y hora por separado
-            fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d').date()
-            hora_obj = datetime.strptime(hora_str, '%H:%M').time()
+            try:
+                fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+                hora_obj = datetime.strptime(hora_str, '%H:%M').time()
+            except (ValueError, TypeError) as ve:
+                messages.error(request, f'Formato de fecha u hora inválido.')
+                logger.error(f'Error parseando fecha/hora: fecha_str={fecha_str}, hora_str={hora_str}, error={str(ve)}')
+                return redirect('detalle_caso', solicitud_id=solicitud_id)
             
             # Normalizar la hora a hora en punto (minutos y segundos en 0)
             hora_normalizada = hora_obj.replace(minute=0, second=0, microsecond=0)
             
-            # Combinar fecha y hora en un datetime aware
-            fecha_entrevista = timezone.make_aware(datetime.combine(fecha_obj, hora_normalizada))
+            # Combinar fecha y hora en un datetime naive primero
+            fecha_hora_naive = datetime.combine(fecha_obj, hora_normalizada)
+            
+            # Verificar que el datetime naive sea válido
+            if not isinstance(fecha_hora_naive, datetime):
+                messages.error(request, 'Error al combinar fecha y hora.')
+                return redirect('detalle_caso', solicitud_id=solicitud_id)
+            
+            # Convertir a datetime aware usando la zona horaria del sistema
+            try:
+                fecha_entrevista = timezone.make_aware(fecha_hora_naive)
+            except (ValueError, TypeError) as e:
+                messages.error(request, f'Error al procesar la fecha y hora seleccionadas.')
+                logger.error(f'Error en make_aware: fecha_hora_naive={fecha_hora_naive}, tipo={type(fecha_hora_naive)}, error={str(e)}')
+                return redirect('detalle_caso', solicitud_id=solicitud_id)
             
             # Verificar que no esté en el pasado
             now = timezone.localtime(timezone.now())
@@ -2977,11 +3068,11 @@ def agendar_cita_coordinadora(request):
             for coord in todas_las_coordinadoras:
                 tiene_cita = Entrevistas.objects.filter(
                     coordinadora=coord,
-                    fecha_entrevista=hora_normalizada
+                    fecha_entrevista=fecha_entrevista
                 ).exists()
                 tiene_horario_bloqueado = HorarioBloqueado.objects.filter(
                     coordinadora=coord,
-                    fecha_hora=hora_normalizada
+                    fecha_hora=fecha_entrevista
                 ).exists()
                 if not tiene_cita and not tiene_horario_bloqueado:
                     coordinadora_asignada = coord
@@ -2998,7 +3089,7 @@ def agendar_cita_coordinadora(request):
             # Verificar que no haya una cita ya agendada para esta solicitud en este horario
             cita_existente = Entrevistas.objects.filter(
                 solicitudes=solicitud,
-                fecha_entrevista=hora_normalizada
+                fecha_entrevista=fecha_entrevista
             ).exists()
             
             if cita_existente:
@@ -3009,7 +3100,7 @@ def agendar_cita_coordinadora(request):
             nueva_entrevista = Entrevistas.objects.create(
                 solicitudes=solicitud,
                 coordinadora=coordinadora_asignada,
-                fecha_entrevista=hora_normalizada,
+                fecha_entrevista=fecha_entrevista,
                 modalidad=modalidad,
                 notas=notas,
                 estado='pendiente'
@@ -3046,28 +3137,60 @@ def reagendar_cita_coordinadora(request, entrevista_id):
 
     # 2. Lógica de la Acción
     if request.method == 'POST':
-        fecha_str = request.POST.get('fecha_reagendar')  # Formato: YYYY-MM-DD
-        hora_str = request.POST.get('hora_reagendar')    # Formato: HH:MM
+        # Obtener valores y asegurarse de que sean strings (no listas)
+        fecha_raw = request.POST.get('fecha_reagendar', '')
+        hora_raw = request.POST.get('hora_reagendar', '')
+        fecha_str = fecha_raw.strip() if fecha_raw else ''
+        hora_str = hora_raw.strip() if hora_raw else ''
         nueva_modalidad = request.POST.get('nueva_modalidad', '')
         notas_reagendamiento = request.POST.get('notas_reagendamiento', '')
+        
+        # Si llegaron como listas, tomar el primer elemento
+        if isinstance(fecha_str, list):
+            fecha_str = fecha_str[0].strip() if fecha_str else ''
+        if isinstance(hora_str, list):
+            hora_str = hora_str[0].strip() if hora_str else ''
         try:
             # Cualquier coordinadora del rol puede reagendar cualquier entrevista del rol
             todas_las_coordinadoras = PerfilUsuario.objects.filter(rol__nombre_rol=ROL_COORDINADORA)
             entrevista_original = get_object_or_404(Entrevistas, id=entrevista_id, coordinadora__in=todas_las_coordinadoras)
             
+            # Validar que fecha_str y hora_str sean strings válidos y no vacíos
             if not fecha_str or not hora_str:
                 messages.error(request, 'Debe seleccionar una fecha y un horario.')
-                return redirect('panel_control_encargado_inclusion')
+                return redirect('detalle_caso', solicitud_id=entrevista_original.solicitudes.id)
+            
+            # Asegurarse de que son strings
+            fecha_str = str(fecha_str)
+            hora_str = str(hora_str)
             
             # Parsear fecha y hora por separado
-            fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d').date()
-            hora_obj = datetime.strptime(hora_str, '%H:%M').time()
+            try:
+                fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+                hora_obj = datetime.strptime(hora_str, '%H:%M').time()
+            except (ValueError, TypeError) as ve:
+                messages.error(request, f'Formato de fecha u hora inválido.')
+                logger.error(f'Error parseando fecha/hora en reagendar: fecha_str={fecha_str}, hora_str={hora_str}, error={str(ve)}')
+                return redirect('detalle_caso', solicitud_id=entrevista_original.solicitudes.id)
             
             # Normalizar la hora a hora en punto (minutos y segundos en 0)
             hora_normalizada = hora_obj.replace(minute=0, second=0, microsecond=0)
             
-            # Combinar fecha y hora en un datetime aware
-            nueva_fecha = timezone.make_aware(datetime.combine(fecha_obj, hora_normalizada))
+            # Combinar fecha y hora en un datetime naive primero
+            fecha_hora_naive = datetime.combine(fecha_obj, hora_normalizada)
+            
+            # Verificar que el datetime naive sea válido
+            if not isinstance(fecha_hora_naive, datetime):
+                messages.error(request, 'Error al combinar fecha y hora.')
+                return redirect('detalle_caso', solicitud_id=entrevista_original.solicitudes.id)
+            
+            # Convertir a datetime aware usando la zona horaria del sistema
+            try:
+                nueva_fecha = timezone.make_aware(fecha_hora_naive)
+            except (ValueError, TypeError) as e:
+                messages.error(request, f'Error al procesar la fecha y hora seleccionadas.')
+                logger.error(f'Error en make_aware (reagendar): fecha_hora_naive={fecha_hora_naive}, tipo={type(fecha_hora_naive)}, error={str(e)}')
+                return redirect('detalle_caso', solicitud_id=entrevista_original.solicitudes.id)
             
             # Crear la nueva cita (mantenemos la misma coordinadora asignada originalmente)
             nueva_entrevista = Entrevistas.objects.create(
@@ -3086,10 +3209,17 @@ def reagendar_cita_coordinadora(request, entrevista_id):
             entrevista_original.save()
             
             messages.success(request, 'Cita reagendada correctamente.')
+            return redirect('detalle_caso', solicitud_id=entrevista_original.solicitudes.id)
         except Exception as e:
             messages.error(request, f'Error al reagendar la cita: {str(e)}')
+            # Intentar redirigir al caso si es posible, sino al panel
+            try:
+                entrevista_original = get_object_or_404(Entrevistas, id=entrevista_id)
+                return redirect('detalle_caso', solicitud_id=entrevista_original.solicitudes.id)
+            except:
+                return redirect('panel_control_encargado_inclusion')
             
-    # 3. Redirigir
+    # 3. Redirigir (si no es POST)
     return redirect('panel_control_encargado_inclusion')
 
 
@@ -3557,6 +3687,12 @@ def cargar_estudiantes_excel(request):
                         errores.append(f'Fila {row_num}: Datos incompletos')
                         continue
                     
+                    # Validar RUT
+                    es_valido, mensaje_error = validar_rut_chileno(rut)
+                    if not es_valido:
+                        errores.append(f'Fila {row_num}: {mensaje_error}')
+                        continue
+                    
                     # Validar semestre
                     semestre_valido = None
                     if semestre_actual is not None:
@@ -3934,6 +4070,12 @@ def cargar_inscripciones_excel(request):
                     
                     if not estudiante_rut:
                         errores.append(f'Fila {row_num}: RUT del estudiante requerido')
+                        continue
+                    
+                    # Validar RUT
+                    es_valido, mensaje_error = validar_rut_chileno(estudiante_rut)
+                    if not es_valido:
+                        errores.append(f'Fila {row_num}: {mensaje_error}')
                         continue
                     
                     # Buscar estudiante

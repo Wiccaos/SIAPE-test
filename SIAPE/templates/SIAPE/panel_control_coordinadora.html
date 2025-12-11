@@ -358,7 +358,7 @@
         document.getElementById('confirmar_accion').value = accion;
         document.getElementById('confirmar_caso_asunto').value = asunto;
         // ***** URL ACTUALIZADA *****
-        document.getElementById('formConfirmar').action = '{% url "coordinadora_confirmar_cita" 0 %}'.replace('0', entrevistaId);
+        document.getElementById('formConfirmar').action = '{% url "encargado_inclusion_confirmar_cita" 0 %}'.replace('0', entrevistaId);
         
         const btnSubmit = document.getElementById('btnConfirmarSubmit');
         if (accion === 'realizada') {
@@ -381,7 +381,7 @@
         document.getElementById('editar_notas_caso_asunto').value = asunto;
         document.getElementById('editar_notas_textarea').value = notas.replace(/\\n/g, '\n');
         // ***** URL ACTUALIZADA *****
-        document.getElementById('formEditarNotas').action = '{% url "coordinadora_editar_notas_cita" 0 %}'.replace('0', entrevistaId);
+        document.getElementById('formEditarNotas').action = '{% url "encargado_inclusion_editar_notas_cita" 0 %}'.replace('0', entrevistaId);
         document.getElementById('modalEditarNotas').style.display = 'block';
     }
 
@@ -696,7 +696,7 @@
         document.getElementById('reagendar_caso_asunto').value = asunto;
         document.getElementById('nueva_modalidad').value = modalidad;
         // ***** URL ACTUALIZADA *****
-        document.getElementById('formReagendar').action = '{% url "coordinadora_reagendar_cita" 0 %}'.replace('0', entrevistaId);
+        document.getElementById('formReagendar').action = '{% url "encargado_inclusion_reagendar_cita" 0 %}'.replace('0', entrevistaId);
         document.getElementById('modalReagendar').style.display = 'block';
         // Inicializar calendario cuando se abre el modal
         if (calHeaderReagendar) {
