@@ -15,6 +15,16 @@ import calendar  # Importar para el calendario mensual
 import logging
 import holidays  # Feriados de Chile
 
+from django.db.models.functions import TruncMonth # Para gráficos de línea de tiempo
+from django.template.loader import get_template   # Para PDF
+from django.http import HttpResponse              # Para respuestas binarias (PDF/Excel)
+from django.db import transaction                 # Para la revisión masiva segura
+import openpyxl                                   # Para Excel
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from xhtml2pdf import pisa # Para PDF
+from collections import defaultdict
+
+
 # Django REST Framework
 from rest_framework import viewsets, mixins, status
 from rest_framework.decorators import api_view, permission_classes
@@ -3514,103 +3524,465 @@ def estudiantes_por_carrera_director(request, carrera_id):
 @login_required
 def estadisticas_director(request):
     """
-    Panel de Estadísticas para el Director de Carrera.
-    Muestra gráficos sobre el estado y tipo de ajustes.
+    Panel de Estadísticas Avanzado para el Director de Carrera.
+    Versión compatible con Windows/SQLite (Cálculo de fechas en Python).
     """
-    
-    # 1. --- Verificación de Permisos ---
     try:
         perfil_director = request.user.perfil
-        if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
-            messages.error(request, 'No tienes permisos para esta acción.')
+        if perfil_director.rol.nombre_rol != 'Director de Carrera':
+            messages.error(request, 'No tienes permisos.')
             return redirect('home')
     except AttributeError:
         return redirect('home')
 
-    # 2. --- Base Query ---
-    # Obtenemos todos los ajustes asignados a estudiantes de las carreras de este director
+    # --- 1. Datos Base ---
     carreras_del_director = Carreras.objects.filter(director=perfil_director)
-    ajustes_base = AjusteAsignado.objects.filter(
-        solicitudes__estudiantes__carreras__in=carreras_del_director
-    )
+    # Si no tiene carreras, evitar errores
+    if not carreras_del_director.exists():
+        messages.warning(request, "No tienes carreras asignadas.")
+        return redirect('dashboard_director')
 
-    # 3. --- Gráfico 1: Estado de Ajustes (Pie Chart) ---
-    # Esto responde a tu petición de "aprobados/rechazados/pendientes"
-    estado_ajustes = ajustes_base.values('estado_aprobacion').annotate(
-        total=Count('id')
-    ).order_by('estado_aprobacion')
+    solicitudes_base = Solicitudes.objects.filter(estudiantes__carreras__in=carreras_del_director)
+    ajustes_base = AjusteAsignado.objects.filter(solicitudes__in=solicitudes_base)
 
-    # Formatear para Chart.js
+    # --- 2. Gráfico 1: Estado General (Pie Chart) ---
+    estado_ajustes = ajustes_base.values('estado_aprobacion').annotate(total=Count('id')).order_by('estado_aprobacion')
+    
+    colores_estado = {'aprobado': '#28a745', 'rechazado': '#dc3545', 'pendiente': '#ffc107'}
     pie_labels = [d['estado_aprobacion'].capitalize() for d in estado_ajustes]
     pie_data = [d['total'] for d in estado_ajustes]
-    
+    pie_colors = [colores_estado.get(d['estado_aprobacion'], '#6c757d') for d in estado_ajustes]
+
     pie_chart_data = {
         'labels': pie_labels,
-        'datasets': [{
-            'data': pie_data,
-            'backgroundColor': [
-                'rgba(40, 167, 69, 0.7)',  # Aprobado (Verde)
-                'rgba(253, 126, 20, 0.7)', # Pendiente (Naranja)
-                'rgba(220, 53, 69, 0.7)'   # Rechazado (Rojo)
-            ],
-            'borderColor': '#ffffff',
-        }]
+        'datasets': [{'data': pie_data, 'backgroundColor': pie_colors}]
     }
 
-    # 4. --- Gráfico 2: Tipos de Apoyo (Idea Adicional) ---
-    # Muestra qué categorías de apoyo son más comunes.
-    tipos_ajustes = ajustes_base.filter(estado_aprobacion='aprobado').values(
-        'ajuste_razonable__categorias_ajustes__nombre_categoria'
-    ).annotate(
-        total=Count('id')
-    ).order_by('-total') # De más común a menos común
+    # --- 3. Gráfico 2: Comparativo (Barras) ---
+    data_cat = ajustes_base.exclude(estado_aprobacion='pendiente').values(
+        'ajuste_razonable__categorias_ajustes__nombre_categoria', 'estado_aprobacion'
+    ).annotate(total=Count('id'))
 
-    bar_labels_tipos = [d['ajuste_razonable__categorias_ajustes__nombre_categoria'] for d in tipos_ajustes]
-    bar_data_tipos = [d['total'] for d in tipos_ajustes]
+    categorias_unicas = sorted(list(set(d['ajuste_razonable__categorias_ajustes__nombre_categoria'] for d in data_cat)))
+    data_aprobados = []
+    data_rechazados = []
 
-    bar_chart_tipos = {
-        'labels': bar_labels_tipos,
-        'datasets': [{
-            'label': 'Ajustes Aprobados por Categoría',
-            'data': bar_data_tipos,
-            'backgroundColor': 'rgba(0, 123, 255, 0.7)', # Azul
-        }]
+    for cat in categorias_unicas:
+        aprob = next((x['total'] for x in data_cat if x['ajuste_razonable__categorias_ajustes__nombre_categoria'] == cat and x['estado_aprobacion'] == 'aprobado'), 0)
+        rech = next((x['total'] for x in data_cat if x['ajuste_razonable__categorias_ajustes__nombre_categoria'] == cat and x['estado_aprobacion'] == 'rechazado'), 0)
+        data_aprobados.append(aprob)
+        data_rechazados.append(rech)
+
+    bar_chart_comparativo = {
+        'labels': categorias_unicas,
+        'datasets': [
+            {'label': 'Aprobados', 'data': data_aprobados, 'backgroundColor': '#28a745'},
+            {'label': 'Rechazados', 'data': data_rechazados, 'backgroundColor': '#dc3545'}
+        ]
     }
 
-    # 5. --- Gráfico 3: Eficiencia/Concentración por Sección (Tu petición) ---
-    # Muestra las 5 secciones (asignaturas) con más ajustes aprobados
-    secciones_data = AjusteAsignado.objects.filter(
-        solicitudes__estudiantes__carreras__in=carreras_del_director,
-        estado_aprobacion='aprobado'
-    ).values(
-        'solicitudes__asignaturas_solicitadas__nombre', # Agrupa por nombre de asignatura
-        'solicitudes__asignaturas_solicitadas__seccion' # y por sección
-    ).annotate(
-        total=Count('id')
-    ).order_by('-total')[:5] # Top 5
+    # --- 4. Gráfico 3: Evolución Mensual (CORREGIDO PARA WINDOWS) ---
+    # En lugar de usar TruncMonth en la DB, traemos las fechas y procesamos en Python
+    fecha_inicio = timezone.now() - timedelta(days=365)
+    
+    # Traemos solo la fecha de creación de las solicitudes recientes
+    fechas_solicitudes = solicitudes_base.filter(created_at__gte=fecha_inicio).values_list('created_at', flat=True)
+    
+    conteo_por_mes = defaultdict(int)
+    
+    # Mapeo de meses en español manual para evitar problemas de locale
+    nombres_meses = {
+        1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril', 5: 'Mayo', 6: 'Junio',
+        7: 'Julio', 8: 'Agosto', 9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
+    }
 
-    bar_labels_secciones = [f"{d['solicitudes__asignaturas_solicitadas__nombre']} ({d['solicitudes__asignaturas_solicitadas__seccion']})" for d in secciones_data]
-    bar_data_secciones = [d['total'] for d in secciones_data]
+    for fecha in fechas_solicitudes:
+        # Convertir a hora local para asegurar el mes correcto
+        fecha_local = timezone.localtime(fecha)
+        # Clave para ordenar: (Año, Mes)
+        clave = (fecha_local.year, fecha_local.month)
+        conteo_por_mes[clave] += 1
+    
+    # Ordenar cronológicamente
+    claves_ordenadas = sorted(conteo_por_mes.keys())
+    
+    line_labels = []
+    line_data = []
 
-    bar_chart_secciones = {
-        'labels': bar_labels_secciones,
+    for anio, mes in claves_ordenadas:
+        nombre_mes = f"{nombres_meses[mes]} {anio}"
+        line_labels.append(nombre_mes)
+        line_data.append(conteo_por_mes[(anio, mes)])
+
+    chart_linea_tiempo = {
+        'labels': line_labels,
         'datasets': [{
-            'label': 'Ajustes Aprobados por Sección (Top 5)',
-            'data': bar_data_secciones,
-            'backgroundColor': 'rgba(204, 0, 0, 0.7)', # Rojo INACAP
+            'label': 'Solicitudes Mensuales',
+            'data': line_data,
+            'borderColor': '#007bff',
+            'backgroundColor': 'rgba(0, 123, 255, 0.1)',
+            'fill': True,
+            'tension': 0.3
+        }]
+    }
+    
+    # --- 5. Gráfico 4: Carreras (Dona) ---
+    solicitudes_por_carrera = solicitudes_base.values('estudiantes__carreras__nombre').annotate(total=Count('id')).order_by('-total')
+    carrera_labels = [d['estudiantes__carreras__nombre'] for d in solicitudes_por_carrera]
+    carrera_data = [d['total'] for d in solicitudes_por_carrera]
+
+    chart_carreras = {
+        'labels': carrera_labels,
+        'datasets': [{
+            'data': carrera_data,
+            'backgroundColor': ['#007bff', '#17a2b8', '#6610f2', '#e83e8c', '#fd7e14']
+        }]
+    }
+    
+    # 5. --- NUEVA ESTADÍSTICA 5: Tasa de Aprobación Global (KPI) ---
+    total_resueltos = ajustes_base.filter(
+        estado_aprobacion__in=['aprobado', 'rechazado']
+    ).count()
+    total_aprobados = ajustes_base.filter(estado_aprobacion='aprobado').count()
+    
+    tasa_aprobacion = 0
+    if total_resueltos > 0:
+        tasa_aprobacion = round((total_aprobados / total_resueltos) * 100, 1)
+
+    # 6. --- NUEVA ESTADÍSTICA 6: Casos Activos por Semestre (Barra) ---
+    # Contar solicitudes APROBADAS, agrupadas por el semestre actual del estudiante
+    casos_por_semestre = solicitudes_base.filter(
+        estado='aprobado',
+        estudiantes__semestre_actual__isnull=False
+    ).values('estudiantes__semestre_actual').annotate(
+        total=Count('id')
+    ).order_by('estudiantes__semestre_actual')
+
+    semestre_labels = [f'Semestre {d["estudiantes__semestre_actual"]}' for d in casos_por_semestre]
+    semestre_data = [d['total'] for d in casos_por_semestre]
+    
+    chart_semestre = {
+        'labels': semestre_labels,
+        'datasets': [{
+            'label': 'Casos Aprobados',
+            'data': semestre_data,
+            'backgroundColor': '#fd7e14' # Naranja
         }]
     }
 
     context = {
         'nombre_usuario': request.user.first_name,
-        # Convertimos los datos a JSON para que JavaScript los pueda leer
         'pie_chart_data_json': json.dumps(pie_chart_data),
-        'bar_chart_tipos_json': json.dumps(bar_chart_tipos),
-        'bar_chart_secciones_json': json.dumps(bar_chart_secciones),
+        'bar_chart_comparativo_json': json.dumps(bar_chart_comparativo),
+        'chart_linea_tiempo_json': json.dumps(chart_linea_tiempo),
+        'chart_carreras_json': json.dumps(chart_carreras),
+        'tasa_aprobacion': tasa_aprobacion,
+        'chart_semestre_json': json.dumps(chart_semestre),
     }
+    
+    
     
     return render(request, 'SIAPE/estadisticas_director.html', context)
 
+@require_POST
+@login_required
+def procesar_revision_director(request, solicitud_id):
+    """
+    Aprueba masivamente los ajustes seleccionados y rechaza los no seleccionados.
+    """
+    try:
+        if request.user.perfil.rol.nombre_rol != ROL_DIRECTOR:
+            return redirect('home')
+
+        solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
+        ajustes_seleccionados_ids = request.POST.getlist('ajustes_seleccionados')
+        motivo_decision = request.POST.get('motivo_decision', '').strip()
+
+        if not motivo_decision:
+            messages.error(request, 'Debes ingresar un motivo para finalizar la revisión.')
+            return redirect('detalle_caso', solicitud_id=solicitud_id)
+
+        with transaction.atomic():
+            todos_ajustes = AjusteAsignado.objects.filter(solicitudes=solicitud)
+            aprobados_count = 0
+
+            for ajuste in todos_ajustes:
+                if str(ajuste.id) in ajustes_seleccionados_ids:
+                    ajuste.estado_aprobacion = 'aprobado'
+                    aprobados_count += 1
+                else:
+                    ajuste.estado_aprobacion = 'rechazado'
+                
+                ajuste.director_aprobador = request.user.perfil
+                ajuste.fecha_aprobacion = timezone.now()
+                ajuste.comentarios_director = motivo_decision
+                ajuste.save()
+
+            if aprobados_count > 0:
+                solicitud.estado = 'aprobado'
+                messages.success(request, f'Caso resuelto: {aprobados_count} ajustes aprobados.')
+            else:
+                solicitud.estado = 'rechazado'
+                messages.warning(request, 'Todos los ajustes fueron rechazados. Caso cerrado como rechazado.')
+            
+            solicitud.save()
+
+    except Exception as e:
+        messages.error(request, f'Error: {str(e)}')
+
+    return redirect('detalle_caso', solicitud_id=solicitud_id)
+
+@login_required
+def exportar_ficha_pdf(request, solicitud_id):
+    """Genera PDF de la resolución."""
+    if request.user.perfil.rol.nombre_rol not in [ROL_DIRECTOR, ROL_ADMIN, ROL_COORDINADORA]:
+         return redirect('home')
+
+    solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
+    ajustes = AjusteAsignado.objects.filter(solicitudes=solicitud)
+    
+    context = {
+        'solicitud': solicitud,
+        'estudiante': solicitud.estudiantes,
+        'ajustes': ajustes,
+        'fecha_emision': timezone.now(),
+        'director': request.user.perfil.usuario.get_full_name()
+    }
+
+    template = get_template('SIAPE/pdf/ficha_resumen.html')
+    html = template.render(context)
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="Ficha_{solicitud.estudiantes.rut}.pdf"'
+    
+    pisa_status = pisa.CreatePDF(html, dest=response)
+    if pisa_status.err:
+        return HttpResponse('Error generando PDF')
+    return response
+
+@login_required
+def exportar_ficha_excel(request, solicitud_id):
+    """Genera Excel de la resolución."""
+    if request.user.perfil.rol.nombre_rol not in [ROL_DIRECTOR, ROL_ADMIN, ROL_COORDINADORA]:
+         return redirect('home')
+
+    solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
+    ajustes = AjusteAsignado.objects.filter(solicitudes=solicitud)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Resolución"
+
+    # Estilos
+    bold = Font(bold=True)
+    center = Alignment(horizontal='center')
+    border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+
+    # Encabezado
+    ws['A1'] = "FICHA DE RESOLUCIÓN - SIAPE"
+    ws['A1'].font = Font(bold=True, size=14, color="D32F2F")
+    
+    ws['A3'] = "Estudiante:"; ws['B3'] = f"{solicitud.estudiantes.nombres} {solicitud.estudiantes.apellidos}"
+    ws['A4'] = "RUT:"; ws['B4'] = solicitud.estudiantes.rut
+    ws['A5'] = "Carrera:"; ws['B5'] = solicitud.estudiantes.carreras.nombre
+    ws['A6'] = "Estado Caso:"; ws['B6'] = solicitud.get_estado_display()
+
+    # Tabla
+    headers = ['Categoría', 'Ajuste', 'Estado', 'Comentarios']
+    ws.append([]); ws.append(headers)
+    
+    for col_num, header in enumerate(headers, 1):
+        cell = ws.cell(row=8, column=col_num)
+        cell.font = bold
+        cell.fill = PatternFill("solid", fgColor="E0E0E0")
+        cell.border = border
+
+    for ajuste in ajustes:
+        row = [
+            ajuste.ajuste_razonable.categorias_ajustes.nombre_categoria,
+            ajuste.ajuste_razonable.descripcion,
+            "APROBADO" if ajuste.estado_aprobacion == 'aprobado' else "RECHAZADO",
+            ajuste.comentarios_director or '-'
+        ]
+        ws.append(row)
+        # Aplicar bordes a la fila recién agregada
+        for cell in ws[ws.max_row]:
+            cell.border = border
+
+    ws.column_dimensions['A'].width = 25
+    ws.column_dimensions['B'].width = 50
+    ws.column_dimensions['C'].width = 15
+    ws.column_dimensions['D'].width = 40
+
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename="Resolucion_{solicitud.estudiantes.rut}.xlsx"'
+    wb.save(response)
+    return response
+
+@login_required
+def exportar_reporte_estadistico_pdf(request):
+    """
+    Genera un PDF con el reporte estadístico completo del Director.
+    """
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != 'Director de Carrera':
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+
+    # 1. Recopilar Datos (Misma lógica que la vista principal)
+    carreras_del_director = Carreras.objects.filter(director=perfil)
+    if not carreras_del_director.exists():
+        messages.warning(request, "No hay datos para exportar.")
+        return redirect('estadisticas_director')
+
+    solicitudes_base = Solicitudes.objects.filter(estudiantes__carreras__in=carreras_del_director)
+    ajustes_base = AjusteAsignado.objects.filter(solicitudes__in=solicitudes_base)
+
+    # Datos: Estado General
+    estado_ajustes = ajustes_base.values('estado_aprobacion').annotate(total=Count('id')).order_by('estado_aprobacion')
+
+    # Datos: Comparativa Categorías
+    data_cat = ajustes_base.exclude(estado_aprobacion='pendiente').values(
+        'ajuste_razonable__categorias_ajustes__nombre_categoria', 'estado_aprobacion'
+    ).annotate(total=Count('id'))
+    
+    # Procesar para tabla
+    categorias_stats = []
+    cats_unicas = sorted(list(set(d['ajuste_razonable__categorias_ajustes__nombre_categoria'] for d in data_cat)))
+    for cat in cats_unicas:
+        aprob = next((x['total'] for x in data_cat if x['ajuste_razonable__categorias_ajustes__nombre_categoria'] == cat and x['estado_aprobacion'] == 'aprobado'), 0)
+        rech = next((x['total'] for x in data_cat if x['ajuste_razonable__categorias_ajustes__nombre_categoria'] == cat and x['estado_aprobacion'] == 'rechazado'), 0)
+        categorias_stats.append({'nombre': cat, 'aprobados': aprob, 'rechazados': rech})
+
+    # Datos: Evolución Mensual (Lógica Python segura)
+    fecha_inicio = timezone.now() - timedelta(days=365)
+    fechas_solicitudes = solicitudes_base.filter(created_at__gte=fecha_inicio).values_list('created_at', flat=True)
+    conteo_por_mes = defaultdict(int)
+    for fecha in fechas_solicitudes:
+        fecha_local = timezone.localtime(fecha)
+        conteo_por_mes[(fecha_local.year, fecha_local.month)] += 1
+    
+    evolucion_stats = []
+    nombres_meses = {1:'Enero', 2:'Febrero', 3:'Marzo', 4:'Abril', 5:'Mayo', 6:'Junio', 7:'Julio', 8:'Agosto', 9:'Septiembre', 10:'Octubre', 11:'Noviembre', 12:'Diciembre'}
+    for key in sorted(conteo_por_mes.keys()):
+        evolucion_stats.append({'mes': f"{nombres_meses[key[1]]} {key[0]}", 'total': conteo_por_mes[key]})
+
+    # Datos: Carreras
+    carreras_stats = solicitudes_base.values('estudiantes__carreras__nombre').annotate(total=Count('id')).order_by('-total')
+
+    # 2. Generar PDF
+    context = {
+        'director': request.user.get_full_name(),
+        'fecha_emision': timezone.now(),
+        'estado_ajustes': estado_ajustes,
+        'categorias_stats': categorias_stats,
+        'evolucion_stats': evolucion_stats,
+        'carreras_stats': carreras_stats,
+    }
+
+    # Necesitamos crear este template a continuación
+    template = get_template('SIAPE/pdf/reporte_estadistico.html') 
+    html = template.render(context)
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="Reporte_Gestion_{timezone.now().strftime("%Y%m%d")}.pdf"'
+    
+    pisa_status = pisa.CreatePDF(html, dest=response)
+    if pisa_status.err:
+        return HttpResponse('Error generando PDF')
+    return response
+
+
+@login_required
+def exportar_reporte_estadistico_excel(request):
+    """
+    Genera un Excel con hojas separadas para cada indicador.
+    """
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != 'Director de Carrera':
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+
+    # Recopilar Datos (Misma lógica)
+    carreras_del_director = Carreras.objects.filter(director=perfil)
+    solicitudes_base = Solicitudes.objects.filter(estudiantes__carreras__in=carreras_del_director)
+    ajustes_base = AjusteAsignado.objects.filter(solicitudes__in=solicitudes_base)
+
+    wb = openpyxl.Workbook()
+    
+    # --- HOJA 1: Resumen General ---
+    ws1 = wb.active
+    ws1.title = "Estado General"
+    ws1.append(["REPORTE DE GESTIÓN - ESTADO DE AJUSTES"])
+    ws1.append(["Generado por:", request.user.get_full_name()])
+    ws1.append(["Fecha:", timezone.now().strftime("%d/%m/%Y")])
+    ws1.append([])
+    
+    # Estilos
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor="D32F2F") # Rojo INACAP
+    
+    ws1.append(["Estado", "Total Casos"])
+    # Estilo cabecera tabla
+    for cell in ws1[5]:
+        cell.font = header_font
+        cell.fill = header_fill
+
+    estado_data = ajustes_base.values('estado_aprobacion').annotate(total=Count('id'))
+    for item in estado_data:
+        ws1.append([item['estado_aprobacion'].capitalize(), item['total']])
+
+    # --- HOJA 2: Por Categoría ---
+    ws2 = wb.create_sheet(title="Categorías")
+    ws2.append(["COMPARATIVA APROBADOS VS RECHAZADOS POR CATEGORÍA"])
+    ws2.append([])
+    ws2.append(["Categoría", "Aprobados", "Rechazados", "Total"])
+    for cell in ws2[3]:
+        cell.font = header_font
+        cell.fill = header_fill
+
+    data_cat = ajustes_base.exclude(estado_aprobacion='pendiente').values(
+        'ajuste_razonable__categorias_ajustes__nombre_categoria', 'estado_aprobacion'
+    ).annotate(total=Count('id'))
+    
+    cats_unicas = sorted(list(set(d['ajuste_razonable__categorias_ajustes__nombre_categoria'] for d in data_cat)))
+    for cat in cats_unicas:
+        aprob = next((x['total'] for x in data_cat if x['ajuste_razonable__categorias_ajustes__nombre_categoria'] == cat and x['estado_aprobacion'] == 'aprobado'), 0)
+        rech = next((x['total'] for x in data_cat if x['ajuste_razonable__categorias_ajustes__nombre_categoria'] == cat and x['estado_aprobacion'] == 'rechazado'), 0)
+        ws2.append([cat, aprob, rech, aprob + rech])
+
+    # --- HOJA 3: Evolución Mensual ---
+    ws3 = wb.create_sheet(title="Evolución Mensual")
+    ws3.append(["SOLICITUDES POR MES (ÚLTIMO AÑO)"])
+    ws3.append([])
+    ws3.append(["Mes/Año", "Total Solicitudes"])
+    for cell in ws3[3]:
+        cell.font = header_font
+        cell.fill = header_fill
+
+    fecha_inicio = timezone.now() - timedelta(days=365)
+    fechas = solicitudes_base.filter(created_at__gte=fecha_inicio).values_list('created_at', flat=True)
+    conteo_mes = defaultdict(int)
+    for f in fechas:
+        fl = timezone.localtime(f)
+        conteo_mes[(fl.year, fl.month)] += 1
+    
+    nombres_meses = {1:'Enero', 2:'Febrero', 3:'Marzo', 4:'Abril', 5:'Mayo', 6:'Junio', 7:'Julio', 8:'Agosto', 9:'Septiembre', 10:'Octubre', 11:'Noviembre', 12:'Diciembre'}
+    
+    for key in sorted(conteo_mes.keys()):
+        ws3.append([f"{nombres_meses[key[1]]} {key[0]}", conteo_mes[key]])
+
+    # Ajustar ancho columnas (básico)
+    for ws in [ws1, ws2, ws3]:
+        ws.column_dimensions['A'].width = 30
+        ws.column_dimensions['B'].width = 15
+
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename="Reporte_Gestion_{timezone.now().strftime("%Y%m%d")}.xlsx"'
+    wb.save(response)
+    return response
 
 # ----------------------------------------------------
 #           CARGA MASIVA DE DATOS (DIRECTOR)
