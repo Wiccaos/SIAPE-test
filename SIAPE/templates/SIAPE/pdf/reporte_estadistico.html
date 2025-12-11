@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        @page { size: letter; margin: 2cm; }
+        body { font-family: Helvetica, sans-serif; color: #333; }
+        h1 { color: #D32F2F; text-align: center; font-size: 20px; border-bottom: 2px solid #D32F2F; padding-bottom: 10px; }
+        h2 { font-size: 16px; margin-top: 20px; background-color: #f0f0f0; padding: 5px; border-left: 5px solid #D32F2F; }
+        .meta { font-size: 12px; color: #666; text-align: right; margin-bottom: 30px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+        th { background-color: #D32F2F; color: white; padding: 8px; text-align: left; }
+        td { border: 1px solid #ddd; padding: 8px; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .footer { position: fixed; bottom: 0; width: 100%; text-align: center; font-size: 10px; color: #999; }
+    </style>
+</head>
+<body>
+    <h1>Reporte de Gestión de Inclusión</h1>
+    
+    <div class="meta">
+        <p><strong>Generado por:</strong> {{ director }}</p>
+        <p><strong>Fecha:</strong> {{ fecha_emision|date:"d/m/Y H:i" }}</p>
+    </div>
+
+    <h2>1. Estado General de Solicitudes</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Estado</th>
+                <th style="text-align: right;">Total Casos</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in estado_ajustes %}
+            <tr>
+                <td>{{ item.estado_aprobacion|title }}</td>
+                <td style="text-align: right;">{{ item.total }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>2. Resolución por Categoría de Apoyo</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Categoría</th>
+                <th style="text-align: center;">Aprobados</th>
+                <th style="text-align: center;">Rechazados</th>
+                <th style="text-align: right;">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cat in categorias_stats %}
+            <tr>
+                <td>{{ cat.nombre }}</td>
+                <td style="text-align: center; color: green;">{{ cat.aprobados }}</td>
+                <td style="text-align: center; color: red;">{{ cat.rechazados }}</td>
+                <td style="text-align: right;"><strong>{{ cat.aprobados|add:cat.rechazados }}</strong></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>3. Evolución Mensual (Último Año)</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Mes</th>
+                <th style="text-align: right;">Solicitudes Nuevas</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in evolucion_stats %}
+            <tr>
+                <td>{{ item.mes }}</td>
+                <td style="text-align: right;">{{ item.total }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        Documento generado automáticamente por Sistema SIAPE
+    </div>
+</body>
+</html>
