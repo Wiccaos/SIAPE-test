@@ -140,6 +140,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -255,3 +256,16 @@ LOGGING = {
 
 
 
+# ============================================
+# AJUSTES TEMPORALES PARA HTTP (IP PUBLICA)
+# ============================================
+
+# Desactivar redirección a HTTPS (porque no tenemos certificado aún)
+SECURE_SSL_REDIRECT = False
+
+# Permitir cookies en HTTP (sin esto, no podrás hacer Login)
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
+
+# Desactivar almacenamiento de CSRF en sesión (esto soluciona tu error actual si la sesión falla)
+CSRF_USE_SESSIONS = False
