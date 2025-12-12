@@ -659,6 +659,7 @@ body.dark-mode .detalle-card li {
     overflow: hidden;
     background: #f9f9fb;
     box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+    table-layout: fixed; /* Necesario para que funcione text-overflow: ellipsis */
 }
 
 .custom-table th,
@@ -666,7 +667,61 @@ body.dark-mode .detalle-card li {
     padding: 12px 16px;
     text-align: left;
     border-bottom: 1px solid #ececec;
-    white-space: nowrap; /* Evita que el texto se rompa */
+    position: relative; /* Para tooltips */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Distribución de anchos para tablas comunes (6 columnas: nombre, email, rut, rol, área, acción) */
+.custom-table th:nth-child(1),
+.custom-table td:nth-child(1) {
+    width: 18%; /* Nombre */
+}
+
+.custom-table th:nth-child(2),
+.custom-table td:nth-child(2) {
+    width: 22%; /* Email */
+}
+
+.custom-table th:nth-child(3),
+.custom-table td:nth-child(3) {
+    width: 12%; /* RUT */
+}
+
+.custom-table th:nth-child(4),
+.custom-table td:nth-child(4) {
+    width: 18%; /* Rol */
+}
+
+.custom-table th:nth-child(5),
+.custom-table td:nth-child(5) {
+    width: 15%; /* Área */
+}
+
+/* Columna de acciones siempre al final con ancho fijo y sin truncamiento */
+.custom-table th:last-child,
+.custom-table td:last-child {
+    width: 15%; /* Acción */
+    text-align: center;
+    white-space: normal; /* Permitir que los botones se muestren correctamente */
+    overflow: visible; /* No truncar la columna de acciones */
+    text-overflow: clip; /* No aplicar ellipsis */
+}
+
+/* Excepciones: elementos que no deben truncarse dentro de celdas */
+.custom-table td .status {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    display: inline-block;
+}
+
+.custom-table td button,
+.custom-table td .btn-accion {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
 }
 
 .custom-table th {
