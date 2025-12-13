@@ -37,6 +37,7 @@
         <!-- Tabla de Usuarios (Arriba) -->
         <!-- Se añade 'margin-bottom: 30px' para separar de la siguiente tabla -->
         <section class="table-container" id="seccion-usuarios">
+            {% csrf_token %}
             <div class="table-header">
                 <h2 class="titulo-usuarios"><i class="fas fa-users-cog"></i> Listado de Usuarios</h2>
                 <button type="button" class="btn-accion btn-asignar" onclick="abrirModalAgregar()">
@@ -117,7 +118,7 @@
                 </form>
             </div>
             
-            <table class="custom-table">
+            <table class="custom-table table-users">
                 <thead>
                     <tr>
                         <th>Nombre</th>
@@ -125,6 +126,7 @@
                         <th>RUT</th>
                         <th>Rol Actual</th>
                         <th>Área</th>
+                        <th>Estado</th>
                         <th>Acción</th>
                     </tr>
                 </thead>
@@ -143,6 +145,17 @@
                         </td>
                         <td>{{ perfil.area.nombre|default:'N/A' }}</td>
                         <td>
+                            {% if perfil.usuario.is_active %}
+                                <span class="status status-aprobado">
+                                    <i class="fas fa-check-circle"></i> Activo
+                                </span>
+                            {% else %}
+                                <span class="status status-rechazado">
+                                    <i class="fas fa-times-circle"></i> Inactivo
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
                             <button type="button" class="btn-accion btn-accion-gray btn-accion-small" 
                                     onclick="abrirModalEditar(
                                         {{ perfil.id }}, 
@@ -155,11 +168,26 @@
                                     )">
                                 <i class="fas fa-edit"></i> Editar
                             </button>
+                            {% if perfil.usuario.id != user.id and not perfil.usuario.is_superuser %}
+                                {% if perfil.usuario.is_active %}
+                                    <button type="button" class="btn-accion btn-accion-orange btn-accion-small" 
+                                            onclick="confirmarDesactivarUsuario({{ perfil.id }}, '{{ perfil.usuario.email|escapejs }}')"
+                                            title="Desactivar usuario">
+                                        <i class="fas fa-user-slash"></i> Desactivar
+                                    </button>
+                                {% else %}
+                                    <button type="button" class="btn-accion btn-accion-green btn-accion-small" 
+                                            onclick="confirmarActivarUsuario({{ perfil.id }}, '{{ perfil.usuario.email|escapejs }}')"
+                                            title="Activar usuario">
+                                        <i class="fas fa-user-check"></i> Activar
+                                    </button>
+                                {% endif %}
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6">
+                        <td colspan="7">
                             <div class="empty-state">
                                 <i class="fas fa-users"></i>
                                 <p>No hay usuarios en el sistema.</p>
@@ -229,10 +257,11 @@
                 </button>
             </div>
             
-            <table class="custom-table">
+            <table class="custom-table table-roles">
                 <thead>
                     <tr>
                         <th>Nombre del Rol</th>
+                        <th>Usuarios</th>
                         <th>Acción</th>
                     </tr>
                 </thead>
@@ -241,6 +270,11 @@
                     {% for rol in roles_list %}
                     <tr>
                         <td>{{ rol.nombre_rol }}</td>
+                        <td>
+                            <span class="badge-usuarios">
+                                <i class="fas fa-users"></i> {{ rol.num_usuarios }} usuario{{ rol.num_usuarios|pluralize }}
+                            </span>
+                        </td>
                         <td>
                             <button type="button" class="btn-accion btn-accion-gray btn-accion-small" 
                                     onclick="abrirModalEditarRol({{ rol.id }}, '{{ rol.nombre_rol|escapejs }}')">
@@ -253,7 +287,7 @@
                         </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="2">No hay roles registrados.</td></tr>
+                    <tr><td colspan="3">No hay roles registrados.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -523,6 +557,34 @@
     </div>
 </div>
 
+{% endblock %}
 
-
+{% block extra_scripts %}
+<script>
+    // Asegurar que las funciones estén disponibles cuando se cargue el DOM
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM cargado, verificando funciones de activar/desactivar usuario');
+        
+        // Verificar que las funciones estén disponibles
+        if (typeof window.confirmarDesactivarUsuario === 'function') {
+            console.log('confirmarDesactivarUsuario está disponible');
+        } else {
+            console.error('confirmarDesactivarUsuario NO está disponible');
+        }
+        
+        if (typeof window.confirmarActivarUsuario === 'function') {
+            console.log('confirmarActivarUsuario está disponible');
+        } else {
+            console.error('confirmarActivarUsuario NO está disponible');
+        }
+        
+        // Verificar token CSRF
+        const csrfToken = obtenerTokenCSRF();
+        if (csrfToken) {
+            console.log('Token CSRF encontrado');
+        } else {
+            console.error('Token CSRF NO encontrado');
+        }
+    });
+</script>
 {% endblock %}

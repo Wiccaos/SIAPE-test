@@ -207,3 +207,107 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// Función auxiliar para obtener el token CSRF
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Función auxiliar para obtener el token CSRF de múltiples fuentes (disponible globalmente)
+window.obtenerTokenCSRF = function() {
+    // Intentar obtener del input hidden
+    const csrfInput = document.querySelector('input[name="csrfmiddlewaretoken"]');
+    if (csrfInput && csrfInput.value) {
+        return csrfInput.value;
+    }
+    
+    // Intentar obtener de las cookies
+    const csrfCookie = getCookie('csrftoken');
+    if (csrfCookie) {
+        return csrfCookie;
+    }
+    
+    // Si no se encuentra, intentar obtener de cualquier formulario
+    const forms = document.querySelectorAll('form');
+    for (let form of forms) {
+        const token = form.querySelector('input[name="csrfmiddlewaretoken"]');
+        if (token && token.value) {
+            return token.value;
+        }
+    }
+    
+    console.error('No se pudo obtener el token CSRF');
+    return null;
+};
+
+// Funciones para activar/desactivar usuarios (definidas globalmente)
+window.confirmarDesactivarUsuario = function(perfilId, email) {
+    console.log('confirmarDesactivarUsuario llamado con:', perfilId, email);
+    
+    if (!confirm(`¿Está seguro de que desea desactivar al usuario ${email}?\n\nEl usuario no podrá iniciar sesión hasta que sea reactivado.`)) {
+        return;
+    }
+    
+    const csrfValue = obtenerTokenCSRF();
+    if (!csrfValue) {
+        alert('Error: No se pudo obtener el token de seguridad. Por favor, recargue la página.');
+        return;
+    }
+    
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/dashboard/admin/gestion-usuarios/activar-desactivar/${perfilId}/`;
+    form.style.display = 'none';
+    
+    // Agregar CSRF token
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfmiddlewaretoken';
+    csrfInput.value = csrfValue;
+    form.appendChild(csrfInput);
+    
+    document.body.appendChild(form);
+    console.log('Enviando formulario para desactivar usuario:', perfilId);
+    form.submit();
+};
+
+window.confirmarActivarUsuario = function(perfilId, email) {
+    console.log('confirmarActivarUsuario llamado con:', perfilId, email);
+    
+    if (!confirm(`¿Está seguro de que desea activar al usuario ${email}?`)) {
+        return;
+    }
+    
+    const csrfValue = obtenerTokenCSRF();
+    if (!csrfValue) {
+        alert('Error: No se pudo obtener el token de seguridad. Por favor, recargue la página.');
+        return;
+    }
+    
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/dashboard/admin/gestion-usuarios/activar-desactivar/${perfilId}/`;
+    form.style.display = 'none';
+    
+    // Agregar CSRF token
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfmiddlewaretoken';
+    csrfInput.value = csrfValue;
+    form.appendChild(csrfInput);
+    
+    document.body.appendChild(form);
+    console.log('Enviando formulario para activar usuario:', perfilId);
+    form.submit();
+};
+

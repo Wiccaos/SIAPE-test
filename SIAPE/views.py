@@ -30,7 +30,7 @@ from .serializer import (
     EstudiantesSerializer, SolicitudesSerializer, EvidenciasSerializer, AsignaturasSerializer, AsignaturasEnCursoSerializer, 
     AjusteRazonableSerializer, AjusteAsignadoSerializer, EntrevistasSerializer, PublicaSolicitudSerializer
 )
-from .validators import validar_rut_chileno, validar_contraseña
+from .validators import validar_rut_chileno, validar_contraseña, traducir_feriado_chileno
 from .models import(
     Usuario, PerfilUsuario, Roles, Areas, CategoriasAjustes, Carreras, Estudiantes, Solicitudes, Evidencias,
     Asignaturas, AsignaturasEnCurso, Entrevistas, AjusteRazonable, AjusteAsignado, HorarioBloqueado
@@ -392,9 +392,11 @@ def get_calendario_disponible(request):
     for dia in range(1, calendar.monthrange(year, month)[1] + 1):
         fecha_dia = date(year, month, dia)
         if fecha_dia in feriados_chile:
+            nombre_feriado = feriados_chile.get(fecha_dia)
+            nombre_espanol = traducir_feriado_chileno(nombre_feriado)
             feriados_mes.append({
                 "fecha": fecha_dia.strftime('%Y-%m-%d'),
-                "nombre": feriados_chile.get(fecha_dia)
+                "nombre": nombre_espanol
             })
     
     respuesta_api = {
@@ -824,7 +826,7 @@ def dashboard_admin(request):
         'total_docentes': PerfilUsuario.objects.filter(rol__nombre_rol=ROL_DOCENTE).count(),
         'total_estudiantes': Estudiantes.objects.count(),
         'total_solicitudes': Solicitudes.objects.count(),
-        'solicitudes_en_proceso': Solicitudes.objects.filter(estado='en_proceso').count(),
+        'solicitudes_en_proceso': Solicitudes.objects.exclude(estado__in=['aprobado', 'rechazado']).count(),  # Todos los casos no aprobados
         'solicitudes_aprobadas': Solicitudes.objects.filter(estado='aprobado').count(),
         'solicitudes_rechazadas': Solicitudes.objects.filter(estado='rechazado').count(),
     }
@@ -952,7 +954,10 @@ def gestion_usuarios_admin(request):
     # Obtener datos para los selectores
     roles_disponibles = Roles.objects.all().order_by('nombre_rol')
     areas_disponibles = Areas.objects.all().order_by('nombre')
-    roles_list = Roles.objects.all().order_by('nombre_rol')
+    # Obtener roles con conteo de usuarios
+    roles_list = Roles.objects.annotate(
+        num_usuarios=Count('perfilusuario')
+    ).order_by('nombre_rol')
     
     # Paginación para roles (10 por página)
     page_roles = request.GET.get('page_roles', 1)
@@ -1098,6 +1103,44 @@ def editar_usuario_admin(request, perfil_id):
         except Exception as e:
             messages.error(request, f'Error al actualizar el usuario: {str(e)}', extra_tags='usuarios')
             
+    return redirect(redirect_url)
+
+@require_POST
+@login_required
+def activar_desactivar_usuario_admin(request, perfil_id):
+    """
+    Vista para activar o desactivar un usuario.
+    """
+    if not _check_admin_permission(request):
+        messages.error(request, 'No tienes permisos para realizar esta acción.', extra_tags='usuarios')
+        return redirect('gestion_usuarios_admin')
+    
+    redirect_url = reverse('gestion_usuarios_admin') + '#seccion-usuarios'
+    
+    try:
+        perfil = get_object_or_404(PerfilUsuario.objects.select_related('usuario'), id=perfil_id)
+        usuario = perfil.usuario
+        
+        # No permitir desactivar al mismo usuario que está haciendo la acción
+        if usuario.id == request.user.id:
+            messages.error(request, 'No puedes desactivar tu propio usuario.', extra_tags='usuarios')
+            return redirect(redirect_url)
+        
+        # No permitir desactivar superusuarios
+        if usuario.is_superuser:
+            messages.error(request, 'No se puede desactivar un superusuario.', extra_tags='usuarios')
+            return redirect(redirect_url)
+        
+        # Cambiar el estado
+        usuario.is_active = not usuario.is_active
+        usuario.save()
+        
+        estado_texto = 'activado' if usuario.is_active else 'desactivado'
+        messages.success(request, f'Usuario {usuario.email} ha sido {estado_texto} correctamente.', extra_tags='usuarios')
+        
+    except Exception as e:
+        messages.error(request, f'Error al cambiar el estado del usuario: {str(e)}', extra_tags='usuarios')
+    
     return redirect(redirect_url)
 
 @login_required
@@ -2791,7 +2834,28 @@ def panel_control_encargado_inclusion(request):
     fechas_citas_json = json.dumps(list(fechas_con_citas))
     citas_data_json = json.dumps(citas_data)
     
-    # 4. --- Datos para Modales ---
+    # 4. --- Obtener feriados del año actual para el calendario ---
+    from datetime import date
+    import calendar as cal_module
+    hoy = timezone.localtime(timezone.now()).date()
+    year = hoy.year
+    month = hoy.month
+    
+    feriados_chile = holidays.Chile(years=year)
+    feriados_mes = []
+    for dia in range(1, cal_module.monthrange(year, month)[1] + 1):
+        fecha_dia = date(year, month, dia)
+        if fecha_dia in feriados_chile:
+            nombre_feriado = feriados_chile.get(fecha_dia)
+            nombre_espanol = traducir_feriado_chileno(nombre_feriado)
+            feriados_mes.append({
+                "fecha": fecha_dia.strftime('%Y-%m-%d'),
+                "nombre": nombre_espanol
+            })
+    
+    feriados_json = json.dumps(feriados_mes)
+    
+    # 5. --- Datos para Modales ---
     categorias_ajustes = CategoriasAjustes.objects.all().order_by('nombre_categoria')
     
     context = {
@@ -2799,6 +2863,7 @@ def panel_control_encargado_inclusion(request):
         'citas_semana_list': citas_semana_list,
         'fechas_citas_json': fechas_citas_json,
         'citas_data_json': citas_data_json,
+        'feriados_json': feriados_json,
         'citas_pendientes_confirmar': citas_pendientes_confirmar,
         'citas_pasadas_semana_list': citas_pasadas_semana,
         'categorias_ajustes': categorias_ajustes,

@@ -57,6 +57,7 @@ urlpatterns = [
     path('dashboard/admin/gestion-usuarios/', views.gestion_usuarios_admin, name='gestion_usuarios_admin'),
     path('dashboard/admin/gestion-usuarios/agregar/', views.agregar_usuario_admin, name='agregar_usuario_admin'),
     path('dashboard/admin/gestion-usuarios/editar/<int:perfil_id>/', views.editar_usuario_admin, name='editar_usuario_admin'),
+    path('dashboard/admin/gestion-usuarios/activar-desactivar/<int:perfil_id>/', views.activar_desactivar_usuario_admin, name='activar_desactivar_usuario_admin'),
     # GESTIÓN INSTITUCIONAL - ADMIN
     path('dashboard/admin/gestion-institucional/', views.gestion_institucional_admin, name='gestion_institucional_admin'),
     # path('dashboard/admin/asignar-estudiantes-asignaturas/', views.asignar_estudiantes_asignaturas_admin, name='asignar_estudiantes_asignaturas_admin'),  # Eliminado - ahora lo hace el Director

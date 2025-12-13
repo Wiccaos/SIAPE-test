@@ -679,38 +679,67 @@ body.dark-mode .detalle-card li {
     width: 18%; /* Nombre */
 }
 
-.custom-table th:nth-child(2),
-.custom-table td:nth-child(2) {
-    width: 22%; /* Email */
+/* Anchos específicos para tabla de usuarios (7 columnas: Nombre, Email, RUT, Rol, Área, Estado, Acción) */
+.custom-table.table-users th:nth-child(1),
+.custom-table.table-users td:nth-child(1) {
+    width: 15%; /* Nombre */
 }
 
-.custom-table th:nth-child(3),
-.custom-table td:nth-child(3) {
-    width: 12%; /* RUT */
+.custom-table.table-users th:nth-child(2),
+.custom-table.table-users td:nth-child(2) {
+    width: 20%; /* Email */
 }
 
-.custom-table th:nth-child(4),
-.custom-table td:nth-child(4) {
-    width: 18%; /* Rol */
+.custom-table.table-users th:nth-child(3),
+.custom-table.table-users td:nth-child(3) {
+    width: 10%; /* RUT */
 }
 
-.custom-table th:nth-child(5),
-.custom-table td:nth-child(5) {
-    width: 15%; /* Área */
+.custom-table.table-users th:nth-child(4),
+.custom-table.table-users td:nth-child(4) {
+    width: 15%; /* Rol */
+}
+
+.custom-table.table-users th:nth-child(5),
+.custom-table.table-users td:nth-child(5) {
+    width: 12%; /* Área */
+}
+
+.custom-table.table-users th:nth-child(6),
+.custom-table.table-users td:nth-child(6) {
+    width: 10%; /* Estado */
 }
 
 /* Columna de acciones siempre al final con ancho fijo y sin truncamiento */
 .custom-table th:last-child,
 .custom-table td:last-child {
-    width: 15%; /* Acción */
+    width: 18%; /* Acción */
     text-align: center;
     white-space: normal; /* Permitir que los botones se muestren correctamente */
     overflow: visible; /* No truncar la columna de acciones */
     text-overflow: clip; /* No aplicar ellipsis */
 }
 
+/* Distribución de anchos para tabla de roles (3 columnas: nombre, usuarios, acción) */
+.table-roles th:nth-child(1),
+.table-roles td:nth-child(1) {
+    width: 40%; /* Nombre del Rol */
+}
+
+.table-roles th:nth-child(2),
+.table-roles td:nth-child(2) {
+    width: 25%; /* Usuarios */
+    text-align: center;
+}
+
+.table-roles th:nth-child(3),
+.table-roles td:nth-child(3) {
+    width: 35%; /* Acción */
+}
+
 /* Excepciones: elementos que no deben truncarse dentro de celdas */
-.custom-table td .status {
+.custom-table td .status,
+.custom-table td .badge-usuarios {
     white-space: normal;
     overflow: visible;
     text-overflow: clip;
@@ -758,6 +787,29 @@ body.dark-mode .detalle-card li {
     font-size: 0.85rem;
     font-weight: 500;
     text-transform: capitalize;
+}
+
+/* Badge para mostrar cantidad de usuarios */
+.badge-usuarios {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background-color: #e7f3ff;
+    color: #007bff;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.badge-usuarios i {
+    font-size: 0.85rem;
+}
+
+body.dark-mode .badge-usuarios {
+    background-color: #1e3a5f;
+    color: #6bb6ff;
 }
 
 /* Colores de estado basados en el mockup */
@@ -1025,6 +1077,7 @@ body.dark-mode .detalle-card li {
 .dot.dot-lleno { background-color: #dc3545; }
 .dot.dot-habil { background-color: #cc0000; }
 .dot.dot-interrupcion { background-color: #e6a800; }
+.dot.dot-feriado { background-color: #ffc107; }
 
 /* Contenedor de navegaciÃ³n del calendario */
 .cal-nav {
@@ -1830,6 +1883,12 @@ body.dark-mode .custom-table tr:not(:last-child) td {
     border-bottom-color: #3a3a3a !important;
 }
 
+/* Nombre del estudiante en citas - Más claro en modo oscuro */
+body.dark-mode .cal-cita-estudiante {
+    color: #ffffff !important;
+    font-weight: 600 !important;
+}
+
 /* Textos secundarios - Gris claro para legibilidad */
 body.dark-mode p,
 body.dark-mode span,
@@ -1979,8 +2038,8 @@ body.dark-mode .cal-day.day-inabil {
 }
 
 body.dark-mode .cal-day.day-entrevista {
-    background-color: #1d3c5a !important;
-    color: #ffffff !important;
+    background-color: #1a4a2a !important;
+    color: #4ade80 !important;
 }
 
 body.dark-mode .cal-day.cal-day-selected {
@@ -2603,6 +2662,12 @@ body.dark-mode .custom-table tr:not(:last-child) td {
     border-bottom-color: #3a3a3a !important;
 }
 
+/* Nombre del estudiante en citas - Más claro en modo oscuro */
+body.dark-mode .cal-cita-estudiante {
+    color: #ffffff !important;
+    font-weight: 600 !important;
+}
+
 /* Textos secundarios - Gris claro para legibilidad */
 body.dark-mode p,
 body.dark-mode span,
@@ -2752,8 +2817,8 @@ body.dark-mode .cal-day.day-inabil {
 }
 
 body.dark-mode .cal-day.day-entrevista {
-    background-color: #1d3c5a !important;
-    color: #ffffff !important;
+    background-color: #1a4a2a !important;
+    color: #4ade80 !important;
 }
 
 body.dark-mode .cal-day.cal-day-selected {

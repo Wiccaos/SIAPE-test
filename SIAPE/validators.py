@@ -1,5 +1,5 @@
 """
-Validador de RUT chileno
+Validador de RUT chileno y utilidades
 """
 import re
 
@@ -144,4 +144,71 @@ def validar_contraseña(password):
         return False, "La contraseña debe contener al menos un número"
     
     return True, None
+
+
+def traducir_feriado_chileno(nombre_feriado):
+    """
+    Traduce el nombre de un feriado chileno del inglés al español.
+    
+    Args:
+        nombre_feriado: Nombre del feriado en inglés (o español si ya está traducido)
+    
+    Returns:
+        Nombre del feriado en español
+    """
+    # Diccionario de traducción de feriados chilenos
+    traducciones = {
+        # Feriados comunes
+        "New Year's Day": "Año Nuevo",
+        "New Year": "Año Nuevo",
+        "Good Friday": "Viernes Santo",
+        "Easter Saturday": "Sábado Santo",
+        "Easter Sunday": "Domingo de Resurrección",
+        "Easter": "Pascua de Resurrección",
+        "Labour Day": "Día del Trabajador",
+        "Labor Day": "Día del Trabajador",
+        "Navy Day": "Día de las Glorias Navales",
+        "National Day": "Día Nacional",
+        "Independence Day": "Día de la Independencia Nacional",
+        "Independence": "Día de la Independencia Nacional",
+        "Day of the Glories of the Army": "Día de las Glorias del Ejército",
+        "Army Day": "Día de las Glorias del Ejército",
+        "All Saints' Day": "Día de Todos los Santos",
+        "All Saints Day": "Día de Todos los Santos",
+        "Immaculate Conception": "Inmaculada Concepción",
+        "Immaculate Conception Day": "Inmaculada Concepción",
+        "Christmas": "Navidad",
+        "Christmas Day": "Navidad",
+        "Christmas Eve": "Víspera de Navidad",
+        "New Year's Eve": "Víspera de Año Nuevo",
+        "New Year Eve": "Víspera de Año Nuevo",
+        
+        # Variaciones comunes
+        "Día Nacional": "Día Nacional",
+        "Día de la Independencia": "Día de la Independencia Nacional",
+        "Día del Trabajador": "Día del Trabajador",
+        "Día de las Glorias Navales": "Día de las Glorias Navales",
+        "Día de las Glorias del Ejército": "Día de las Glorias del Ejército",
+        "Día de Todos los Santos": "Día de Todos los Santos",
+        "Inmaculada Concepción": "Inmaculada Concepción",
+        "Año Nuevo": "Año Nuevo",
+        "Navidad": "Navidad",
+    }
+    
+    # Si el nombre ya está en español o no está en el diccionario, devolverlo tal cual
+    # Si está en el diccionario, devolver la traducción
+    nombre_limpio = nombre_feriado.strip() if nombre_feriado else ""
+    
+    # Buscar traducción exacta
+    if nombre_limpio in traducciones:
+        return traducciones[nombre_limpio]
+    
+    # Buscar traducción parcial (case-insensitive)
+    nombre_lower = nombre_limpio.lower()
+    for key, value in traducciones.items():
+        if key.lower() == nombre_lower:
+            return value
+    
+    # Si no se encuentra traducción, devolver el nombre original
+    return nombre_limpio
 

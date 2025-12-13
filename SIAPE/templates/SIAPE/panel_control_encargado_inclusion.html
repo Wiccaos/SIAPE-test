@@ -101,6 +101,7 @@
                         <div class="calendario-grid" id="cal-grid-body"></div>
                         <div class="calendario-leyenda calendario-leyenda-mt">
                             <div><span class="dot dot-entrevista"></span> Día con Cita(s)</div>
+                            <div><span class="dot dot-feriado"></span> Feriado</div>
                         </div>
                     </div>
                 </div>
@@ -303,6 +304,7 @@
                                 <div class="calendario-leyenda calendario-leyenda-mt">
                                     <div><span class="dot dot-disponible"></span> Día Disponible</div>
                                     <div><span class="dot dot-lleno"></span> Día Completo</div>
+                                    <div><span class="dot dot-feriado"></span> Feriado</div>
                                 </div>
                             </div>
                         </div>
@@ -574,7 +576,14 @@
                 dayDiv.classList.add('day-today');
             }
 
-            if (esSeleccionable) {
+            // Verificar si es feriado
+            const feriadoInfo = calendarioDataReagendar.feriados?.find(f => f.fecha === fechaStr);
+            const esFeriado = !!feriadoInfo;
+            
+            if (esFeriado) {
+                dayDiv.classList.add('day-feriado');
+                dayDiv.title = feriadoInfo.nombre;
+            } else if (esSeleccionable) {
                 if (calendarioDataReagendar.fechasConDisponibilidad?.includes(fechaStr)) {
                     dayDiv.classList.add('day-disponible');
                 } else if (calendarioDataReagendar.diasCompletos?.includes(fechaStr)) {
@@ -761,12 +770,37 @@
     document.addEventListener('DOMContentLoaded', function() {
         const fechasConCitas = JSON.parse('{{ fechas_citas_json|escapejs }}' || "[]");
         const todasLasCitas = JSON.parse('{{ citas_data_json|escapejs }}' || "[]");
+        const feriados = JSON.parse('{{ feriados_json|escapejs }}' || "[]");
 
         let navDate = new Date();
         const hoy = new Date();
         const hoyStr = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
         let diaSeleccionado = null; 
         let diaSeleccionadoStr = null;
+        
+        // Función para obtener feriados del mes actual
+        let feriadosCache = {};
+        async function obtenerFeriadosDelMes(year, month) {
+            const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+            
+            // Verificar cache
+            if (feriadosCache[monthKey]) {
+                return feriadosCache[monthKey];
+            }
+            
+            try {
+                const response = await fetch(`/api/calendario-disponible/?month=${monthKey}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const feriados = data.feriados || [];
+                    feriadosCache[monthKey] = feriados;
+                    return feriados;
+                }
+            } catch (error) {
+                console.error('Error al obtener feriados:', error);
+            }
+            return [];
+        }
 
         const calHeader = document.getElementById('cal-header');
         const calGridBody = document.getElementById('cal-grid-body');
@@ -789,7 +823,7 @@
             citasPorFecha[cita.fecha].push(cita);
         }
 
-        function mostrarCitasDelDia(fechaStr, diaEl) {
+        async function mostrarCitasDelDia(fechaStr, diaEl) {
             const [year, month, day] = fechaStr.split('-');
             citasDiaTitulo.innerText = `Citas para ${day}/${month}/${year}`;
 
@@ -806,6 +840,28 @@
                 if (diaSeleccionado) {
                     diaSeleccionado.classList.add('cal-day-selected');
                 }
+            }
+
+            // Verificar si es feriado
+            const yearNum = parseInt(year);
+            const monthNum = parseInt(month);
+            const feriadosMes = await obtenerFeriadosDelMes(yearNum, monthNum - 1);
+            const feriadoInfo = feriadosMes.find(f => f.fecha === fechaStr);
+            
+            if (feriadoInfo) {
+                citasDiaContainer.innerHTML = `
+                    <div class="empty-state p-10">
+                        <i class="fas fa-calendar-times empty-state-icon" style="color: #ffc107; font-size: 3rem;"></i>
+                        <h4 style="color: #856404; margin: 15px 0 10px 0; font-size: 1.2rem;">🎉 Día Feriado</h4>
+                        <p class="empty-state-text" style="color: #856404; font-weight: 500; font-size: 1rem;">
+                            ${feriadoInfo.nombre}
+                        </p>
+                        <p class="empty-state-text" style="color: #666; font-size: 0.9rem; margin-top: 10px;">
+                            No hay citas programadas para este día.
+                        </p>
+                    </div>
+                `;
+                return;
             }
 
             const citas = citasPorFecha[fechaStr] || [];
@@ -834,10 +890,13 @@
             citasDiaContainer.innerHTML = html;
         }
 
-        function renderCalendar() {
+        async function renderCalendar() {
             const year = navDate.getFullYear();
             const month = navDate.getMonth();
             calHeader.innerText = `${meses[month]} ${year}`;
+            
+            // Obtener feriados del mes actual
+            const feriadosMes = await obtenerFeriadosDelMes(year, month);
             
             calGridBody.innerHTML = `
                 <div class="cal-day-header">L</div>
@@ -871,6 +930,10 @@
                 const fechaStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
                 dayDiv.dataset.fecha = fechaStr;
 
+                // Verificar si es feriado
+                const feriadoInfo = feriadosMes.find(f => f.fecha === fechaStr);
+                const esFeriado = !!feriadoInfo;
+
                 if (fechaStr === hoyStr) {
                     dayDiv.classList.add('day-today');
                 }
@@ -879,7 +942,14 @@
                     dayDiv.classList.add('day-entrevista');
                 }
                 
-                dayDiv.addEventListener('click', () => mostrarCitasDelDia(fechaStr, dayDiv));
+                if (esFeriado) {
+                    dayDiv.classList.add('day-feriado');
+                    dayDiv.title = feriadoInfo.nombre; // Mostrar nombre del feriado al pasar el mouse
+                }
+                
+                dayDiv.addEventListener('click', () => {
+                    mostrarCitasDelDia(fechaStr, dayDiv).catch(err => console.error('Error al mostrar citas:', err));
+                });
                 calGridBody.appendChild(dayDiv);
             }
 
@@ -895,7 +965,7 @@
             if (diaSeleccionadoStr) {
                 const [selYear, selMonth] = diaSeleccionadoStr.split('-');
                 if (parseInt(selYear) === year && parseInt(selMonth) === (month + 1)) {
-                    mostrarCitasDelDia(diaSeleccionadoStr, null);
+                    mostrarCitasDelDia(diaSeleccionadoStr, null).catch(err => console.error('Error al mostrar citas:', err));
                 } else {
                     diaSeleccionado = null;
                     diaSeleccionadoStr = null;
