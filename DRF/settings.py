@@ -255,17 +255,3 @@ LOGGING = {
 }
 
 
-
-# ============================================
-# AJUSTES TEMPORALES PARA HTTP (IP PUBLICA)
-# ============================================
-
-# Desactivar redirección a HTTPS (porque no tenemos certificado aún)
-SECURE_SSL_REDIRECT = False
-
-# Permitir cookies en HTTP (sin esto, no podrás hacer Login)
-SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_SECURE = False
-
-# Desactivar almacenamiento de CSRF en sesión (esto soluciona tu error actual si la sesión falla)
-CSRF_USE_SESSIONS = False
