@@ -170,9 +170,20 @@ if USE_S3:
     }
     
     # Configuración de ubicación de archivos
-    AWS_DEFAULT_ACL = 'private'  # Archivos privados por defecto
+    # Para cuentas de estudiante/Academy, usar configuración simplificada
+    AWS_DEFAULT_ACL = None  # No establecer ACL (usa permisos del bucket)
     AWS_S3_FILE_OVERWRITE = False  # No sobrescribir archivos existentes
     AWS_QUERYSTRING_AUTH = True  # URLs firmadas para archivos privados
+    
+    # Configuración adicional para S3
+    AWS_S3_VERIFY = True  # Verificar certificados SSL
+    AWS_S3_USE_SSL = True  # Usar HTTPS
+    
+    # Deshabilitar ACLs si la cuenta no tiene permisos para gestionarlos
+    # Esto es común en cuentas de estudiante/Academy
+    AWS_S3_OBJECT_PARAMETERS = {
+        'CacheControl': 'max-age=86400',  # Cache por 1 día
+    }
     
     # Ubicación de archivos media en S3
     # Para Django 5.2+ usar STORAGES
