@@ -160,5 +160,6 @@ urlpatterns = [
 from django.conf import settings
 from django.conf.urls.static import static
 
-if settings.DEBUG:
+# Solo servir archivos media localmente en modo DEBUG y cuando no se use S3
+if settings.DEBUG and not getattr(settings, 'USE_S3', False):
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

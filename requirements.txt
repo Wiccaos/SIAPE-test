@@ -13,3 +13,5 @@ tzdata==2025.2
 uritemplate==4.2.0
 openpyxl==3.1.2
 holidays==0.86
+django-storages==1.14.2
+boto3==1.35.0

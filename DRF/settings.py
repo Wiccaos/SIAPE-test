@@ -50,6 +50,7 @@ INSTALLED_APPS = [
 
     # APLICACIONES DE TERCEROS
     'rest_framework',
+    'storages',  # Para almacenamiento en S3
 
     # DOCUMENTACION API
     'drf_yasg',
@@ -147,11 +148,42 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Guardado de archivos en el servidor
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+# ============================================
+# CONFIGURACIÓN DE ALMACENAMIENTO EN S3
+# ============================================
 
-# URL publica para el navegador
-MEDIA_URL = '/media/'
+# Verificar si estamos en producción (usando S3) o desarrollo (almacenamiento local)
+USE_S3 = config('USE_S3', default='False', cast=bool)
+
+if USE_S3:
+    # Configuración de AWS S3
+    AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY')
+    AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME')
+    AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='us-east-1')
+    AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
+    
+    # Configuración de seguridad S3
+    AWS_S3_OBJECT_PARAMETERS = {
+        'CacheControl': 'max-age=86400',  # Cache por 1 día
+    }
+    
+    # Configuración de ubicación de archivos
+    AWS_DEFAULT_ACL = 'private'  # Archivos privados por defecto
+    AWS_S3_FILE_OVERWRITE = False  # No sobrescribir archivos existentes
+    AWS_QUERYSTRING_AUTH = True  # URLs firmadas para archivos privados
+    
+    # Ubicación de archivos media en S3
+    DEFAULT_FILE_STORAGE = 'SIAPE.storages.MediaStorage'
+    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
+    
+    # Opcional: También almacenar archivos estáticos en S3
+    # STATICFILES_STORAGE = 'storages.backends.s3boto3.S3StaticStorage'
+    # STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/static/'
+else:
+    # Configuración local para desarrollo
+    MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+    MEDIA_URL = '/media/'
 
 # Redireccionar al inicio despues de login
 LOGIN_REDIRECT_URL = '/home/' 
