@@ -159,6 +159,7 @@ if USE_S3:
     # Configuración de AWS S3
     AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID')
     AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY')
+    AWS_SESSION_TOKEN = config('AWS_SESSION_TOKEN', default=None)
     # Nombre del bucket S3 - debe ser 'siape-docs'
     AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default='siape-docs')
     AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='us-east-1')
