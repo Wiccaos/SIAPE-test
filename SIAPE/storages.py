@@ -26,6 +26,22 @@ class MediaStorage(S3Boto3Storage):
         if not self.bucket_name:
             from django.conf import settings
             self.bucket_name = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'siape-docs')
+    
+    def exists(self, name):
+        """
+        Sobrescribir exists() para evitar errores 403 en HeadObject.
+        Para cuentas de estudiante, simplemente asumimos que el archivo no existe
+        si no podemos verificarlo, permitiendo que se suba.
+        """
+        try:
+            return super().exists(name)
+        except Exception as e:
+            # Si hay un error de permisos (403), asumimos que no existe
+            # Esto permite que el archivo se suba sin verificar primero
+            if '403' in str(e) or 'Forbidden' in str(e):
+                return False
+            # Para otros errores, relanzar la excepción
+            raise
 
 
 class StaticStorage(S3Boto3Storage):

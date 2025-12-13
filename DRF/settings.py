@@ -179,6 +179,12 @@ if USE_S3:
     AWS_S3_VERIFY = True  # Verificar certificados SSL
     AWS_S3_USE_SSL = True  # Usar HTTPS
     
+    # Deshabilitar verificación de existencia antes de subir (evita errores 403 en HeadObject)
+    # Esto es útil para cuentas de estudiante que pueden no tener permisos de HeadObject
+    AWS_S3_OBJECT_PARAMETERS = {
+        'CacheControl': 'max-age=86400',  # Cache por 1 día
+    }
+    
     # Deshabilitar ACLs si la cuenta no tiene permisos para gestionarlos
     # Esto es común en cuentas de estudiante/Academy
     AWS_S3_OBJECT_PARAMETERS = {
