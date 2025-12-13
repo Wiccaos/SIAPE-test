@@ -163,7 +163,7 @@ if USE_S3:
     # Nombre del bucket S3 - debe ser 'siape-docs'
     AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default='siape-docs')
     AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='us-east-1')
-    AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
+    # AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
     
     # Configuración de seguridad S3
     AWS_S3_OBJECT_PARAMETERS = {
@@ -180,37 +180,29 @@ if USE_S3:
     AWS_S3_VERIFY = True  # Verificar certificados SSL
     AWS_S3_USE_SSL = True  # Usar HTTPS
     
-    # Deshabilitar verificación de existencia antes de subir (evita errores 403 en HeadObject)
-    # Esto es útil para cuentas de estudiante que pueden no tener permisos de HeadObject
+
     AWS_S3_OBJECT_PARAMETERS = {
-        'CacheControl': 'max-age=86400',  # Cache por 1 día
+        'CacheControl': 'max-age=86400',
     }
     
-    # Deshabilitar ACLs si la cuenta no tiene permisos para gestionarlos
-    # Esto es común en cuentas de estudiante/Academy
+
     AWS_S3_OBJECT_PARAMETERS = {
-        'CacheControl': 'max-age=86400',  # Cache por 1 día
+        'CacheControl': 'max-age=86400',
     }
     
-    # Ubicación de archivos media en S3
-    # Para Django 5.2+ usar STORAGES
-    # 'default' = archivos media (evidencias, documentos) -> S3
-    # 'staticfiles' = archivos estáticos (CSS, JS) -> local
     STORAGES = {
         'default': {
-            'BACKEND': 'SIAPE.storages.MediaStorage',  # Media files van a S3
+            'BACKEND': 'SIAPE.storages.MediaStorage',
         },
         'staticfiles': {
-            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',  # Static files locales
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
         },
     }
     # Mantener DEFAULT_FILE_STORAGE para compatibilidad con versiones anteriores
     DEFAULT_FILE_STORAGE = 'SIAPE.storages.MediaStorage'
-    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
+    # MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
     
-    # Opcional: También almacenar archivos estáticos en S3
-    # STATICFILES_STORAGE = 'storages.backends.s3boto3.S3StaticStorage'
-    # STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/static/'
+
 else:
     # Configuración local para desarrollo
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
