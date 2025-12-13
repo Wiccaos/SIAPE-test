@@ -21,9 +21,13 @@
             <i class="fas fa-folder-open"></i>
             Casos
         </a>
+        <a href="{% url 'estadisticas_asesor_pedagogico' %}" class="nav-item">
+            <i class="fas fa-chart-bar"></i>
+            Estadísticas
+        </a>
     </nav>
 
-    <section class="kpi-container">
+    <section class="kpi-container kpi-container-asesor">
         <!-- KPI 1: Casos Nuevos -->
         <div class="kpi-card">
             <div class="kpi-icon icon-solicitudes">
@@ -31,7 +35,7 @@
             </div>
             <div class="kpi-info">
                 <span class="kpi-value">{{ kpis.casos_nuevos_semana|default:0 }}</span>
-                <span class="kpi-label">Casos Nuevos (Esta Semana)</span>
+                <span class="kpi-label">Nuevos</span>
             </div>
         </div>
 
@@ -42,12 +46,13 @@
             </div>
             <div class="kpi-info">
                 <span class="kpi-value">{{ kpis.casos_devueltos_director|default:0 }}</span>
-                <span class="kpi-label">Casos Devueltos (Desde Director)</span>
+                <span class="kpi-label">Devueltos</span>
             </div>
         </div>
 
-        <!-- KPIs por cada estado -->
+        <!-- KPIs por cada estado con nombres simplificados -->
         {% for estado in estados_con_cantidad %}
+        {% if estado.valor != 'pendiente_aprobacion' %}
         <div class="kpi-card">
             <div class="kpi-icon {% if estado.valor == 'aprobado' %}icon-resueltos{% elif estado.valor == 'rechazado' %}kpi-icon-danger{% elif estado.valor == 'pendiente_preaprobacion' %}icon-proceso{% else %}icon-solicitudes{% endif %}">
                 {% if estado.valor == 'aprobado' %}
@@ -62,17 +67,24 @@
                     <i class="fas fa-tools"></i>
                 {% elif estado.valor == 'pendiente_preaprobacion' %}
                     <i class="fas fa-clipboard-check"></i>
-                {% elif estado.valor == 'pendiente_aprobacion' %}
-                    <i class="fas fa-user-check"></i>
                 {% else %}
                     <i class="fas fa-file"></i>
                 {% endif %}
             </div>
             <div class="kpi-info">
                 <span class="kpi-value">{{ estado.cantidad|default:0 }}</span>
-                <span class="kpi-label">{{ estado.nombre }}</span>
+                <span class="kpi-label">
+                    {% if estado.valor == 'pendiente_entrevista' %}En Entrevista
+                    {% elif estado.valor == 'pendiente_formulacion_caso' %}Formulación Caso
+                    {% elif estado.valor == 'pendiente_formulacion_ajustes' %}Formulación Ajustes
+                    {% elif estado.valor == 'pendiente_preaprobacion' %}Preaprobación
+                    {% elif estado.valor == 'aprobado' %}Aprobados
+                    {% elif estado.valor == 'rechazado' %}Rechazados
+                    {% else %}{{ estado.nombre|truncatewords:2 }}{% endif %}
+                </span>
             </div>
         </div>
+        {% endif %}
         {% endfor %}
     </section>
 

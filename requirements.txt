@@ -15,3 +15,4 @@ openpyxl==3.1.2
 holidays==0.86
 django-storages==1.14.2
 boto3==1.35.0
+reportlab==4.0.7

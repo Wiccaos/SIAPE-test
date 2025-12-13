@@ -1,0 +1,738 @@
+{% extends "plantilla.html" %}
+{% load static %}
+
+{% block title %}
+    Estadísticas del Sistema | SIAPE
+{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Asegurar que el texto tachado se muestre en las leyendas de Chart.js cuando está oculto */
+        /* Chart.js aplica automáticamente text-decoration: line-through cuando hidden: true */
+        /* Este CSS asegura que se muestre correctamente */
+        canvas ~ ul li[style*="opacity"] span,
+        canvas ~ ul li[style*="opacity"] {
+            text-decoration: line-through !important;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="main-content"> 
+    
+    <nav class="dashboard-nav">
+        <a href="{% url 'dashboard_asesor' %}" class="nav-item">
+            <i class="fas fa-home"></i>
+            Panel Principal
+        </a>
+        <a href="{% url 'casos_generales' %}" class="nav-item">
+            <i class="fas fa-folder-open"></i>
+            Casos
+        </a>
+        <a href="{% url 'estadisticas_asesor_pedagogico' %}" class="nav-item active">
+            <i class="fas fa-chart-bar"></i>
+            Estadísticas
+        </a>
+    </nav>
+
+    <h1 class="page-title"><i class="fas fa-chart-line"></i> Estadísticas del Sistema</h1>
+    <p class="text-muted" style="margin-bottom: 30px;">Vista completa de estadísticas y métricas del sistema SIAPE</p>
+
+    <!-- KPIs Principales -->
+    <section class="kpi-container">
+        <div class="kpi-card">
+            <div class="kpi-icon icon-solicitudes">
+                <i class="fas fa-file-medical"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ total_casos }}</span>
+                <span class="kpi-label">Total Casos</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-resueltos">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ ajustes_stats.total }}</span>
+                <span class="kpi-label">Total Ajustes</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-proceso">
+                <i class="fas fa-percentage"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ tasa_aprobacion_general }}%</span>
+                <span class="kpi-label">Tasa Aprobación</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-proceso">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ tiempo_promedio }}</span>
+                <span class="kpi-label">Días Promedio</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-resueltos">
+                <i class="fas fa-calendar-week"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ casos_resueltos_semana }}</span>
+                <span class="kpi-label">Resueltos</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Selector de Rango de Tiempo y Generación de Reportes -->
+    <section class="filters-section" style="margin-bottom: 30px; margin-top: 20px;">
+        <form method="GET" action="{% url 'estadisticas_asesor_pedagogico' %}" style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; margin-bottom: 15px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <label for="rango" style="font-weight: 600; color: var(--text-secondary);">Rango de Tiempo:</label>
+                <select name="rango" id="rango" onchange="this.form.submit()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; background: var(--bg-input); color: var(--text-primary); min-width: 180px;">
+                    <option value="mes" {% if rango_seleccionado == 'mes' %}selected{% endif %}>Último Mes</option>
+                    <option value="semestre" {% if rango_seleccionado == 'semestre' %}selected{% endif %}>Último Semestre</option>
+                    <option value="año" {% if rango_seleccionado == 'año' %}selected{% endif %}>Último Año</option>
+                    <option value="historico" {% if rango_seleccionado == 'historico' %}selected{% endif %}>Histórico Completo</option>
+                </select>
+            </div>
+            <span style="color: var(--text-secondary); font-size: 0.9em;">
+                <i class="fas fa-info-circle"></i> Mostrando: <strong>{{ rango_nombre }}</strong>
+            </span>
+        </form>
+        
+        <!-- Botones de Generación de Reportes -->
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <span style="font-weight: 600; color: var(--text-secondary); margin-right: 5px;">Generar Reporte:</span>
+            <a href="{% url 'generar_reporte_pdf_asesor' %}?rango={{ rango_seleccionado }}" 
+               class="btn btn-primary" 
+               style="padding: 8px 16px; background: #dc3545; color: white; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;"
+               target="_blank">
+                <i class="fas fa-file-pdf"></i> PDF
+            </a>
+            <a href="{% url 'generar_reporte_powerbi_asesor' %}?rango={{ rango_seleccionado }}" 
+               class="btn btn-secondary" 
+               style="padding: 8px 16px; background: #007bff; color: white; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;"
+               download>
+                <i class="fas fa-file-excel"></i> PowerBI (CSV)
+            </a>
+        </div>
+    </section>
+
+    <!-- Gráficos de Tendencias -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+        <!-- Casos por Mes -->
+        <section class="table-container">
+            <div class="table-header">
+                <h3>
+                    <i class="fas fa-chart-line"></i> 
+                    {% if rango_seleccionado == 'mes' %}
+                        Casos por Semana ({{ rango_nombre }})
+                    {% elif rango_seleccionado == 'semestre' or rango_seleccionado == 'año' %}
+                        Casos por Mes ({{ rango_nombre }})
+                    {% else %}
+                        Casos por Año ({{ rango_nombre }})
+                    {% endif %}
+                </h3>
+            </div>
+            <div style="padding: 20px;">
+                <canvas id="graficoCasosMes"></canvas>
+            </div>
+        </section>
+
+        <!-- Casos por Día -->
+        <section class="table-container">
+            <div class="table-header">
+                <h3>
+                    <i class="fas fa-chart-area"></i> 
+                    {% if rango_seleccionado == 'mes' %}
+                        Casos por Día ({{ rango_nombre }})
+                    {% elif rango_seleccionado == 'semestre' %}
+                        Casos por Semana ({{ rango_nombre }})
+                    {% elif rango_seleccionado == 'año' %}
+                        Casos por Mes ({{ rango_nombre }})
+                    {% else %}
+                        Casos por Mes (Últimos 24 Meses)
+                    {% endif %}
+                </h3>
+            </div>
+            <div style="padding: 20px;">
+                <canvas id="graficoCasosDia"></canvas>
+            </div>
+        </section>
+    </div>
+
+    <!-- Distribución por Estado y Roles -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+        <!-- Distribución por Estado -->
+        <section class="table-container">
+            <div class="table-header">
+                <h3><i class="fas fa-chart-pie"></i> Distribución por Estado</h3>
+            </div>
+            <div style="padding: 20px; min-height: 400px;">
+                <canvas id="graficoEstados"></canvas>
+            </div>
+        </section>
+
+        <!-- Distribución por Roles -->
+        <section class="table-container">
+            <div class="table-header">
+                <h3><i class="fas fa-users"></i> Casos Asignados por Rol</h3>
+            </div>
+            <div style="padding: 20px;">
+                <canvas id="graficoRoles"></canvas>
+            </div>
+        </section>
+    </div>
+
+    <!-- Estadísticas de Ajustes -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+        <!-- Estado de Ajustes -->
+        <section class="table-container">
+            <div class="table-header">
+                <h3><i class="fas fa-tools"></i> Estado de Ajustes</h3>
+            </div>
+            <div style="padding: 20px; min-height: 300px;">
+                <canvas id="graficoAjustes"></canvas>
+            </div>
+        </section>
+
+        <!-- Ajustes por Categoría -->
+        <section class="table-container">
+            <div class="table-header">
+                <h3><i class="fas fa-tags"></i> Ajustes por Categoría</h3>
+            </div>
+            <div style="padding: 20px;">
+                <canvas id="graficoCategorias"></canvas>
+            </div>
+        </section>
+    </div>
+
+    <!-- Tablas Detalladas -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+        <!-- Tabla de Estados -->
+        <section class="table-container">
+            <div class="table-header">
+                <h3><i class="fas fa-list"></i> Casos por Estado</h3>
+            </div>
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>Estado</th>
+                        <th style="text-align: center;">Cantidad</th>
+                        <th style="text-align: center;">Porcentaje</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for estado in estados_stats %}
+                    <tr>
+                        <td>{{ estado.nombre }}</td>
+                        <td style="text-align: center;"><strong>{{ estado.cantidad }}</strong></td>
+                        <td style="text-align: center;">{{ estado.porcentaje }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Tabla de Roles -->
+        <section class="table-container">
+            <div class="table-header">
+                <h3><i class="fas fa-user-tie"></i> Casos Asignados por Rol</h3>
+            </div>
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>Rol</th>
+                        <th style="text-align: center;">Casos Asignados</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Encargado de Inclusión</td>
+                        <td style="text-align: center;"><strong>{{ roles_stats.encargado_inclusion }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Coordinador Técnico Pedagógico</td>
+                        <td style="text-align: center;"><strong>{{ roles_stats.coordinador_tecnico }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Asesor Pedagógico</td>
+                        <td style="text-align: center;"><strong>{{ roles_stats.asesor_pedagogico }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Sin Asignar</td>
+                        <td style="text-align: center;"><strong>{{ roles_stats.sin_asignar }}</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+    </div>
+
+    <!-- Tabla de Carreras -->
+    <section class="table-container" style="margin-bottom: 30px;">
+        <div class="table-header">
+            <h3><i class="fas fa-graduation-cap"></i> Estadísticas por Carrera (Top 10)</h3>
+        </div>
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Carrera</th>
+                    <th style="text-align: center;">Total Casos</th>
+                    <th style="text-align: center;">Aprobados</th>
+                    <th style="text-align: center;">Pendientes</th>
+                    <th style="text-align: center;">Tasa Aprobación</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for carrera in carreras_stats %}
+                <tr>
+                    <td><strong>{{ carrera.nombre }}</strong></td>
+                    <td style="text-align: center;">{{ carrera.total }}</td>
+                    <td style="text-align: center;">
+                        <span class="badge-estado badge-activa">{{ carrera.aprobados }}</span>
+                    </td>
+                    <td style="text-align: center;">
+                        <span class="badge-estado" style="background: #fff3cd; color: #856404;">{{ carrera.pendientes }}</span>
+                    </td>
+                    <td style="text-align: center;">
+                        <strong>{{ carrera.tasa_aprobacion }}%</strong>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5">
+                        <div class="empty-state">
+                            <i class="fas fa-graduation-cap"></i>
+                            <p>No hay datos de carreras disponibles.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <!-- Tabla de Ajustes por Categoría -->
+    {% if ajustes_por_categoria %}
+    <section class="table-container">
+        <div class="table-header">
+            <h3><i class="fas fa-tags"></i> Ajustes por Categoría</h3>
+        </div>
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Categoría</th>
+                    <th style="text-align: center;">Total Ajustes</th>
+                    <th style="text-align: center;">Aprobados</th>
+                    <th style="text-align: center;">Tasa Aprobación</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for categoria, stats in ajustes_por_categoria.items %}
+                <tr>
+                    <td><strong>{{ categoria }}</strong></td>
+                    <td style="text-align: center;">{{ stats.total }}</td>
+                    <td style="text-align: center;">
+                        <span class="badge-estado badge-activa">{{ stats.aprobados }}</span>
+                    </td>
+                    <td style="text-align: center;">
+                        <strong>{{ stats.tasa_aprobacion }}%</strong>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const isDarkMode = document.body.classList.contains('dark-mode');
+    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+    const textColor = isDarkMode ? '#ffffff' : '#333333';
+
+    // Gráfico: Casos por Mes
+    const ctxMes = document.getElementById('graficoCasosMes').getContext('2d');
+    const meses = [{% for item in casos_por_mes %}'{{ item.mes|escapejs }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+    const cantidadesMes = [{% for item in casos_por_mes %}{{ item.cantidad }}{% if not forloop.last %},{% endif %}{% endfor %}];
+    
+    new Chart(ctxMes, {
+        type: 'line',
+        data: {
+            labels: meses,
+            datasets: [{
+                label: 'Casos Creados',
+                data: cantidadesMes,
+                borderColor: '#cc0000',
+                backgroundColor: 'rgba(204, 0, 0, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: gridColor },
+                    ticks: { color: textColor }
+                },
+                x: {
+                    grid: { color: gridColor },
+                    ticks: { color: textColor }
+                }
+            },
+            plugins: {
+                legend: {
+                    labels: { color: textColor }
+                }
+            }
+        }
+    });
+
+    // Gráfico: Casos por Día
+    const ctxDia = document.getElementById('graficoCasosDia').getContext('2d');
+    const dias = [{% for item in casos_por_dia %}'{{ item.fecha|escapejs }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+    const cantidadesDia = [{% for item in casos_por_dia %}{{ item.cantidad }}{% if not forloop.last %},{% endif %}{% endfor %}];
+    
+    new Chart(ctxDia, {
+        type: 'bar',
+        data: {
+            labels: dias,
+            datasets: [{
+                label: 'Casos por Día',
+                data: cantidadesDia,
+                backgroundColor: 'rgba(0, 123, 255, 0.6)',
+                borderColor: 'rgba(0, 123, 255, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: gridColor },
+                    ticks: { color: textColor, stepSize: 1 }
+                },
+                x: {
+                    grid: { color: gridColor },
+                    ticks: { color: textColor, maxRotation: 45, minRotation: 45 }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+
+    // Gráfico: Distribución por Estado
+    const ctxEstados = document.getElementById('graficoEstados').getContext('2d');
+    // Crear etiquetas más cortas para la leyenda
+    const estadosLabelsFull = [{% for estado in estados_stats %}'{{ estado.nombre|escapejs }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+    const estadosLabelsShort = estadosLabelsFull.map(label => {
+        // Acortar nombres largos para la leyenda
+        if (label.includes('Pendiente de Entrevista')) return 'Pendiente Entrevista';
+        if (label.includes('Pendiente de Formulación del Caso')) return 'Pendiente Formulación Caso';
+        if (label.includes('Pendiente de Formulación de Ajustes')) return 'Pendiente Formulación Ajustes';
+        if (label.includes('Pendiente de Preaprobación')) return 'Pendiente Preaprobación';
+        if (label.includes('Pendiente de Aprobación')) return 'Pendiente Aprobación';
+        if (label.includes('Aprobado e Informado')) return 'Aprobado';
+        if (label.includes('Rechazada')) return 'Rechazado';
+        return label;
+    });
+    const estadosData = [{% for estado in estados_stats %}{{ estado.cantidad }}{% if not forloop.last %},{% endif %}{% endfor %}];
+    
+    const graficoEstados = new Chart(ctxEstados, {
+        type: 'doughnut',
+        data: {
+            labels: estadosLabelsShort,
+            datasets: [{
+                data: estadosData,
+                backgroundColor: [
+                    '#28a745', '#dc3545', '#ffc107', '#17a2b8',
+                    '#6f42c1', '#e83e8c', '#20c997', '#fd7e14'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 1.5,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: { 
+                        color: textColor, 
+                        boxWidth: 15, 
+                        padding: 12,
+                        font: { size: 11 },
+                        generateLabels: function(chart) {
+                            const data = chart.data;
+                            if (data.labels.length && data.datasets.length) {
+                                const meta = chart.getDatasetMeta(0);
+                                return data.labels.map((label, i) => {
+                                    const value = data.datasets[0].data[i];
+                                    const isHidden = meta.data[i] ? meta.data[i].hidden : false;
+                                    const labelText = `${label} (${value})`;
+                                    return {
+                                        text: labelText,
+                                        fillStyle: data.datasets[0].backgroundColor[i],
+                                        strokeStyle: data.datasets[0].backgroundColor[i],
+                                        hidden: isHidden,
+                                        index: i,
+                                        datasetIndex: 0
+                                    };
+                                });
+                            }
+                            return [];
+                        },
+                        usePointStyle: false
+                    },
+                    onClick: function(e, legendItem, legend) {
+                        const index = legendItem.datasetIndex;
+                        const chart = legend.chart;
+                        const meta = chart.getDatasetMeta(index);
+                        const ci = legendItem.index;
+                        meta.data[ci].hidden = !meta.data[ci].hidden;
+                        chart.update();
+                        // Aplicar tachado después de actualizar
+                        aplicarTachadoLeyenda(chart);
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = estadosLabelsFull[context.dataIndex] || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Gráfico: Casos por Rol
+    const ctxRoles = document.getElementById('graficoRoles').getContext('2d');
+    new Chart(ctxRoles, {
+        type: 'bar',
+        data: {
+            labels: ['Encargado de Inclusión', 'Coordinador Técnico', 'Asesor Pedagógico', 'Sin Asignar'],
+            datasets: [{
+                label: 'Casos Asignados',
+                data: [
+                    {{ roles_stats.encargado_inclusion }},
+                    {{ roles_stats.coordinador_tecnico }},
+                    {{ roles_stats.asesor_pedagogico }},
+                    {{ roles_stats.sin_asignar }}
+                ],
+                backgroundColor: [
+                    'rgba(40, 167, 69, 0.6)',
+                    'rgba(0, 123, 255, 0.6)',
+                    'rgba(255, 193, 7, 0.6)',
+                    'rgba(108, 117, 125, 0.6)'
+                ],
+                borderColor: [
+                    '#28a745',
+                    '#007bff',
+                    '#ffc107',
+                    '#6c757d'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: gridColor },
+                    ticks: { color: textColor, stepSize: 1 }
+                },
+                x: {
+                    grid: { color: gridColor },
+                    ticks: { color: textColor }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+
+    // Gráfico: Estado de Ajustes
+    const ctxAjustes = document.getElementById('graficoAjustes').getContext('2d');
+    const ajustesAprobados = {{ ajustes_stats.aprobados }};
+    const ajustesRechazados = {{ ajustes_stats.rechazados }};
+    const ajustesPendientes = {{ ajustes_stats.pendientes }};
+    const totalAjustes = ajustesAprobados + ajustesRechazados + ajustesPendientes;
+    
+    const graficoAjustes = new Chart(ctxAjustes, {
+        type: 'pie',
+        data: {
+            labels: ['Aprobados', 'Rechazados', 'Pendientes'],
+            datasets: [{
+                data: [ajustesAprobados, ajustesRechazados, ajustesPendientes],
+                backgroundColor: [
+                    '#28a745',
+                    '#dc3545',
+                    '#ffc107'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 1.5,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: { 
+                        color: textColor, 
+                        boxWidth: 15, 
+                        padding: 12,
+                        font: { size: 11 },
+                        generateLabels: function(chart) {
+                            const data = chart.data;
+                            if (data.labels.length && data.datasets.length) {
+                                const meta = chart.getDatasetMeta(0);
+                                return data.labels.map((label, i) => {
+                                    const value = data.datasets[0].data[i];
+                                    const percentage = totalAjustes > 0 ? ((value / totalAjustes) * 100).toFixed(1) : 0;
+                                    const isHidden = meta.data[i] ? meta.data[i].hidden : false;
+                                    const labelText = `${label} (${value} - ${percentage}%)`;
+                                    return {
+                                        text: labelText,
+                                        fillStyle: data.datasets[0].backgroundColor[i],
+                                        strokeStyle: data.datasets[0].backgroundColor[i],
+                                        hidden: isHidden,
+                                        index: i,
+                                        datasetIndex: 0
+                                    };
+                                });
+                            }
+                            return [];
+                        },
+                        usePointStyle: false
+                    },
+                    onClick: function(e, legendItem, legend) {
+                        const index = legendItem.datasetIndex;
+                        const chart = legend.chart;
+                        const meta = chart.getDatasetMeta(index);
+                        const ci = legendItem.index;
+                        meta.data[ci].hidden = !meta.data[ci].hidden;
+                        chart.update();
+                        // Aplicar tachado después de actualizar
+                        aplicarTachadoLeyenda(chart);
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const percentage = totalAjustes > 0 ? ((value / totalAjustes) * 100).toFixed(1) : 0;
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Función para aplicar tachado a elementos ocultos en la leyenda
+    function aplicarTachadoLeyenda(chart) {
+        setTimeout(() => {
+            const meta = chart.getDatasetMeta(0);
+            const legendContainer = chart.canvas.parentElement;
+            const legendItems = legendContainer.querySelectorAll('ul li');
+            legendItems.forEach((li, i) => {
+                if (meta.data[i] && meta.data[i].hidden) {
+                    const span = li.querySelector('span');
+                    if (span) {
+                        span.style.textDecoration = 'line-through';
+                        span.style.opacity = '0.5';
+                    }
+                } else {
+                    const span = li.querySelector('span');
+                    if (span) {
+                        span.style.textDecoration = 'none';
+                        span.style.opacity = '1';
+                    }
+                }
+            });
+        }, 50);
+    }
+    
+    // Aplicar tachado inicial después de crear los gráficos circulares
+    setTimeout(() => {
+        aplicarTachadoLeyenda(graficoEstados);
+        aplicarTachadoLeyenda(graficoAjustes);
+    }, 200);
+
+    // Gráfico: Ajustes por Categoría
+    {% if ajustes_por_categoria %}
+    const ctxCategorias = document.getElementById('graficoCategorias').getContext('2d');
+    const categoriasLabels = [{% for categoria in ajustes_por_categoria.keys %}'{{ categoria|escapejs }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+    const categoriasData = [{% for stats in ajustes_por_categoria.values %}{{ stats.total }}{% if not forloop.last %},{% endif %}{% endfor %}];
+    
+    new Chart(ctxCategorias, {
+        type: 'bar',
+        data: {
+            labels: categoriasLabels,
+            datasets: [{
+                label: 'Total Ajustes',
+                data: categoriasData,
+                backgroundColor: 'rgba(204, 0, 0, 0.6)',
+                borderColor: '#cc0000',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: gridColor },
+                    ticks: { color: textColor, stepSize: 1 }
+                },
+                x: {
+                    grid: { color: gridColor },
+                    ticks: { color: textColor, maxRotation: 45, minRotation: 45 }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+    {% endif %}
+});
+</script>
+{% endblock %}
+

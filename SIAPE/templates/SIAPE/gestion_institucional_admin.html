@@ -42,6 +42,8 @@
                 <thead>
                     <tr>
                         <th>Nombre del Área</th>
+                        <th>Carreras</th>
+                        <th>Docentes</th>
                         <th>Acción</th>
                     </tr>
                 </thead>
@@ -49,6 +51,16 @@
                     {% for area in areas_list %}
                     <tr>
                         <td>{{ area.nombre }}</td>
+                        <td>
+                            <span class="badge-usuarios">
+                                <i class="fas fa-graduation-cap"></i> {{ area.total_carreras|default:0 }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge-usuarios">
+                                <i class="fas fa-chalkboard-teacher"></i> {{ area.total_docentes|default:0 }}
+                            </span>
+                        </td>
                         <td>
                             <button type="button" class="btn-accion btn-accion-gray btn-accion-small" 
                                     onclick="abrirModalEditarArea({{ area.id }}, '{{ area.nombre|escapejs }}')">
@@ -61,7 +73,7 @@
                         </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="2">No hay áreas registradas.</td></tr>
+                    <tr><td colspan="4">No hay áreas registradas.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -121,6 +133,7 @@
                     <tr>
                         <th>Nombre Carrera</th>
                         <th>Área</th>
+                        <th>Estudiantes</th>
                         <th>Director Asignado</th>
                         <th>Acción</th>
                     </tr>
@@ -130,6 +143,11 @@
                     <tr>
                         <td>{{ carrera.nombre }}</td>
                         <td>{{ carrera.area.nombre|default:'N/A' }}</td>
+                        <td>
+                            <span class="badge-usuarios">
+                                <i class="fas fa-user-graduate"></i> {{ carrera.total_estudiantes|default:0 }}
+                            </span>
+                        </td>
                         <td>{{ carrera.director.usuario.first_name|default:'Sin' }} {{ carrera.director.usuario.last_name|default:'Director' }}</td>
                         <td>
                             <button type="button" class="btn-accion btn-accion-gray btn-accion-small" 
@@ -143,7 +161,7 @@
                         </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="4">No hay carreras registradas.</td></tr>
+                    <tr><td colspan="5">No hay carreras registradas.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>

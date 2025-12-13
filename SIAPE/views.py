@@ -6,6 +6,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import logout, login
 from django.utils import timezone
 from django.urls import reverse
+from django.http import HttpResponse
 from datetime import timedelta, datetime, time, date
 from django.db.models import Count, Q
 from django.views.decorators.http import require_POST
@@ -14,6 +15,13 @@ import json
 import calendar  # Importar para el calendario mensual
 import logging
 import holidays  # Feriados de Chile
+import csv
+from io import BytesIO
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
 
 # Django REST Framework
 from rest_framework import viewsets, mixins, status
@@ -49,6 +57,63 @@ ROL_DOCENTE = 'Docente'
 ROL_ADMIN = 'Administrador'
 ROL_COORDINADORA = 'Encargado de Inclusión'
 ROL_COORDINADOR_TECNICO_PEDAGOGICO = 'Coordinador Técnico Pedagógico'
+
+
+# ------------ FUNCIONES UTILITARIAS ------------
+
+def desactivar_asignaturas_semestre_vencido():
+    """
+    Desactiva automáticamente las asignaturas cuyo semestre ha terminado.
+    
+    Semestres:
+    - Otoño (otono): Marzo - Julio (termina el 31 de julio)
+    - Primavera (primavera): Agosto - Diciembre (termina el 31 de diciembre)
+    
+    Esta función se ejecuta automáticamente cuando se accede al sistema.
+    """
+    hoy = timezone.localtime().date()
+    mes_actual = hoy.month
+    anio_actual = hoy.year
+    
+    asignaturas_desactivadas = 0
+    
+    # Si estamos en agosto o después, desactivar Otoño del año actual
+    if mes_actual >= 8:
+        count = Asignaturas.objects.filter(
+            is_active=True,
+            semestre='otono',
+            anio=anio_actual
+        ).update(is_active=False)
+        asignaturas_desactivadas += count
+    
+    # Si estamos en enero o febrero, desactivar Primavera del año anterior
+    if mes_actual <= 2:
+        count = Asignaturas.objects.filter(
+            is_active=True,
+            semestre='primavera',
+            anio=anio_actual - 1
+        ).update(is_active=False)
+        asignaturas_desactivadas += count
+    
+    # Desactivar cualquier asignatura de años anteriores que siga activa
+    # (Otoño de años pasados)
+    count = Asignaturas.objects.filter(
+        is_active=True,
+        semestre='otono',
+        anio__lt=anio_actual
+    ).update(is_active=False)
+    asignaturas_desactivadas += count
+    
+    # (Primavera de años pasados, excepto el año actual si estamos en enero-febrero)
+    anio_limite = anio_actual - 1 if mes_actual <= 2 else anio_actual
+    count = Asignaturas.objects.filter(
+        is_active=True,
+        semestre='primavera',
+        anio__lt=anio_limite
+    ).update(is_active=False)
+    asignaturas_desactivadas += count
+    
+    return asignaturas_desactivadas
 
 
 # ----------------------------------------------
@@ -807,8 +872,10 @@ def casos_generales(request):
 def dashboard_admin(request):
     """
     Dashboard para Administradores del Sistema.
-    Muestra KPIs globales y casos que requieren acción.
+    Muestra estadísticas globales del sistema y métricas de actividad.
     """
+    import json
+    from collections import Counter
     
     # Verificar permisos
     rol = None
@@ -819,27 +886,125 @@ def dashboard_admin(request):
     if not request.user.is_superuser and rol != ROL_ADMIN:
         return redirect('home')
 
-    # --- KPIs ---
+    # --- Fechas de referencia ---
+    hoy = timezone.now()
+    # Usar inicio del día para comparaciones más precisas
+    inicio_hoy = hoy.replace(hour=0, minute=0, second=0, microsecond=0)
+    hace_7_dias = inicio_hoy - timedelta(days=7)
+    hace_14_dias = inicio_hoy - timedelta(days=14)
+    hace_30_dias = inicio_hoy - timedelta(days=30)
+    inicio_mes = hoy.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    # --- KPIs Principales ---
     kpis = {
-        'total_asesores': PerfilUsuario.objects.filter(rol__nombre_rol=ROL_ASESOR).count(),
-        'total_directores': PerfilUsuario.objects.filter(rol__nombre_rol=ROL_DIRECTOR).count(),
-        'total_docentes': PerfilUsuario.objects.filter(rol__nombre_rol=ROL_DOCENTE).count(),
+        'total_usuarios': Usuario.objects.filter(is_active=True).count(),
         'total_estudiantes': Estudiantes.objects.count(),
         'total_solicitudes': Solicitudes.objects.count(),
-        'solicitudes_en_proceso': Solicitudes.objects.exclude(estado__in=['aprobado', 'rechazado']).count(),  # Todos los casos no aprobados
+        'solicitudes_en_proceso': Solicitudes.objects.exclude(estado__in=['aprobado', 'rechazado']).count(),
         'solicitudes_aprobadas': Solicitudes.objects.filter(estado='aprobado').count(),
         'solicitudes_rechazadas': Solicitudes.objects.filter(estado='rechazado').count(),
     }
-
-    # --- Tabla: Casos Críticos (Sin Asignar) ---
-    solicitudes_sin_asignar = Solicitudes.objects.filter(
-        asesor_pedagogico_asignado__isnull=True,
-        estado='en_proceso'
-    ).select_related(
-        'estudiantes', 
-        'estudiantes__carreras'
-    ).order_by('created_at') # <-- Más antiguas primero
-
+    
+    # --- Usuarios Activos (últimos 7 días) ---
+    usuarios_activos_7d = Usuario.objects.filter(
+        last_login__gte=hace_7_dias,
+        is_active=True
+    ).count()
+    
+    # --- Estadísticas comparativas (esta semana vs anterior) ---
+    solicitudes_esta_semana = Solicitudes.objects.filter(created_at__gte=hace_7_dias).count()
+    solicitudes_semana_anterior = Solicitudes.objects.filter(
+        created_at__gte=hace_14_dias,
+        created_at__lt=hace_7_dias
+    ).count()
+    
+    # Calcular variación porcentual
+    if solicitudes_semana_anterior > 0:
+        variacion_solicitudes = round(((solicitudes_esta_semana - solicitudes_semana_anterior) / solicitudes_semana_anterior) * 100, 1)
+    else:
+        variacion_solicitudes = 100 if solicitudes_esta_semana > 0 else 0
+    
+    # Usuarios nuevos esta semana vs anterior
+    usuarios_nuevos_semana = Usuario.objects.filter(date_joined__gte=hace_7_dias).count()
+    usuarios_nuevos_anterior = Usuario.objects.filter(
+        date_joined__gte=hace_14_dias,
+        date_joined__lt=hace_7_dias
+    ).count()
+    
+    # --- Gráfico: Actividad del Sistema ---
+    # Primero verificamos si hay solicitudes en los últimos 30 días
+    total_solicitudes_30d = Solicitudes.objects.filter(created_at__gte=hace_30_dias).count()
+    
+    # Si no hay solicitudes en 30 días, buscamos la fecha de la solicitud más antigua
+    if total_solicitudes_30d == 0:
+        solicitud_mas_antigua = Solicitudes.objects.order_by('created_at').first()
+        if solicitud_mas_antigua:
+            dias_desde_primera = (hoy.date() - solicitud_mas_antigua.created_at.date()).days
+            dias_a_mostrar = min(dias_desde_primera + 1, 90)
+            fecha_inicio_grafico = inicio_hoy - timedelta(days=dias_a_mostrar)
+        else:
+            dias_a_mostrar = 30
+            fecha_inicio_grafico = hace_30_dias
+    else:
+        dias_a_mostrar = 30
+        fecha_inicio_grafico = hace_30_dias
+    
+    # Obtener solicitudes y procesar fechas en Python (evita problemas de TruncDate con MySQL)
+    solicitudes_periodo = Solicitudes.objects.filter(
+        created_at__gte=fecha_inicio_grafico
+    ).values_list('created_at', flat=True)
+    
+    # Contar solicitudes por día usando Python
+    actividad_dict = Counter()
+    for fecha_creacion in solicitudes_periodo:
+        if fecha_creacion:
+            # Convertir a fecha local y luego a string
+            fecha_local = timezone.localtime(fecha_creacion) if timezone.is_aware(fecha_creacion) else fecha_creacion
+            fecha_key = fecha_local.strftime('%Y-%m-%d')
+            actividad_dict[fecha_key] += 1
+    
+    # Crear lista de todos los días (incluyendo días sin actividad)
+    actividad_labels = []
+    actividad_data = []
+    
+    for i in range(dias_a_mostrar, -1, -1):
+        dia = (hoy - timedelta(days=i)).date()
+        dia_key = dia.strftime('%Y-%m-%d')
+        actividad_labels.append(dia.strftime('%d/%m'))
+        actividad_data.append(actividad_dict.get(dia_key, 0))
+    
+    # --- Gráfico: Distribución por Estado ---
+    estados_count = {
+        'En Proceso': Solicitudes.objects.filter(estado='en_proceso').count(),
+        'Pendiente Entrevista': Solicitudes.objects.filter(estado='pendiente_entrevista').count(),
+        'Pendiente Formulación': Solicitudes.objects.filter(estado='pendiente_formulacion_ajustes').count(),
+        'Pendiente Preaprobación': Solicitudes.objects.filter(estado='pendiente_preaprobacion').count(),
+        'Pendiente Aprobación': Solicitudes.objects.filter(estado='pendiente_aprobacion').count(),
+        'Aprobado': Solicitudes.objects.filter(estado='aprobado').count(),
+        'Rechazado': Solicitudes.objects.filter(estado='rechazado').count(),
+    }
+    
+    estados_labels = list(estados_count.keys())
+    estados_data = list(estados_count.values())
+    
+    # --- Distribución de usuarios por rol ---
+    roles_count = PerfilUsuario.objects.values('rol__nombre_rol').annotate(
+        total=Count('id')
+    ).order_by('-total')
+    
+    roles_labels = [r['rol__nombre_rol'] or 'Sin Rol' for r in roles_count]
+    roles_data = [r['total'] for r in roles_count]
+    
+    # --- Últimos accesos al sistema ---
+    ultimos_accesos = Usuario.objects.filter(
+        last_login__isnull=False
+    ).select_related('perfil', 'perfil__rol').order_by('-last_login')[:10]
+    
+    # --- Solicitudes recientes (últimas 5) ---
+    solicitudes_recientes = Solicitudes.objects.select_related(
+        'estudiantes', 'estudiantes__carreras'
+    ).order_by('-created_at')[:5]
+    
     # --- Gráfico: Distribución de Solicitudes por Área ---
     distribucion_areas = Areas.objects.annotate(
         total_solicitudes=Count('carreras__estudiantes__solicitudes')
@@ -860,8 +1025,23 @@ def dashboard_admin(request):
 
     context = {
         'kpis': kpis,
-        'solicitudes_sin_asignar': solicitudes_sin_asignar,
-        'total_sin_asignar': solicitudes_sin_asignar.count(),
+        # Estadísticas de actividad
+        'usuarios_activos_7d': usuarios_activos_7d,
+        'solicitudes_esta_semana': solicitudes_esta_semana,
+        'variacion_solicitudes': variacion_solicitudes,
+        'usuarios_nuevos_semana': usuarios_nuevos_semana,
+        'usuarios_nuevos_anterior': usuarios_nuevos_anterior,
+        # Datos para gráficos (JSON)
+        'actividad_labels_json': json.dumps(actividad_labels),
+        'actividad_data_json': json.dumps(actividad_data),
+        'dias_actividad': dias_a_mostrar,  # Para el título dinámico
+        'estados_labels_json': json.dumps(estados_labels),
+        'estados_data_json': json.dumps(estados_data),
+        'roles_labels_json': json.dumps(roles_labels),
+        'roles_data_json': json.dumps(roles_data),
+        # Tablas
+        'ultimos_accesos': ultimos_accesos,
+        'solicitudes_recientes': solicitudes_recientes,
         'distribucion_apoyos': distribucion_con_porcentaje,
     }
     
@@ -1149,9 +1329,14 @@ def gestion_institucional_admin(request):
         return redirect('home')
     
     # Obtener querysets base
-    carreras = Carreras.objects.select_related('director__usuario', 'area').all().order_by('nombre')
+    carreras = Carreras.objects.select_related('director__usuario', 'area').annotate(
+        total_estudiantes=Count('estudiantes')
+    ).order_by('area__nombre', 'nombre')
     asignaturas = Asignaturas.objects.select_related('carreras', 'docente__usuario').all().order_by('nombre')
-    areas = Areas.objects.all().order_by('nombre')
+    areas = Areas.objects.annotate(
+        total_carreras=Count('carreras', distinct=True),
+        total_docentes=Count('perfilusuario', distinct=True)
+    ).order_by('nombre')
     directores = PerfilUsuario.objects.select_related('usuario').filter(rol__nombre_rol=ROL_DIRECTOR).order_by('usuario__first_name')
     docentes = PerfilUsuario.objects.select_related('usuario').filter(rol__nombre_rol=ROL_DOCENTE).order_by('usuario__first_name')
     
@@ -1599,8 +1784,27 @@ def agregar_asignatura_admin(request):
             docente_id = request.POST.get('docente_id')
             carrera = get_object_or_404(Carreras, id=carrera_id)
             docente = get_object_or_404(PerfilUsuario, id=docente_id, rol__nombre_rol=ROL_DOCENTE)
-            Asignaturas.objects.create(nombre=nombre, seccion=seccion, carreras=carrera, docente=docente)
-            messages.success(request, f'Asignatura "{nombre} - {seccion}" creada y asignada a {carrera.nombre}.', extra_tags='asignaturas')
+            
+            # Determinar semestre y año actual
+            hoy = timezone.localtime().date()
+            anio_actual = hoy.year
+            mes_actual = hoy.month
+            # Otoño: Marzo-Julio (meses 3-7), Primavera: Agosto-Diciembre (meses 8-12)
+            # Enero-Febrero se considera Primavera del año anterior para inscripciones tardías
+            if mes_actual >= 3 and mes_actual <= 7:
+                semestre_actual = 'otono'
+            else:
+                semestre_actual = 'primavera'
+            
+            Asignaturas.objects.create(
+                nombre=nombre, 
+                seccion=seccion, 
+                carreras=carrera, 
+                docente=docente,
+                semestre=semestre_actual,
+                anio=anio_actual
+            )
+            messages.success(request, f'Asignatura "{nombre} - {seccion}" creada para {semestre_actual.capitalize()} {anio_actual}.', extra_tags='asignaturas')
         except Exception as e:
             messages.error(request, f'Error al crear la asignatura: {str(e)}', extra_tags='asignaturas')
     return redirect(reverse('gestion_institucional_admin') + '#seccion-asignaturas')
@@ -1892,28 +2096,60 @@ def detalle_casos_encargado_inclusion(request, solicitud_id):
     categorias_ajustes = CategoriasAjustes.objects.all().order_by('nombre_categoria')
     # Permisos de edición: Solo Encargado de Inclusión, Asesor Pedagógico y Admin pueden editar la descripción del caso
     # El Coordinador Técnico Pedagógico NO puede editar el caso formulado por el Encargado de Inclusión
+    # Estados editables por el Encargado de Inclusión
+    ESTADOS_EDITABLES_ENCARGADO = ['pendiente_entrevista', 'pendiente_formulacion_caso']
+    caso_editable_encargado = solicitud.estado in ESTADOS_EDITABLES_ENCARGADO
+    
     # El Docente solo puede VER, no editar
-    puede_editar_descripcion = rol_nombre in [ROL_COORDINADORA, ROL_ASESOR, ROL_ADMIN]
+    # El Encargado de Inclusión solo puede editar si el caso está en sus estados
     es_docente = rol_nombre == ROL_DOCENTE
-    puede_agendar_cita = rol_nombre == ROL_COORDINADORA
+    if rol_nombre == ROL_COORDINADORA:
+        puede_editar_descripcion = caso_editable_encargado
+        puede_agendar_cita = caso_editable_encargado
+    elif rol_nombre == ROL_ASESOR:
+        puede_editar_descripcion = solicitud.estado == 'pendiente_preaprobacion'
+        puede_agendar_cita = False
+    elif rol_nombre == ROL_ADMIN or request.user.is_superuser:
+        puede_editar_descripcion = True
+        puede_agendar_cita = True
+    else:
+        puede_editar_descripcion = False
+        puede_agendar_cita = False
     
     # Acciones de Encargado de Inclusión
     puede_formular_caso = rol_nombre == ROL_COORDINADORA and solicitud.estado == 'pendiente_formulacion_caso'
     puede_enviar_coordinador_tecnico_pedagogico = rol_nombre == ROL_COORDINADORA and solicitud.estado == 'pendiente_formulacion_caso'
     
+    # Estados editables por el Coordinador Técnico Pedagógico
+    ESTADOS_EDITABLES_COORDINADOR_TECNICO = ['pendiente_formulacion_ajustes']
+    caso_editable_coordinador_tecnico = solicitud.estado in ESTADOS_EDITABLES_COORDINADOR_TECNICO
+    
     # Acciones de Coordinador Técnico Pedagógico
-    puede_formular_ajustes = rol_nombre == ROL_COORDINADOR_TECNICO_PEDAGOGICO and solicitud.estado == 'pendiente_formulacion_ajustes'
-    puede_enviar_asesor_pedagogico = rol_nombre == ROL_COORDINADOR_TECNICO_PEDAGOGICO and solicitud.estado == 'pendiente_formulacion_ajustes'
-    puede_devolver_a_encargado_inclusion = rol_nombre == ROL_COORDINADOR_TECNICO_PEDAGOGICO and solicitud.estado == 'pendiente_formulacion_ajustes'
+    puede_formular_ajustes = rol_nombre == ROL_COORDINADOR_TECNICO_PEDAGOGICO and caso_editable_coordinador_tecnico
+    puede_enviar_asesor_pedagogico = rol_nombre == ROL_COORDINADOR_TECNICO_PEDAGOGICO and caso_editable_coordinador_tecnico
+    puede_devolver_a_encargado_inclusion = rol_nombre == ROL_COORDINADOR_TECNICO_PEDAGOGICO and caso_editable_coordinador_tecnico
+    puede_editar_ajustes_coordinador = rol_nombre == ROL_COORDINADOR_TECNICO_PEDAGOGICO and caso_editable_coordinador_tecnico
+    puede_eliminar_ajustes_coordinador = rol_nombre == ROL_COORDINADOR_TECNICO_PEDAGOGICO and caso_editable_coordinador_tecnico
+    
+    # Estados editables por el Asesor Pedagógico
+    ESTADOS_EDITABLES_ASESOR = ['pendiente_preaprobacion']
+    caso_editable_asesor = solicitud.estado in ESTADOS_EDITABLES_ASESOR
     
     # Acciones de Asesor Pedagógico
-    puede_enviar_a_director = rol_nombre == ROL_ASESOR and solicitud.estado == 'pendiente_preaprobacion'
-    puede_devolver_a_coordinador_tecnico_pedagogico = rol_nombre == ROL_ASESOR and solicitud.estado == 'pendiente_preaprobacion'
-    puede_editar_ajustes_asesor = rol_nombre == ROL_ASESOR and solicitud.estado == 'pendiente_preaprobacion'  # Asesora Pedagógica puede editar ajustes antes de enviar a Director
+    puede_enviar_a_director = rol_nombre == ROL_ASESOR and caso_editable_asesor
+    puede_devolver_a_coordinador_tecnico_pedagogico = rol_nombre == ROL_ASESOR and caso_editable_asesor
+    puede_editar_ajustes_asesor = rol_nombre == ROL_ASESOR and caso_editable_asesor
+    puede_eliminar_ajustes_asesor = rol_nombre == ROL_ASESOR and caso_editable_asesor
+    
+    # Estados editables por el Director
+    ESTADOS_EDITABLES_DIRECTOR = ['pendiente_aprobacion']
+    caso_editable_director = solicitud.estado in ESTADOS_EDITABLES_DIRECTOR
     
     # Acciones de Director
-    puede_aprobar = rol_nombre == ROL_DIRECTOR and solicitud.estado == 'pendiente_aprobacion'
-    puede_rechazar = rol_nombre == ROL_DIRECTOR and solicitud.estado == 'pendiente_aprobacion'
+    puede_aprobar = rol_nombre == ROL_DIRECTOR and caso_editable_director
+    puede_rechazar = rol_nombre == ROL_DIRECTOR and caso_editable_director
+    # El Director puede desactivar casos aprobados para enviarlos a revisión
+    puede_desactivar_caso = rol_nombre == ROL_DIRECTOR and solicitud.estado == 'aprobado'
 
     context = {
         'solicitud': solicitud,
@@ -1938,10 +2174,18 @@ def detalle_casos_encargado_inclusion(request, solicitud_id):
         'es_docente': es_docente,  # Para ocultar acciones de edición en el template
     }
     
-    # Permiso para subir archivos (solo Encargado de Inclusión)
-    puede_subir_archivo = rol_nombre == ROL_COORDINADORA
+    # Permiso para subir archivos (solo Encargado de Inclusión y solo en estados editables)
+    puede_subir_archivo = rol_nombre == ROL_COORDINADORA and caso_editable_encargado
     
     context['puede_subir_archivo'] = puede_subir_archivo
+    context['caso_editable_encargado'] = caso_editable_encargado
+    context['caso_editable_coordinador_tecnico'] = caso_editable_coordinador_tecnico
+    context['puede_editar_ajustes_coordinador'] = puede_editar_ajustes_coordinador
+    context['puede_eliminar_ajustes_coordinador'] = puede_eliminar_ajustes_coordinador
+    context['caso_editable_asesor'] = caso_editable_asesor
+    context['puede_eliminar_ajustes_asesor'] = puede_eliminar_ajustes_asesor
+    context['caso_editable_director'] = caso_editable_director
+    context['puede_desactivar_caso'] = puede_desactivar_caso
     
     return render(request, 'SIAPE/detalle_casos_encargado_inclusion.html', context)
 
@@ -1950,7 +2194,11 @@ def detalle_casos_encargado_inclusion(request, solicitud_id):
 def subir_archivo_caso(request, solicitud_id):
     """
     Permite al Encargado de Inclusión subir un archivo al caso.
+    Solo puede hacerlo cuando el caso está en estados que le corresponden.
     """
+    # Estados permitidos para edición del Encargado de Inclusión
+    ESTADOS_EDITABLES_ENCARGADO = ['pendiente_entrevista', 'pendiente_formulacion_caso']
+    
     # 1. Verificar Permiso
     try:
         perfil = request.user.perfil
@@ -1964,7 +2212,12 @@ def subir_archivo_caso(request, solicitud_id):
     # 2. Obtener la solicitud
     solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
     
-    # 3. Validar que el encargado de inclusión tenga acceso a este caso
+    # 3. Verificar que el caso esté en un estado editable para el Encargado de Inclusión
+    if solicitud.estado not in ESTADOS_EDITABLES_ENCARGADO and not request.user.is_superuser:
+        messages.error(request, 'No puedes modificar este caso porque ya fue enviado al siguiente rol.')
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+    
+    # 4. Validar que el encargado de inclusión tenga acceso a este caso
     if solicitud.coordinadora_asignada != perfil and not request.user.is_superuser:
         messages.error(request, 'No tienes permisos para subir archivos a este caso.')
         return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
@@ -2678,6 +2931,47 @@ def rechazar_caso(request, solicitud_id):
 
 @require_POST
 @login_required
+def desactivar_caso(request, solicitud_id):
+    """
+    Vista para que el Director desactive un caso aprobado y lo envíe a revisión.
+    Cambia el estado del caso de 'aprobado' a 'pendiente_preaprobacion'.
+    Esto permite que un caso ya aprobado sea reevaluado por el equipo.
+    """
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+        perfil = None
+
+    # 2. --- Obtener la Solicitud ---
+    solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
+    
+    # 3. --- Verificar que el caso está en estado aprobado ---
+    if solicitud.estado != 'aprobado':
+        messages.error(request, 'Solo se pueden desactivar casos que estén aprobados.')
+        return redirect('detalle_caso', solicitud_id=solicitud_id)
+    
+    try:
+        # 4. --- Cambiar el estado del caso (vuelve a Asesoría Pedagógica para revisión) ---
+        solicitud.estado = 'pendiente_preaprobacion'
+        solicitud.save()
+        
+        messages.warning(request, 'Caso desactivado. El caso ha sido enviado a revisión por Asesoría Pedagógica.')
+        
+    except Exception as e:
+        logger.error(f"Error al desactivar caso: {str(e)}")
+        messages.error(request, f'Error al desactivar el caso: {str(e)}')
+    
+    # 5. --- Redirigir de vuelta al detalle ---
+    return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+
+@require_POST
+@login_required
 def aprobar_ajuste_director(request, ajuste_asignado_id):
     """
     Vista para que el Director apruebe un ajuste individual.
@@ -2964,7 +3258,11 @@ def confirmar_cita_coordinadora(request, entrevista_id):
     """
     Permite al Encargado de Inclusión confirmar la asistencia (realizada o no asistió) 
     de una entrevista que ella gestiona.
+    Solo puede hacerlo cuando el caso está en estados que le corresponden.
     """
+    # Estados permitidos para edición del Encargado de Inclusión
+    ESTADOS_EDITABLES_ENCARGADO = ['pendiente_entrevista', 'pendiente_formulacion_caso']
+    
     # 1. Verificar Permiso
     try:
         if request.user.perfil.rol.nombre_rol != ROL_COORDINADORA:
@@ -2972,6 +3270,16 @@ def confirmar_cita_coordinadora(request, entrevista_id):
             return redirect('panel_control_encargado_inclusion')
     except AttributeError:
         return redirect('home')
+    
+    # 1.1 Verificar estado del caso
+    try:
+        entrevista_temp = Entrevistas.objects.select_related('solicitudes').get(id=entrevista_id)
+        if entrevista_temp.solicitudes.estado not in ESTADOS_EDITABLES_ENCARGADO and not request.user.is_superuser:
+            messages.error(request, 'No puedes confirmar citas para este caso porque ya fue enviado al siguiente rol.')
+            return redirect('panel_control_encargado_inclusion')
+    except Entrevistas.DoesNotExist:
+        messages.error(request, 'La cita no existe.')
+        return redirect('panel_control_encargado_inclusion')
 
     # 2. Lógica de la Acción
     if request.method == 'POST':
@@ -3125,7 +3433,11 @@ def eliminar_horario_bloqueado(request, horario_id):
 def editar_notas_cita_coordinadora(request, entrevista_id):
     """
     Permite al Encargado de Inclusión editar las notas de una cita que él gestiona.
+    Solo puede hacerlo cuando el caso está en estados que le corresponden.
     """
+    # Estados permitidos para edición del Encargado de Inclusión
+    ESTADOS_EDITABLES_ENCARGADO = ['pendiente_entrevista', 'pendiente_formulacion_caso']
+    
     # 1. Verificar Permiso
     try:
         if request.user.perfil.rol.nombre_rol != ROL_COORDINADORA:
@@ -3133,6 +3445,16 @@ def editar_notas_cita_coordinadora(request, entrevista_id):
             return redirect('panel_control_encargado_inclusion')
     except AttributeError:
         return redirect('home')
+    
+    # 1.1 Verificar estado del caso
+    try:
+        entrevista_temp = Entrevistas.objects.select_related('solicitudes').get(id=entrevista_id)
+        if entrevista_temp.solicitudes.estado not in ESTADOS_EDITABLES_ENCARGADO and not request.user.is_superuser:
+            messages.error(request, 'No puedes editar notas de citas para este caso porque ya fue enviado al siguiente rol.')
+            return redirect('panel_control_encargado_inclusion')
+    except Entrevistas.DoesNotExist:
+        messages.error(request, 'La cita no existe.')
+        return redirect('panel_control_encargado_inclusion')
 
     # 2. Lógica de la Acción
     if request.method == 'POST':
@@ -3154,7 +3476,11 @@ def editar_notas_cita_coordinadora(request, entrevista_id):
 def agendar_cita_coordinadora(request):
     """
     Permite al Encargado de Inclusión agendar una nueva cita para un caso.
+    Solo puede hacerlo cuando el caso está en estados que le corresponden.
     """
+    # Estados permitidos para edición del Encargado de Inclusión
+    ESTADOS_EDITABLES_ENCARGADO = ['pendiente_entrevista', 'pendiente_formulacion_caso']
+    
     # 1. Verificar Permiso
     try:
         if request.user.perfil.rol.nombre_rol != ROL_COORDINADORA:
@@ -3166,6 +3492,16 @@ def agendar_cita_coordinadora(request):
     # 2. Lógica de la Acción
     if request.method == 'POST':
         solicitud_id = request.POST.get('solicitud_id')
+        
+        # Verificar estado del caso antes de agendar
+        if solicitud_id:
+            try:
+                solicitud_check = Solicitudes.objects.get(id=solicitud_id)
+                if solicitud_check.estado not in ESTADOS_EDITABLES_ENCARGADO and not request.user.is_superuser:
+                    messages.error(request, 'No puedes agendar citas para este caso porque ya fue enviado al siguiente rol.')
+                    return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+            except Solicitudes.DoesNotExist:
+                pass  # Se manejará más adelante en el flujo
         # Obtener valores y asegurarse de que sean strings (no listas)
         fecha_raw = request.POST.get('fecha_agendar', '')
         hora_raw = request.POST.get('hora_agendar', '')
@@ -3296,7 +3632,11 @@ def reagendar_cita_coordinadora(request, entrevista_id):
     """
     Permite al Encargado de Inclusión reagendar una cita (usualmente una que 'no asistió').
     Crea una nueva entrevista y actualiza la antigua.
+    Solo puede hacerlo cuando el caso está en estados que le corresponden.
     """
+    # Estados permitidos para edición del Encargado de Inclusión
+    ESTADOS_EDITABLES_ENCARGADO = ['pendiente_entrevista', 'pendiente_formulacion_caso']
+    
     # 1. Verificar Permiso
     try:
         if request.user.perfil.rol.nombre_rol != ROL_COORDINADORA:
@@ -3304,6 +3644,16 @@ def reagendar_cita_coordinadora(request, entrevista_id):
             return redirect('panel_control_encargado_inclusion')
     except AttributeError:
         return redirect('home')
+    
+    # 1.1 Verificar estado del caso
+    try:
+        entrevista_temp = Entrevistas.objects.select_related('solicitudes').get(id=entrevista_id)
+        if entrevista_temp.solicitudes.estado not in ESTADOS_EDITABLES_ENCARGADO and not request.user.is_superuser:
+            messages.error(request, 'No puedes reagendar citas para este caso porque ya fue enviado al siguiente rol.')
+            return redirect('detalle_casos_encargado_inclusion', solicitud_id=entrevista_temp.solicitudes.id)
+    except Entrevistas.DoesNotExist:
+        messages.error(request, 'La cita no existe.')
+        return redirect('panel_control_encargado_inclusion')
 
     # 2. Lógica de la Acción
     if request.method == 'POST':
@@ -3469,6 +3819,990 @@ def dashboard_asesor(request):
     }
     
     return render(request, 'SIAPE/dashboard_asesor.html', context)
+
+
+@login_required
+def estadisticas_asesor_pedagogico(request):
+    """
+    Vista completa de estadísticas para el Asesor Pedagógico.
+    Incluye estadísticas por roles, ajustes, fechas, carreras y rendimiento del sistema.
+    """
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_ASESOR:
+            messages.error(request, 'No tienes permisos para acceder a esta página.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+    
+    # 2. --- Obtener Rango de Tiempo Seleccionado ---
+    rango_seleccionado = request.GET.get('rango', 'mes')  # mes, semestre, año, historico
+    
+    # 3. --- Configuración de Fechas según Rango ---
+    now = timezone.localtime(timezone.now())
+    today = now.date()
+    
+    fecha_inicio = None
+    fecha_fin_dt = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+    
+    if rango_seleccionado == 'mes':
+        # Último mes (30 días)
+        fecha_inicio = today - timedelta(days=30)
+        fecha_inicio_dt = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+        rango_nombre = 'Último Mes'
+    elif rango_seleccionado == 'semestre':
+        # Último semestre (6 meses)
+        fecha_inicio = today - timedelta(days=180)
+        fecha_inicio_dt = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+        rango_nombre = 'Último Semestre'
+    elif rango_seleccionado == 'año':
+        # Último año
+        fecha_inicio = today.replace(month=1, day=1)
+        fecha_inicio_dt = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+        rango_nombre = 'Último Año'
+    else:  # historico
+        # Todo el histórico (sin filtro de fecha)
+        fecha_inicio_dt = None
+        rango_nombre = 'Histórico Completo'
+    
+    # Rango de fechas para análisis
+    start_of_week = today - timedelta(days=today.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
+    start_of_month = today.replace(day=1)
+    start_of_year = today.replace(month=1, day=1)
+    
+    # 3. --- ESTADÍSTICAS POR ESTADO ---
+    total_casos_sistema = Solicitudes.objects.count()
+    estados_stats = []
+    for estado_valor, estado_nombre in Solicitudes.ESTADO_CHOICES:
+        cantidad = Solicitudes.objects.filter(estado=estado_valor).count()
+        porcentaje = round((cantidad / total_casos_sistema * 100) if total_casos_sistema > 0 else 0, 1)
+        estados_stats.append({
+            'valor': estado_valor,
+            'nombre': estado_nombre,
+            'cantidad': cantidad,
+            'porcentaje': porcentaje
+        })
+    
+    # 4. --- ESTADÍSTICAS POR ROLES (casos asignados) ---
+    # Encargado de Inclusión
+    casos_encargado_inclusion = Solicitudes.objects.filter(
+        coordinadora_asignada__isnull=False
+    ).count()
+    
+    # Coordinador Técnico Pedagógico
+    casos_coordinador_tecnico = Solicitudes.objects.filter(
+        coordinador_tecnico_pedagogico_asignado__isnull=False
+    ).count()
+    
+    # Asesor Pedagógico
+    casos_asesor_pedagogico = Solicitudes.objects.filter(
+        asesor_pedagogico_asignado__isnull=False
+    ).count()
+    
+    # Sin asignar
+    casos_sin_asignar = Solicitudes.objects.filter(
+        coordinadora_asignada__isnull=True,
+        coordinador_tecnico_pedagogico_asignado__isnull=True,
+        asesor_pedagogico_asignado__isnull=True
+    ).count()
+    
+    roles_stats = {
+        'encargado_inclusion': casos_encargado_inclusion,
+        'coordinador_tecnico': casos_coordinador_tecnico,
+        'asesor_pedagogico': casos_asesor_pedagogico,
+        'sin_asignar': casos_sin_asignar,
+    }
+    
+    # 5. --- ESTADÍSTICAS POR AJUSTES ---
+    total_ajustes = AjusteAsignado.objects.count()
+    ajustes_aprobados = AjusteAsignado.objects.filter(estado_aprobacion='aprobado').count()
+    ajustes_rechazados = AjusteAsignado.objects.filter(estado_aprobacion='rechazado').count()
+    ajustes_pendientes = AjusteAsignado.objects.filter(estado_aprobacion='pendiente').count()
+    
+    # Por categoría
+    ajustes_por_categoria = {}
+    for categoria in CategoriasAjustes.objects.all():
+        total_cat = AjusteRazonable.objects.filter(categorias_ajustes=categoria).count()
+        aprobados_cat = AjusteAsignado.objects.filter(
+            ajuste_razonable__categorias_ajustes=categoria,
+            estado_aprobacion='aprobado'
+        ).count()
+        ajustes_por_categoria[categoria.nombre_categoria] = {
+            'total': total_cat,
+            'aprobados': aprobados_cat,
+            'tasa_aprobacion': round((aprobados_cat / total_cat * 100) if total_cat > 0 else 0, 1)
+        }
+    
+    # 6. --- ESTADÍSTICAS POR FECHA (Tendencias) según Rango ---
+    casos_por_mes = []
+    casos_por_dia = []
+    
+    if rango_seleccionado == 'mes':
+        # Último mes: mostrar por día
+        for i in range(29, -1, -1):
+            fecha_dia = today - timedelta(days=i)
+            dia_inicio_dt = timezone.make_aware(datetime.combine(fecha_dia, datetime.min.time()))
+            dia_fin_dt = timezone.make_aware(datetime.combine(fecha_dia, datetime.max.time()))
+            
+            cantidad = Solicitudes.objects.filter(
+                created_at__range=(dia_inicio_dt, dia_fin_dt)
+            ).count()
+            
+            casos_por_dia.append({
+                'fecha': fecha_dia.strftime('%d/%m'),
+                'cantidad': cantidad
+            })
+        
+        # También por semana para el gráfico de mes
+        semanas_en_mes = 4
+        for i in range(semanas_en_mes - 1, -1, -1):
+            semana_inicio = today - timedelta(days=(i * 7) + today.weekday())
+            semana_fin = semana_inicio + timedelta(days=6)
+            if semana_fin > today:
+                semana_fin = today
+            
+            semana_inicio_dt = timezone.make_aware(datetime.combine(semana_inicio, datetime.min.time()))
+            semana_fin_dt = timezone.make_aware(datetime.combine(semana_fin, datetime.max.time()))
+            
+            cantidad = Solicitudes.objects.filter(
+                created_at__range=(semana_inicio_dt, semana_fin_dt)
+            ).count()
+            
+            casos_por_mes.append({
+                'mes': f'Sem {i+1}',
+                'cantidad': cantidad
+            })
+    
+    elif rango_seleccionado == 'semestre':
+        # Último semestre: mostrar por mes
+        for i in range(5, -1, -1):
+            fecha_mes = today - timedelta(days=30 * i)
+            mes_inicio = fecha_mes.replace(day=1)
+            if i == 0:
+                mes_fin = today
+            else:
+                siguiente_mes = mes_inicio + timedelta(days=32)
+                mes_fin = siguiente_mes.replace(day=1) - timedelta(days=1)
+            
+            mes_inicio_dt = timezone.make_aware(datetime.combine(mes_inicio, datetime.min.time()))
+            mes_fin_dt = timezone.make_aware(datetime.combine(mes_fin, datetime.max.time()))
+            
+            cantidad = Solicitudes.objects.filter(
+                created_at__range=(mes_inicio_dt, mes_fin_dt)
+            ).count()
+            
+            casos_por_mes.append({
+                'mes': mes_inicio.strftime('%b %Y'),
+                'cantidad': cantidad
+            })
+        
+        # Por semana para el gráfico diario
+        for i in range(25, -1, -1):  # Últimas 26 semanas
+            semana_inicio = today - timedelta(days=(i * 7) + today.weekday())
+            semana_fin = semana_inicio + timedelta(days=6)
+            if semana_fin > today:
+                semana_fin = today
+            
+            semana_inicio_dt = timezone.make_aware(datetime.combine(semana_inicio, datetime.min.time()))
+            semana_fin_dt = timezone.make_aware(datetime.combine(semana_fin, datetime.max.time()))
+            
+            cantidad = Solicitudes.objects.filter(
+                created_at__range=(semana_inicio_dt, semana_fin_dt)
+            ).count()
+            
+            casos_por_dia.append({
+                'fecha': semana_inicio.strftime('%d/%m'),
+                'cantidad': cantidad
+            })
+    
+    elif rango_seleccionado == 'año':
+        # Último año: mostrar por mes
+        for i in range(11, -1, -1):
+            fecha_mes = today - timedelta(days=30 * i)
+            mes_inicio = fecha_mes.replace(day=1)
+            if i == 0:
+                mes_fin = today
+            else:
+                siguiente_mes = mes_inicio + timedelta(days=32)
+                mes_fin = siguiente_mes.replace(day=1) - timedelta(days=1)
+            
+            mes_inicio_dt = timezone.make_aware(datetime.combine(mes_inicio, datetime.min.time()))
+            mes_fin_dt = timezone.make_aware(datetime.combine(mes_fin, datetime.max.time()))
+            
+            cantidad = Solicitudes.objects.filter(
+                created_at__range=(mes_inicio_dt, mes_fin_dt)
+            ).count()
+            
+            casos_por_mes.append({
+                'mes': mes_inicio.strftime('%b %Y'),
+                'cantidad': cantidad
+            })
+        
+        # Por mes para el gráfico diario también
+        casos_por_dia = casos_por_mes.copy()
+    
+    else:  # historico
+        # Histórico completo: mostrar por año
+        # Obtener el año más antiguo
+        primer_caso = Solicitudes.objects.order_by('created_at').first()
+        if primer_caso:
+            año_inicio = primer_caso.created_at.year
+            año_actual = today.year
+            
+            # Por año
+            for año in range(año_inicio, año_actual + 1):
+                año_inicio_dt = timezone.make_aware(datetime(año, 1, 1))
+                if año == año_actual:
+                    año_fin_dt = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+                else:
+                    año_fin_dt = timezone.make_aware(datetime(año + 1, 1, 1)) - timedelta(seconds=1)
+                
+                cantidad = Solicitudes.objects.filter(
+                    created_at__range=(año_inicio_dt, año_fin_dt)
+                ).count()
+                
+                casos_por_mes.append({
+                    'mes': str(año),
+                    'cantidad': cantidad
+                })
+            
+            # Por mes (últimos 24 meses)
+            for i in range(23, -1, -1):
+                fecha_mes = today - timedelta(days=30 * i)
+                mes_inicio = fecha_mes.replace(day=1)
+                if i == 0:
+                    mes_fin = today
+                else:
+                    siguiente_mes = mes_inicio + timedelta(days=32)
+                    mes_fin = siguiente_mes.replace(day=1) - timedelta(days=1)
+                
+                mes_inicio_dt = timezone.make_aware(datetime.combine(mes_inicio, datetime.min.time()))
+                mes_fin_dt = timezone.make_aware(datetime.combine(mes_fin, datetime.max.time()))
+                
+                cantidad = Solicitudes.objects.filter(
+                    created_at__range=(mes_inicio_dt, mes_fin_dt)
+                ).count()
+                
+                casos_por_dia.append({
+                    'fecha': mes_inicio.strftime('%b %Y'),
+                    'cantidad': cantidad
+                })
+    
+    # 7. --- ESTADÍSTICAS POR CARRERA ---
+    carreras_stats = []
+    for carrera in Carreras.objects.all():
+        total_casos = Solicitudes.objects.filter(estudiantes__carreras=carrera).count()
+        casos_aprobados = Solicitudes.objects.filter(
+            estudiantes__carreras=carrera,
+            estado='aprobado'
+        ).count()
+        casos_pendientes = Solicitudes.objects.filter(
+            estudiantes__carreras=carrera
+        ).exclude(estado__in=['aprobado', 'rechazado']).count()
+        
+        if total_casos > 0:
+            carreras_stats.append({
+                'nombre': carrera.nombre,
+                'total': total_casos,
+                'aprobados': casos_aprobados,
+                'pendientes': casos_pendientes,
+                'tasa_aprobacion': round((casos_aprobados / total_casos * 100), 1)
+            })
+    
+    # Ordenar por total de casos
+    carreras_stats.sort(key=lambda x: x['total'], reverse=True)
+    
+    # 8. --- ESTADÍSTICAS DE RENDIMIENTO ---
+    # Tiempo promedio de resolución (casos aprobados)
+    casos_aprobados_completos = Solicitudes.objects.filter(estado='aprobado')
+    tiempos_resolucion = []
+    for caso in casos_aprobados_completos:
+        if caso.created_at and caso.updated_at:
+            tiempo = (caso.updated_at - caso.created_at).days
+            tiempos_resolucion.append(tiempo)
+    
+    tiempo_promedio = round(sum(tiempos_resolucion) / len(tiempos_resolucion), 1) if tiempos_resolucion else 0
+    
+    # Casos resueltos esta semana
+    start_of_week_dt = timezone.make_aware(datetime.combine(start_of_week, datetime.min.time()))
+    end_of_week_dt = timezone.make_aware(datetime.combine(end_of_week, datetime.max.time()))
+    
+    casos_resueltos_semana = Solicitudes.objects.filter(
+        estado__in=['aprobado', 'rechazado'],
+        updated_at__range=(start_of_week_dt, end_of_week_dt)
+    ).count()
+    
+    # Tasa de aprobación general (valores iniciales, se filtrarán después si aplica)
+    total_resueltos = Solicitudes.objects.filter(estado__in=['aprobado', 'rechazado']).count()
+    total_aprobados = Solicitudes.objects.filter(estado='aprobado').count()
+    tasa_aprobacion_general = round((total_aprobados / total_resueltos * 100) if total_resueltos > 0 else 0, 1)
+    
+    # Valores iniciales para totales
+    total_casos = Solicitudes.objects.count()
+    
+    # 9. --- ESTADÍSTICAS DE USUARIOS ACTIVOS ---
+    # Usuarios activos por rol (últimos 30 días)
+    usuarios_activos_por_rol = {}
+    for rol_nombre in [ROL_COORDINADORA, ROL_COORDINADOR_TECNICO_PEDAGOGICO, ROL_ASESOR, ROL_DIRECTOR]:
+        usuarios_rol = PerfilUsuario.objects.filter(rol__nombre_rol=rol_nombre).count()
+        usuarios_activos_por_rol[rol_nombre] = usuarios_rol
+    
+    # 10. --- ESTADÍSTICAS DE AJUSTES POR ESTADO ---
+    ajustes_stats = {
+        'total': total_ajustes,
+        'aprobados': ajustes_aprobados,
+        'rechazados': ajustes_rechazados,
+        'pendientes': ajustes_pendientes,
+        'tasa_aprobacion': round((ajustes_aprobados / total_ajustes * 100) if total_ajustes > 0 else 0, 1)
+    }
+    
+    # 11. --- Filtrar Estadísticas por Rango de Tiempo (si aplica) ---
+    if rango_seleccionado != 'historico' and fecha_inicio_dt:
+        # Filtrar estados por rango
+        estados_stats_filtrados = []
+        total_filtrado = Solicitudes.objects.filter(created_at__gte=fecha_inicio_dt).count()
+        for estado_valor, estado_nombre in Solicitudes.ESTADO_CHOICES:
+            cantidad = Solicitudes.objects.filter(
+                estado=estado_valor,
+                created_at__gte=fecha_inicio_dt
+            ).count()
+            porcentaje = round((cantidad / total_filtrado * 100) if total_filtrado > 0 else 0, 1)
+            estados_stats_filtrados.append({
+                'valor': estado_valor,
+                'nombre': estado_nombre,
+                'cantidad': cantidad,
+                'porcentaje': porcentaje
+            })
+        estados_stats = estados_stats_filtrados
+        
+        # Filtrar roles por rango
+        casos_encargado_inclusion_filtrado = Solicitudes.objects.filter(
+            coordinadora_asignada__isnull=False,
+            created_at__gte=fecha_inicio_dt
+        ).count()
+        
+        casos_coordinador_tecnico_filtrado = Solicitudes.objects.filter(
+            coordinador_tecnico_pedagogico_asignado__isnull=False,
+            created_at__gte=fecha_inicio_dt
+        ).count()
+        
+        casos_asesor_pedagogico_filtrado = Solicitudes.objects.filter(
+            asesor_pedagogico_asignado__isnull=False,
+            created_at__gte=fecha_inicio_dt
+        ).count()
+        
+        casos_sin_asignar_filtrado = Solicitudes.objects.filter(
+            coordinadora_asignada__isnull=True,
+            coordinador_tecnico_pedagogico_asignado__isnull=True,
+            asesor_pedagogico_asignado__isnull=True,
+            created_at__gte=fecha_inicio_dt
+        ).count()
+        
+        roles_stats = {
+            'encargado_inclusion': casos_encargado_inclusion_filtrado,
+            'coordinador_tecnico': casos_coordinador_tecnico_filtrado,
+            'asesor_pedagogico': casos_asesor_pedagogico_filtrado,
+            'sin_asignar': casos_sin_asignar_filtrado,
+        }
+    
+    # 12. --- Filtrar KPIs por Rango de Tiempo ---
+    if rango_seleccionado != 'historico' and fecha_inicio_dt:
+        total_casos_filtrado = Solicitudes.objects.filter(created_at__gte=fecha_inicio_dt).count()
+        total_ajustes_filtrado = AjusteAsignado.objects.filter(
+            created_at__gte=fecha_inicio_dt
+        ).count() if fecha_inicio_dt else total_ajustes
+        ajustes_aprobados_filtrado = AjusteAsignado.objects.filter(
+            estado_aprobacion='aprobado',
+            created_at__gte=fecha_inicio_dt
+        ).count() if fecha_inicio_dt else ajustes_aprobados
+        ajustes_rechazados_filtrado = AjusteAsignado.objects.filter(
+            estado_aprobacion='rechazado',
+            created_at__gte=fecha_inicio_dt
+        ).count() if fecha_inicio_dt else ajustes_rechazados
+        ajustes_pendientes_filtrado = AjusteAsignado.objects.filter(
+            estado_aprobacion='pendiente',
+            created_at__gte=fecha_inicio_dt
+        ).count() if fecha_inicio_dt else ajustes_pendientes
+        
+        ajustes_stats = {
+            'total': total_ajustes_filtrado,
+            'aprobados': ajustes_aprobados_filtrado,
+            'rechazados': ajustes_rechazados_filtrado,
+            'pendientes': ajustes_pendientes_filtrado,
+            'tasa_aprobacion': round((ajustes_aprobados_filtrado / total_ajustes_filtrado * 100) if total_ajustes_filtrado > 0 else 0, 1)
+        }
+        
+        # Tiempo promedio y casos resueltos filtrados
+        casos_aprobados_filtrados = Solicitudes.objects.filter(
+            estado='aprobado',
+            created_at__gte=fecha_inicio_dt
+        ) if fecha_inicio_dt else Solicitudes.objects.filter(estado='aprobado')
+        
+        tiempos_resolucion_filtrados = []
+        for caso in casos_aprobados_filtrados:
+            if caso.created_at and caso.updated_at:
+                tiempo = (caso.updated_at - caso.created_at).days
+                tiempos_resolucion_filtrados.append(tiempo)
+        
+        tiempo_promedio = round(sum(tiempos_resolucion_filtrados) / len(tiempos_resolucion_filtrados), 1) if tiempos_resolucion_filtrados else 0
+        
+        # Casos resueltos en el rango
+        casos_resueltos_rango = Solicitudes.objects.filter(
+            estado__in=['aprobado', 'rechazado'],
+            updated_at__gte=fecha_inicio_dt
+        ).count() if fecha_inicio_dt else casos_resueltos_semana
+        
+        total_resueltos_filtrado = Solicitudes.objects.filter(
+            estado__in=['aprobado', 'rechazado'],
+            created_at__gte=fecha_inicio_dt
+        ).count() if fecha_inicio_dt else total_resueltos
+        
+        total_aprobados_filtrado = Solicitudes.objects.filter(
+            estado='aprobado',
+            created_at__gte=fecha_inicio_dt
+        ).count() if fecha_inicio_dt else total_aprobados
+        
+        tasa_aprobacion_general = round((total_aprobados_filtrado / total_resueltos_filtrado * 100) if total_resueltos_filtrado > 0 else 0, 1)
+        
+        total_casos = total_casos_filtrado
+        total_ajustes = total_ajustes_filtrado
+        casos_resueltos_semana = casos_resueltos_rango
+    
+    # 13. --- Preparar Contexto ---
+    context = {
+        'rango_seleccionado': rango_seleccionado,
+        'rango_nombre': rango_nombre,
+        'estados_stats': estados_stats,
+        'roles_stats': roles_stats,
+        'ajustes_stats': ajustes_stats,
+        'ajustes_por_categoria': ajustes_por_categoria,
+        'casos_por_mes': casos_por_mes,
+        'casos_por_dia': casos_por_dia,
+        'carreras_stats': carreras_stats[:10],  # Top 10
+        'tiempo_promedio': tiempo_promedio,
+        'casos_resueltos_semana': casos_resueltos_semana,
+        'tasa_aprobacion_general': tasa_aprobacion_general,
+        'usuarios_activos_por_rol': usuarios_activos_por_rol,
+        'total_casos': total_casos,
+        'total_ajustes': total_ajustes,
+    }
+    
+    return render(request, 'SIAPE/estadisticas_asesor_pedagogico.html', context)
+
+
+def obtener_datos_estadisticas_por_rango(rango_seleccionado):
+    """
+    Función auxiliar para obtener datos de estadísticas según el rango de tiempo.
+    Reutiliza la lógica de estadisticas_asesor_pedagogico.
+    """
+    now = timezone.localtime(timezone.now())
+    today = now.date()
+    
+    fecha_inicio_dt = None
+    rango_nombre = ''
+    
+    if rango_seleccionado == 'mes':
+        fecha_inicio = today - timedelta(days=30)
+        fecha_inicio_dt = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+        rango_nombre = 'Último Mes'
+    elif rango_seleccionado == 'semestre':
+        fecha_inicio = today - timedelta(days=180)
+        fecha_inicio_dt = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+        rango_nombre = 'Último Semestre'
+    elif rango_seleccionado == 'año':
+        fecha_inicio = today.replace(month=1, day=1)
+        fecha_inicio_dt = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+        rango_nombre = 'Último Año'
+    else:  # historico
+        fecha_inicio_dt = None
+        rango_nombre = 'Histórico Completo'
+    
+    # Obtener datos filtrados
+    if rango_seleccionado != 'historico' and fecha_inicio_dt:
+        queryset_casos = Solicitudes.objects.filter(created_at__gte=fecha_inicio_dt)
+        queryset_ajustes = AjusteAsignado.objects.filter(created_at__gte=fecha_inicio_dt)
+    else:
+        queryset_casos = Solicitudes.objects.all()
+        queryset_ajustes = AjusteAsignado.objects.all()
+    
+    total_casos = queryset_casos.count()
+    total_ajustes = queryset_ajustes.count()
+    
+    # Casos por estado
+    casos_por_estado = {}
+    for estado_valor, estado_nombre in Solicitudes.ESTADO_CHOICES:
+        cantidad = queryset_casos.filter(estado=estado_valor).count()
+        casos_por_estado[estado_nombre] = cantidad
+    
+    # Roles stats
+    roles_stats = {
+        'encargado_inclusion': queryset_casos.filter(coordinadora_asignada__isnull=False).count(),
+        'coordinador_tecnico': queryset_casos.filter(coordinador_tecnico_pedagogico_asignado__isnull=False).count(),
+        'asesor_pedagogico': queryset_casos.filter(asesor_pedagogico_asignado__isnull=False).count(),
+        'sin_asignar': queryset_casos.filter(
+            coordinadora_asignada__isnull=True,
+            coordinador_tecnico_pedagogico_asignado__isnull=True,
+            asesor_pedagogico_asignado__isnull=True
+        ).count(),
+    }
+    
+    # Ajustes stats
+    ajustes_stats = {
+        'total': total_ajustes,
+        'aprobados': queryset_ajustes.filter(estado_aprobacion='aprobado').count(),
+        'rechazados': queryset_ajustes.filter(estado_aprobacion='rechazado').count(),
+        'pendientes': queryset_ajustes.filter(estado_aprobacion='pendiente').count(),
+    }
+    
+    # Tiempo promedio de resolución
+    casos_aprobados = queryset_casos.filter(estado='aprobado')
+    tiempos_resolucion = []
+    for caso in casos_aprobados:
+        if caso.created_at and caso.updated_at:
+            tiempo = (caso.updated_at - caso.created_at).days
+            tiempos_resolucion.append(tiempo)
+    tiempo_promedio = round(sum(tiempos_resolucion) / len(tiempos_resolucion), 1) if tiempos_resolucion else 0
+    
+    # Tasa de aprobación
+    total_resueltos = queryset_casos.filter(estado__in=['aprobado', 'rechazado']).count()
+    total_aprobados = queryset_casos.filter(estado='aprobado').count()
+    tasa_aprobacion = round((total_aprobados / total_resueltos * 100) if total_resueltos > 0 else 0, 1)
+    
+    # Casos resueltos en el rango
+    casos_resueltos = queryset_casos.filter(estado__in=['aprobado', 'rechazado']).count()
+    
+    # Ajustes por categoría
+    ajustes_por_categoria = {}
+    for categoria in CategoriasAjustes.objects.all():
+        total_cat = queryset_ajustes.filter(ajuste_razonable__categorias_ajustes=categoria).count()
+        aprobados_cat = queryset_ajustes.filter(
+            ajuste_razonable__categorias_ajustes=categoria,
+            estado_aprobacion='aprobado'
+        ).count()
+        ajustes_por_categoria[categoria.nombre_categoria] = {
+            'total': total_cat,
+            'aprobados': aprobados_cat,
+            'tasa_aprobacion': round((aprobados_cat / total_cat * 100) if total_cat > 0 else 0, 1)
+        }
+    
+    # Estadísticas por carrera (top 10)
+    carreras_stats = []
+    for carrera in Carreras.objects.all():
+        total_casos_carrera = queryset_casos.filter(estudiantes__carreras=carrera).count()
+        casos_aprobados_carrera = queryset_casos.filter(
+            estudiantes__carreras=carrera,
+            estado='aprobado'
+        ).count()
+        if total_casos_carrera > 0:
+            carreras_stats.append({
+                'nombre': carrera.nombre,
+                'total': total_casos_carrera,
+                'aprobados': casos_aprobados_carrera,
+                'tasa_aprobacion': round((casos_aprobados_carrera / total_casos_carrera * 100), 1)
+            })
+    carreras_stats.sort(key=lambda x: x['total'], reverse=True)
+    carreras_stats = carreras_stats[:10]
+    
+    # Usuarios activos por rol
+    usuarios_activos_por_rol = {}
+    for rol_nombre in [ROL_COORDINADORA, ROL_COORDINADOR_TECNICO_PEDAGOGICO, ROL_ASESOR, ROL_DIRECTOR]:
+        usuarios_rol = PerfilUsuario.objects.filter(rol__nombre_rol=rol_nombre).count()
+        usuarios_activos_por_rol[rol_nombre] = usuarios_rol
+    
+    # Casos por mes (últimos 12 meses o según rango)
+    casos_por_mes = []
+    if rango_seleccionado == 'mes':
+        # Último mes: por semana
+        for i in range(3, -1, -1):
+            semana_inicio = today - timedelta(days=(i * 7) + today.weekday())
+            semana_fin = semana_inicio + timedelta(days=6)
+            if semana_fin > today:
+                semana_fin = today
+            semana_inicio_dt = timezone.make_aware(datetime.combine(semana_inicio, datetime.min.time()))
+            semana_fin_dt = timezone.make_aware(datetime.combine(semana_fin, datetime.max.time()))
+            cantidad = queryset_casos.filter(created_at__range=(semana_inicio_dt, semana_fin_dt)).count()
+            casos_por_mes.append({
+                'periodo': f'Sem {i+1}',
+                'cantidad': cantidad
+            })
+    elif rango_seleccionado == 'semestre':
+        # Último semestre: por mes
+        for i in range(5, -1, -1):
+            fecha_mes = today - timedelta(days=30 * i)
+            mes_inicio = fecha_mes.replace(day=1)
+            if i == 0:
+                mes_fin = today
+            else:
+                siguiente_mes = mes_inicio + timedelta(days=32)
+                mes_fin = siguiente_mes.replace(day=1) - timedelta(days=1)
+            mes_inicio_dt = timezone.make_aware(datetime.combine(mes_inicio, datetime.min.time()))
+            mes_fin_dt = timezone.make_aware(datetime.combine(mes_fin, datetime.max.time()))
+            cantidad = queryset_casos.filter(created_at__range=(mes_inicio_dt, mes_fin_dt)).count()
+            casos_por_mes.append({
+                'periodo': mes_inicio.strftime('%b %Y'),
+                'cantidad': cantidad
+            })
+    else:
+        # Año o histórico: por mes (últimos 12 meses)
+        for i in range(11, -1, -1):
+            fecha_mes = today - timedelta(days=30 * i)
+            mes_inicio = fecha_mes.replace(day=1)
+            if i == 0:
+                mes_fin = today
+            else:
+                siguiente_mes = mes_inicio + timedelta(days=32)
+                mes_fin = siguiente_mes.replace(day=1) - timedelta(days=1)
+            mes_inicio_dt = timezone.make_aware(datetime.combine(mes_inicio, datetime.min.time()))
+            mes_fin_dt = timezone.make_aware(datetime.combine(mes_fin, datetime.max.time()))
+            cantidad = queryset_casos.filter(created_at__range=(mes_inicio_dt, mes_fin_dt)).count()
+            casos_por_mes.append({
+                'periodo': mes_inicio.strftime('%b %Y'),
+                'cantidad': cantidad
+            })
+    
+    return {
+        'rango_nombre': rango_nombre,
+        'total_casos': total_casos,
+        'total_ajustes': total_ajustes,
+        'casos_por_estado': casos_por_estado,
+        'roles_stats': roles_stats,
+        'ajustes_stats': ajustes_stats,
+        'tiempo_promedio': tiempo_promedio,
+        'tasa_aprobacion': tasa_aprobacion,
+        'casos_resueltos': casos_resueltos,
+        'ajustes_por_categoria': ajustes_por_categoria,
+        'carreras_stats': carreras_stats,
+        'usuarios_activos_por_rol': usuarios_activos_por_rol,
+        'casos_por_mes': casos_por_mes,
+        'fecha_inicio_dt': fecha_inicio_dt
+    }
+
+
+@login_required
+def generar_reporte_pdf_asesor(request):
+    """
+    Genera un reporte PDF con las estadísticas del Asesor Pedagógico según el rango de tiempo seleccionado.
+    """
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_ASESOR:
+            messages.error(request, 'No tienes permisos para acceder a esta página.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+    
+    rango_seleccionado = request.GET.get('rango', 'mes')
+    datos = obtener_datos_estadisticas_por_rango(rango_seleccionado)
+    
+    # Crear el objeto HttpResponse con el tipo de contenido PDF
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="reporte_estadisticas_{rango_seleccionado}_{timezone.now().strftime("%Y%m%d")}.pdf"'
+    
+    # Crear el objeto PDF usando BytesIO
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+    
+    # Contenedor para los elementos del PDF
+    elements = []
+    
+    # Estilos con colores rojo, blanco y negro
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=20,
+        textColor=colors.HexColor('#dc3545'),  # Rojo
+        spaceAfter=20,
+        alignment=1,  # Centrado
+        fontName='Helvetica-Bold'
+    )
+    
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=14,
+        textColor=colors.HexColor('#000000'),  # Negro
+        spaceAfter=12,
+        fontName='Helvetica-Bold'
+    )
+    
+    # Colores del esquema
+    color_rojo = colors.HexColor('#dc3545')
+    color_negro = colors.HexColor('#000000')
+    color_blanco = colors.white
+    color_gris_claro = colors.HexColor('#f5f5f5')
+    
+    # Título
+    elements.append(Paragraph('Reporte de Estadísticas SIAPE', title_style))
+    elements.append(Paragraph(f'Rango de Tiempo: {datos["rango_nombre"]}', heading_style))
+    elements.append(Paragraph(f'Fecha de Generación: {timezone.now().strftime("%d/%m/%Y %H:%M")}', styles['Normal']))
+    elements.append(Spacer(1, 0.4*inch))
+    
+    # KPIs Principales
+    elements.append(Paragraph('Indicadores Principales', heading_style))
+    kpi_data = [
+        ['Indicador', 'Valor'],
+        ['Total Casos', str(datos['total_casos'])],
+        ['Total Ajustes', str(datos['total_ajustes'])],
+        ['Ajustes Aprobados', str(datos['ajustes_stats']['aprobados'])],
+        ['Ajustes Rechazados', str(datos['ajustes_stats']['rechazados'])],
+        ['Ajustes Pendientes', str(datos['ajustes_stats']['pendientes'])],
+        ['Casos Resueltos', str(datos['casos_resueltos'])],
+        ['Tasa de Aprobación', f"{datos['tasa_aprobacion']}%"],
+        ['Tiempo Promedio Resolución', f"{datos['tiempo_promedio']} días"],
+    ]
+    kpi_table = Table(kpi_data, colWidths=[4*inch, 2*inch])
+    kpi_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+        ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('TOPPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+        ('GRID', (0, 0), (-1, -1), 1, color_negro),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+    ]))
+    elements.append(kpi_table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Casos por Estado
+    elements.append(Paragraph('Casos por Estado', heading_style))
+    estado_data = [['Estado', 'Cantidad']]
+    for estado, cantidad in datos['casos_por_estado'].items():
+        estado_data.append([estado, str(cantidad)])
+    
+    estado_table = Table(estado_data, colWidths=[4*inch, 2*inch])
+    estado_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+        ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('TOPPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+        ('GRID', (0, 0), (-1, -1), 1, color_negro),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+    ]))
+    elements.append(estado_table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Casos por Rol
+    elements.append(Paragraph('Casos Asignados por Rol', heading_style))
+    rol_data = [
+        ['Rol', 'Cantidad'],
+        ['Encargado de Inclusión', str(datos['roles_stats']['encargado_inclusion'])],
+        ['Coordinador Técnico Pedagógico', str(datos['roles_stats']['coordinador_tecnico'])],
+        ['Asesor Pedagógico', str(datos['roles_stats']['asesor_pedagogico'])],
+        ['Sin Asignar', str(datos['roles_stats']['sin_asignar'])],
+    ]
+    rol_table = Table(rol_data, colWidths=[4*inch, 2*inch])
+    rol_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+        ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('TOPPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+        ('GRID', (0, 0), (-1, -1), 1, color_negro),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+    ]))
+    elements.append(rol_table)
+    elements.append(PageBreak())
+    
+    # Ajustes por Categoría
+    if datos['ajustes_por_categoria']:
+        elements.append(Paragraph('Ajustes por Categoría', heading_style))
+        categoria_data = [['Categoría', 'Total', 'Aprobados', 'Tasa Aprobación (%)']]
+        for categoria, stats in datos['ajustes_por_categoria'].items():
+            categoria_data.append([
+                categoria,
+                str(stats['total']),
+                str(stats['aprobados']),
+                f"{stats['tasa_aprobacion']}%"
+            ])
+        
+        categoria_table = Table(categoria_data, colWidths=[2.5*inch, 1.2*inch, 1.2*inch, 1.5*inch])
+        categoria_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+            ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('ALIGN', (1, 1), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('TOPPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+            ('GRID', (0, 0), (-1, -1), 1, color_negro),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+        ]))
+        elements.append(categoria_table)
+        elements.append(Spacer(1, 0.3*inch))
+    
+    # Estadísticas por Carrera (Top 10)
+    if datos['carreras_stats']:
+        elements.append(Paragraph('Estadísticas por Carrera (Top 10)', heading_style))
+        carrera_data = [['Carrera', 'Total Casos', 'Aprobados', 'Tasa Aprobación (%)']]
+        for carrera in datos['carreras_stats']:
+            carrera_data.append([
+                carrera['nombre'][:40],  # Limitar longitud
+                str(carrera['total']),
+                str(carrera['aprobados']),
+                f"{carrera['tasa_aprobacion']}%"
+            ])
+        
+        carrera_table = Table(carrera_data, colWidths=[3*inch, 1.2*inch, 1.2*inch, 1.5*inch])
+        carrera_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+            ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('ALIGN', (1, 1), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('FONTSIZE', (0, 1), (0, -1), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('TOPPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+            ('GRID', (0, 0), (-1, -1), 1, color_negro),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+        ]))
+        elements.append(carrera_table)
+        elements.append(Spacer(1, 0.3*inch))
+    
+    # Usuarios Activos por Rol
+    elements.append(Paragraph('Usuarios Activos por Rol', heading_style))
+    usuarios_data = [['Rol', 'Cantidad de Usuarios']]
+    for rol, cantidad in datos['usuarios_activos_por_rol'].items():
+        usuarios_data.append([rol, str(cantidad)])
+    
+    usuarios_table = Table(usuarios_data, colWidths=[4*inch, 2*inch])
+    usuarios_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+        ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('TOPPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+        ('GRID', (0, 0), (-1, -1), 1, color_negro),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+    ]))
+    elements.append(usuarios_table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Casos por Período
+    if datos['casos_por_mes']:
+        elements.append(Paragraph('Casos por Período', heading_style))
+        periodo_data = [['Período', 'Cantidad de Casos']]
+        for periodo in datos['casos_por_mes']:
+            periodo_data.append([periodo['periodo'], str(periodo['cantidad'])])
+        
+        periodo_table = Table(periodo_data, colWidths=[3*inch, 3*inch])
+        periodo_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+            ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('ALIGN', (1, 1), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('TOPPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+            ('GRID', (0, 0), (-1, -1), 1, color_negro),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+        ]))
+        elements.append(periodo_table)
+    
+    # Construir el PDF
+    doc.build(elements)
+    
+    # Obtener el valor del BytesIO buffer y escribirlo en la respuesta
+    pdf = buffer.getvalue()
+    buffer.close()
+    response.write(pdf)
+    
+    return response
+
+
+@login_required
+def generar_reporte_powerbi_asesor(request):
+    """
+    Genera un archivo CSV con los datos para PowerBI según el rango de tiempo seleccionado.
+    """
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_ASESOR:
+            messages.error(request, 'No tienes permisos para acceder a esta página.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+    
+    rango_seleccionado = request.GET.get('rango', 'mes')
+    datos = obtener_datos_estadisticas_por_rango(rango_seleccionado)
+    
+    # Crear la respuesta HTTP con el tipo de contenido CSV
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="reporte_powerbi_{rango_seleccionado}_{timezone.now().strftime("%Y%m%d")}.csv"'
+    
+    # Agregar BOM para UTF-8 (ayuda con Excel)
+    response.write('\ufeff')
+    
+    writer = csv.writer(response)
+    
+    # Encabezados
+    writer.writerow(['Tipo de Dato', 'Categoría', 'Valor', 'Rango de Tiempo'])
+    
+    # KPIs
+    writer.writerow(['KPI', 'Total Casos', datos['total_casos'], datos['rango_nombre']])
+    writer.writerow(['KPI', 'Total Ajustes', datos['total_ajustes'], datos['rango_nombre']])
+    writer.writerow(['KPI', 'Ajustes Aprobados', datos['ajustes_stats']['aprobados'], datos['rango_nombre']])
+    writer.writerow(['KPI', 'Ajustes Rechazados', datos['ajustes_stats']['rechazados'], datos['rango_nombre']])
+    writer.writerow(['KPI', 'Ajustes Pendientes', datos['ajustes_stats']['pendientes'], datos['rango_nombre']])
+    
+    # Casos por Estado
+    for estado, cantidad in datos['casos_por_estado'].items():
+        writer.writerow(['Estado', estado, cantidad, datos['rango_nombre']])
+    
+    # Casos por Rol
+    writer.writerow(['Rol', 'Encargado de Inclusión', datos['roles_stats']['encargado_inclusion'], datos['rango_nombre']])
+    writer.writerow(['Rol', 'Coordinador Técnico Pedagógico', datos['roles_stats']['coordinador_tecnico'], datos['rango_nombre']])
+    writer.writerow(['Rol', 'Asesor Pedagógico', datos['roles_stats']['asesor_pedagogico'], datos['rango_nombre']])
+    
+    # Agregar datos detallados de casos si es necesario
+    if datos['fecha_inicio_dt']:
+        casos = Solicitudes.objects.filter(created_at__gte=datos['fecha_inicio_dt']).select_related('estudiantes', 'estudiantes__carreras')
+    else:
+        casos = Solicitudes.objects.all().select_related('estudiantes', 'estudiantes__carreras')
+    
+    writer.writerow([])  # Línea en blanco
+    writer.writerow(['Detalle de Casos'])
+    writer.writerow(['ID', 'Estudiante', 'Carrera', 'Estado', 'Fecha Creación', 'Asunto'])
+    
+    for caso in casos[:1000]:  # Limitar a 1000 casos para no hacer el archivo muy grande
+        estudiante_nombre = f"{caso.estudiantes.nombres} {caso.estudiantes.apellidos}" if caso.estudiantes else "N/A"
+        carrera_nombre = caso.estudiantes.carreras.nombre if caso.estudiantes and caso.estudiantes.carreras else "N/A"
+        fecha_creacion = timezone.localtime(caso.created_at).strftime('%Y-%m-%d %H:%M:%S') if caso.created_at else "N/A"
+        writer.writerow([
+            caso.id,
+            estudiante_nombre,
+            carrera_nombre,
+            caso.get_estado_display(),
+            fecha_creacion,
+            caso.asunto[:50] if caso.asunto else "N/A"  # Limitar longitud del asunto
+        ])
+    
+    return response
+
 
 # ----------------------------------------------------
 #                VISTA DIRECTOR DE CARRERA
@@ -3754,6 +5088,139 @@ def estadisticas_director(request):
     }
     
     return render(request, 'SIAPE/estadisticas_director.html', context)
+
+
+# ----------------------------------------------------
+#           GESTIÓN DE ASIGNATURAS (DIRECTOR)
+# ----------------------------------------------------
+
+@login_required
+def gestion_asignaturas_director(request):
+    """
+    Vista para que el Director gestione las asignaturas de sus carreras.
+    Permite ver, activar/desactivar y filtrar asignaturas.
+    """
+    try:
+        perfil_director = request.user.perfil
+        if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para esta acción.')
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+    
+    # Desactivar automáticamente asignaturas de semestres vencidos
+    asignaturas_desactivadas = desactivar_asignaturas_semestre_vencido()
+    if asignaturas_desactivadas > 0:
+        messages.info(request, f'Se desactivaron automáticamente {asignaturas_desactivadas} asignatura(s) de semestres anteriores.')
+    
+    # Obtener carreras del director
+    carreras_del_director = Carreras.objects.filter(director=perfil_director)
+    
+    # Filtros
+    filtro_estado = request.GET.get('estado', 'todas')  # todas, activas, inactivas
+    filtro_carrera = request.GET.get('carrera', '')
+    filtro_semestre = request.GET.get('semestre', '')
+    
+    # Obtener asignaturas
+    asignaturas = Asignaturas.objects.filter(
+        carreras__in=carreras_del_director
+    ).select_related('carreras', 'docente__usuario').order_by('-is_active', 'nombre', 'seccion')
+    
+    # Aplicar filtros
+    if filtro_estado == 'activas':
+        asignaturas = asignaturas.filter(is_active=True)
+    elif filtro_estado == 'inactivas':
+        asignaturas = asignaturas.filter(is_active=False)
+    
+    if filtro_carrera:
+        asignaturas = asignaturas.filter(carreras_id=filtro_carrera)
+    
+    if filtro_semestre:
+        asignaturas = asignaturas.filter(semestre=filtro_semestre)
+    
+    # Estadísticas
+    total_asignaturas = Asignaturas.objects.filter(carreras__in=carreras_del_director).count()
+    total_activas = Asignaturas.objects.filter(carreras__in=carreras_del_director, is_active=True).count()
+    total_inactivas = Asignaturas.objects.filter(carreras__in=carreras_del_director, is_active=False).count()
+    
+    context = {
+        'asignaturas': asignaturas,
+        'carreras': carreras_del_director,
+        'total_asignaturas': total_asignaturas,
+        'total_activas': total_activas,
+        'total_inactivas': total_inactivas,
+        'filtro_estado': filtro_estado,
+        'filtro_carrera': filtro_carrera,
+        'filtro_semestre': filtro_semestre,
+        'semestres': [('otono', 'Otoño (Marzo-Julio)'), ('primavera', 'Primavera (Agosto-Diciembre)')],
+    }
+    
+    return render(request, 'SIAPE/gestion_asignaturas_director.html', context)
+
+
+@login_required
+@require_POST
+def toggle_asignatura_estado(request, asignatura_id):
+    """
+    Activa o desactiva una asignatura.
+    """
+    try:
+        perfil_director = request.user.perfil
+        if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para esta acción.')
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+    
+    carreras_del_director = Carreras.objects.filter(director=perfil_director)
+    asignatura = get_object_or_404(Asignaturas, id=asignatura_id, carreras__in=carreras_del_director)
+    
+    # Toggle estado
+    asignatura.is_active = not asignatura.is_active
+    asignatura.save()
+    
+    estado_texto = "activada" if asignatura.is_active else "desactivada"
+    messages.success(request, f'Asignatura "{asignatura.nombre} - {asignatura.seccion}" {estado_texto} correctamente.')
+    
+    return redirect('gestion_asignaturas_director')
+
+
+@login_required
+@require_POST
+def bulk_toggle_asignaturas(request):
+    """
+    Activa o desactiva múltiples asignaturas a la vez.
+    """
+    try:
+        perfil_director = request.user.perfil
+        if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para esta acción.')
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+    
+    accion = request.POST.get('accion')  # 'activar' o 'desactivar'
+    asignaturas_ids = request.POST.getlist('asignaturas_ids')
+    
+    if not asignaturas_ids:
+        messages.warning(request, 'No se seleccionaron asignaturas.')
+        return redirect('gestion_asignaturas_director')
+    
+    carreras_del_director = Carreras.objects.filter(director=perfil_director)
+    
+    # Filtrar solo asignaturas del director
+    asignaturas = Asignaturas.objects.filter(
+        id__in=asignaturas_ids,
+        carreras__in=carreras_del_director
+    )
+    
+    nuevo_estado = accion == 'activar'
+    count = asignaturas.update(is_active=nuevo_estado)
+    
+    estado_texto = "activadas" if nuevo_estado else "desactivadas"
+    messages.success(request, f'{count} asignatura(s) {estado_texto} correctamente.')
+    
+    return redirect('gestion_asignaturas_director')
 
 
 # ----------------------------------------------------
@@ -4156,12 +5623,26 @@ def cargar_asignaturas_excel(request):
                         errores.append(f'Fila {row_num}: No se encontró el docente especificado')
                         continue
                     
+                    # Determinar semestre y año actual
+                    hoy = timezone.localtime().date()
+                    anio_actual = hoy.year
+                    mes_actual = hoy.month
+                    if mes_actual >= 3 and mes_actual <= 7:
+                        semestre_actual = 'otono'
+                    else:
+                        semestre_actual = 'primavera'
+                    
                     # Crear o actualizar asignatura
                     asignatura, created = Asignaturas.objects.update_or_create(
                         nombre=nombre,
                         seccion=seccion,
                         carreras=carrera,
-                        defaults={'docente': docente_perfil}
+                        defaults={
+                            'docente': docente_perfil,
+                            'semestre': semestre_actual,
+                            'anio': anio_actual,
+                            'is_active': True
+                        }
                     )
                     
                     if created:
@@ -4190,7 +5671,7 @@ def cargar_asignaturas_excel(request):
 def cargar_inscripciones_excel(request):
     """
     Procesa un archivo Excel para inscribir estudiantes en asignaturas.
-    Columnas esperadas: Estudiante_RUT, Asignatura_Nombre, Asignatura_Seccion (o Asignatura_ID)
+    Columnas esperadas: Estudiante_RUT, Asignatura_Nombre, Asignatura_Seccion
     """
     import openpyxl
     from django.db import transaction
@@ -4220,8 +5701,11 @@ def cargar_inscripciones_excel(request):
         
         headers = [cell.value.lower().strip() if cell.value else '' for cell in ws[1]]
         
-        if 'estudiante_rut' not in headers:
-            messages.error(request, 'El archivo debe contener la columna: ESTUDIANTE_RUT')
+        # Validar columnas requeridas
+        columnas_requeridas = ['estudiante_rut', 'asignatura_nombre', 'asignatura_seccion']
+        columnas_faltantes = [col for col in columnas_requeridas if col not in headers]
+        if columnas_faltantes:
+            messages.error(request, f'El archivo debe contener las columnas: {", ".join([c.upper() for c in columnas_faltantes])}')
             return redirect('gestion_carga_masiva_director')
         
         col_idx = {h: headers.index(h) for h in headers if h}
@@ -4234,12 +5718,19 @@ def cargar_inscripciones_excel(request):
             for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
                 try:
                     estudiante_rut = str(row[col_idx.get('estudiante_rut', 0)] or '').strip()
-                    asignatura_id = row[col_idx.get('asignatura_id', -1)] if 'asignatura_id' in col_idx else None
-                    asignatura_nombre = str(row[col_idx.get('asignatura_nombre', -1)] or '').strip() if 'asignatura_nombre' in col_idx else None
-                    asignatura_seccion = str(row[col_idx.get('asignatura_seccion', -1)] or '').strip() if 'asignatura_seccion' in col_idx else None
+                    asignatura_nombre = str(row[col_idx.get('asignatura_nombre', 1)] or '').strip()
+                    asignatura_seccion = str(row[col_idx.get('asignatura_seccion', 2)] or '').strip()
                     
                     if not estudiante_rut:
                         errores.append(f'Fila {row_num}: RUT del estudiante requerido')
+                        continue
+                    
+                    if not asignatura_nombre:
+                        errores.append(f'Fila {row_num}: Nombre de asignatura requerido')
+                        continue
+                    
+                    if not asignatura_seccion:
+                        errores.append(f'Fila {row_num}: Sección de asignatura requerida')
                         continue
                     
                     # Validar RUT
@@ -4259,23 +5750,26 @@ def cargar_inscripciones_excel(request):
                         errores.append(f'Fila {row_num}: El estudiante no pertenece a tus carreras')
                         continue
                     
-                    # Buscar asignatura
-                    asignatura = None
-                    if asignatura_id:
-                        try:
-                            asignatura = Asignaturas.objects.get(id=int(asignatura_id))
-                        except (ValueError, Asignaturas.DoesNotExist):
-                            errores.append(f'Fila {row_num}: Asignatura ID inválido')
-                            continue
-                    elif asignatura_nombre and asignatura_seccion:
-                        asignatura = Asignaturas.objects.filter(
-                            nombre=asignatura_nombre,
-                            seccion=asignatura_seccion,
-                            carreras__in=carreras_del_director
-                        ).first()
+                    # Buscar asignatura por nombre Y sección (dentro de las carreras del director, solo activas)
+                    asignatura = Asignaturas.objects.filter(
+                        nombre=asignatura_nombre,
+                        seccion=asignatura_seccion,
+                        carreras__in=carreras_del_director,
+                        is_active=True
+                    ).first()
                     
                     if not asignatura:
-                        errores.append(f'Fila {row_num}: No se encontró la asignatura')
+                        # Verificar si existe pero está inactiva
+                        asignatura_inactiva = Asignaturas.objects.filter(
+                            nombre=asignatura_nombre,
+                            seccion=asignatura_seccion,
+                            carreras__in=carreras_del_director,
+                            is_active=False
+                        ).first()
+                        if asignatura_inactiva:
+                            errores.append(f'Fila {row_num}: La asignatura "{asignatura_nombre}" - "{asignatura_seccion}" está inactiva')
+                        else:
+                            errores.append(f'Fila {row_num}: No se encontró asignatura con nombre "{asignatura_nombre}" y sección "{asignatura_seccion}"')
                         continue
                     
                     # Crear inscripción si no existe
@@ -4346,8 +5840,8 @@ def descargar_plantilla_excel(request, tipo):
         
     elif tipo == 'inscripciones':
         ws.title = 'Inscripciones'
-        ws.append(['Estudiante_RUT', 'Asignatura_ID', 'Asignatura_Nombre', 'Asignatura_Seccion'])
-        ws.append(['12345678-9', '', 'Cálculo I', 'A-001'])
+        ws.append(['Estudiante_RUT', 'Asignatura_Nombre', 'Asignatura_Seccion'])
+        ws.append(['12345678-9', 'Cálculo I', 'A-001'])
         filename = 'plantilla_inscripciones.xlsx'
         
     else:
@@ -4419,16 +5913,33 @@ def dashboard_coordinador_tecnico_pedagogico(request):
     kpi_casos_pendientes_total = casos_pendientes_formulacion.count()
     
     # KPI 3: Casos devueltos desde Asesora Pedagógica
-    # Casos que están en 'pendiente_formulacion_ajustes' y que tienen ajustes asignados
-    # (lo que indica que fueron formulados y luego devueltos)
-    # Esto es una aproximación: casos con ajustes que están pendientes de formulación
     casos_devueltos = Solicitudes.objects.filter(
         estado='pendiente_formulacion_ajustes',
         ajusteasignado__isnull=False
     ).distinct().count()
     
+    # KPI 4: Total de ajustes formulados por este coordinador
+    casos_asignados = Solicitudes.objects.filter(
+        coordinador_tecnico_pedagogico_asignado=perfil
+    )
+    total_ajustes_formulados = AjusteAsignado.objects.filter(
+        solicitudes__in=casos_asignados
+    ).count()
+    
+    # KPI 5: Ajustes aprobados
+    ajustes_aprobados = AjusteAsignado.objects.filter(
+        solicitudes__in=casos_asignados,
+        estado_aprobacion='aprobado'
+    ).count()
+    
+    # KPI 6: Casos enviados a Asesor Pedagógico esta semana
+    casos_enviados_semana = Solicitudes.objects.filter(
+        estado='pendiente_preaprobacion',
+        coordinador_tecnico_pedagogico_asignado=perfil,
+        updated_at__range=(start_of_week_dt, end_of_week_dt)
+    ).count()
+    
     # 4. --- Obtener Lista de Casos Pendientes de Formulación ---
-    # Los casos más recientes primero
     casos_pendientes_list = casos_pendientes_formulacion.order_by('-updated_at')[:10]
     
     # 5. --- Preparar Contexto ---
@@ -4438,12 +5949,172 @@ def dashboard_coordinador_tecnico_pedagogico(request):
             'casos_nuevos_semana': casos_nuevos_semana,
             'casos_pendientes_total': kpi_casos_pendientes_total,
             'casos_devueltos': casos_devueltos,
+            'total_ajustes_formulados': total_ajustes_formulados,
+            'ajustes_aprobados': ajustes_aprobados,
+            'casos_enviados_semana': casos_enviados_semana,
         },
         'casos_pendientes_list': casos_pendientes_list,
     }
     
     # 6. --- Renderizar Template ---
     return render(request, 'SIAPE/dashboard_coordinador_tecnico_pedagogico.html', context)
+
+
+# ----------------------------------------------------
+#           GESTIÓN DE CATEGORÍAS DE AJUSTES
+#           (Coordinador Técnico Pedagógico)
+# ----------------------------------------------------
+
+@login_required
+def gestion_categorias_ajustes(request):
+    """
+    Vista para que el Coordinador Técnico Pedagógico gestione las categorías de ajustes.
+    Permite crear, editar y eliminar categorías.
+    """
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_COORDINADOR_TECNICO_PEDAGOGICO:
+            messages.error(request, 'No tienes permisos para acceder a esta página.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+    
+    # 2. --- Obtener todas las categorías con conteo de uso ---
+    categorias = CategoriasAjustes.objects.annotate(
+        total_ajustes=Count('ajusterazonable')
+    ).order_by('nombre_categoria')
+    
+    # 3. --- Procesar formularios ---
+    if request.method == 'POST':
+        accion = request.POST.get('accion')
+        
+        if accion == 'crear':
+            nombre = request.POST.get('nombre', '').strip()
+            if nombre:
+                # Verificar si ya existe
+                if CategoriasAjustes.objects.filter(nombre_categoria__iexact=nombre).exists():
+                    messages.error(request, f'La categoría "{nombre}" ya existe.')
+                else:
+                    CategoriasAjustes.objects.create(nombre_categoria=nombre.capitalize())
+                    messages.success(request, f'Categoría "{nombre}" creada exitosamente.')
+            else:
+                messages.error(request, 'El nombre de la categoría es requerido.')
+        
+        elif accion == 'editar':
+            categoria_id = request.POST.get('categoria_id')
+            nuevo_nombre = request.POST.get('nuevo_nombre', '').strip()
+            if categoria_id and nuevo_nombre:
+                try:
+                    categoria = CategoriasAjustes.objects.get(id=categoria_id)
+                    # Verificar si el nuevo nombre ya existe (excepto la misma categoría)
+                    if CategoriasAjustes.objects.filter(nombre_categoria__iexact=nuevo_nombre).exclude(id=categoria_id).exists():
+                        messages.error(request, f'La categoría "{nuevo_nombre}" ya existe.')
+                    else:
+                        categoria.nombre_categoria = nuevo_nombre.capitalize()
+                        categoria.save()
+                        messages.success(request, 'Categoría actualizada exitosamente.')
+                except CategoriasAjustes.DoesNotExist:
+                    messages.error(request, 'Categoría no encontrada.')
+            else:
+                messages.error(request, 'Datos incompletos.')
+        
+        elif accion == 'eliminar':
+            categoria_id = request.POST.get('categoria_id')
+            if categoria_id:
+                try:
+                    categoria = CategoriasAjustes.objects.get(id=categoria_id)
+                    # Verificar si tiene ajustes asociados
+                    total_ajustes = AjusteRazonable.objects.filter(categorias_ajustes=categoria).count()
+                    if total_ajustes > 0:
+                        messages.error(request, f'No se puede eliminar la categoría "{categoria.nombre_categoria}" porque tiene {total_ajustes} ajuste(s) asociado(s).')
+                    else:
+                        nombre_categoria = categoria.nombre_categoria
+                        categoria.delete()
+                        messages.success(request, f'Categoría "{nombre_categoria}" eliminada exitosamente.')
+                except CategoriasAjustes.DoesNotExist:
+                    messages.error(request, 'Categoría no encontrada.')
+        
+        return redirect('gestion_categorias_ajustes')
+    
+    # 4. --- Preparar Contexto ---
+    context = {
+        'categorias': categorias,
+    }
+    
+    return render(request, 'SIAPE/gestion_categorias_ajustes.html', context)
+
+
+@login_required
+def estadisticas_ajustes_coordinador_tecnico(request):
+    """
+    Vista de estadísticas de ajustes formulados por el Coordinador Técnico Pedagógico.
+    """
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_COORDINADOR_TECNICO_PEDAGOGICO:
+            messages.error(request, 'No tienes permisos para acceder a esta página.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+    
+    # 2. --- Obtener ajustes formulados por este coordinador ---
+    # Aproximación: ajustes en casos asignados a este coordinador
+    casos_asignados = Solicitudes.objects.filter(
+        coordinador_tecnico_pedagogico_asignado=perfil
+    )
+    
+    ajustes_formulados = AjusteAsignado.objects.filter(
+        solicitudes__in=casos_asignados
+    ).select_related(
+        'ajuste_razonable__categorias_ajustes',
+        'solicitudes__estudiantes',
+        'solicitudes__estudiantes__carreras'
+    )
+    
+    # 3. --- Estadísticas por categoría ---
+    estadisticas_categoria = {}
+    for ajuste in ajustes_formulados:
+        categoria = ajuste.ajuste_razonable.categorias_ajustes
+        if categoria:
+            if categoria.nombre_categoria not in estadisticas_categoria:
+                estadisticas_categoria[categoria.nombre_categoria] = {
+                    'total': 0,
+                    'aprobados': 0,
+                    'rechazados': 0,
+                    'pendientes': 0
+                }
+            estadisticas_categoria[categoria.nombre_categoria]['total'] += 1
+            if ajuste.estado_aprobacion == 'aprobado':
+                estadisticas_categoria[categoria.nombre_categoria]['aprobados'] += 1
+            elif ajuste.estado_aprobacion == 'rechazado':
+                estadisticas_categoria[categoria.nombre_categoria]['rechazados'] += 1
+            else:
+                estadisticas_categoria[categoria.nombre_categoria]['pendientes'] += 1
+    
+    # 4. --- Estadísticas generales ---
+    total_ajustes = ajustes_formulados.count()
+    ajustes_aprobados = ajustes_formulados.filter(estado_aprobacion='aprobado').count()
+    ajustes_rechazados = ajustes_formulados.filter(estado_aprobacion='rechazado').count()
+    ajustes_pendientes = ajustes_formulados.filter(estado_aprobacion='pendiente').count()
+    
+    # 5. --- Ajustes recientes ---
+    ajustes_recientes = ajustes_formulados.order_by('-created_at')[:10]
+    
+    # 6. --- Preparar Contexto ---
+    context = {
+        'total_ajustes': total_ajustes,
+        'ajustes_aprobados': ajustes_aprobados,
+        'ajustes_rechazados': ajustes_rechazados,
+        'ajustes_pendientes': ajustes_pendientes,
+        'estadisticas_categoria': estadisticas_categoria,
+        'ajustes_recientes': ajustes_recientes,
+    }
+    
+    return render(request, 'SIAPE/estadisticas_ajustes_coordinador_tecnico.html', context)
 
 
 # ----------- Vistas para Docente ------------  

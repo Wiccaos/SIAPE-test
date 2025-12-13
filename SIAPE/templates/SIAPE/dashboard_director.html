@@ -29,6 +29,10 @@
             <i class="fas fa-graduation-cap"></i>
             Mis Carreras
         </a>
+        <a href="{% url 'gestion_asignaturas_director' %}" class="nav-item">
+            <i class="fas fa-book"></i>
+            Asignaturas
+        </a>
         <a href="{% url 'gestion_carga_masiva_director' %}" class="nav-item">
             <i class="fas fa-file-upload"></i>
             Carga Masiva
@@ -50,7 +54,7 @@
             </div>
             <div class="kpi-info">
                 <span class="kpi-value">{{ kpis.total_pendientes|default:0 }}</span>
-                <span class="kpi-label">Pendientes de Aprobación</span>
+                <span class="kpi-label">Pendientes</span>
             </div>
         </div>
 
@@ -60,7 +64,7 @@
             </div>
             <div class="kpi-info">
                 <span class="kpi-value">{{ kpis.total_aprobados|default:0 }}</span>
-                <span class="kpi-label">Casos Aprobados (Hist.)</span>
+                <span class="kpi-label">Aprobados</span>
             </div>
         </div>
     </section>
@@ -78,7 +82,7 @@
                     <th>Carrera</th>
                     <th>Asunto</th>
                     <th>Fecha Solicitud</th>
-                    <th style="width: 25%;">Acciones</th>
+                    <th style="text-align: center;">Acción</th>
                 </tr>
             </thead>
             <tbody>
@@ -89,26 +93,10 @@
                     <td>{{ solicitud.estudiantes.carreras.nombre }}</td>
                     <td>{{ solicitud.asunto }}</td>
                     <td>{{ solicitud.created_at|date:"d/m/Y" }}</td>
-                    <td class="acciones-container">
+                    <td style="text-align: center;">
                         <a href="{% url 'detalle_caso' solicitud.id %}" class="btn-accion btn-agendar btn-accion-small">
-                            <i class="fas fa-eye"></i> Ver
-                        </a> 
-
-                        <form action="{% url 'aprobar_caso' solicitud.id %}" method="POST" style="display: inline-block;">
-                            {% csrf_token %}
-                            <button type="submit" class="btn-accion btn-accion-green btn-accion-small"
-                                    onclick="return confirm('¿Está seguro de APROBAR este caso? Esta acción es final.')">
-                                <i class="fas fa-check"></i> Aprobar
-                            </button>
-                        </form>
-
-                        <form action="{% url 'rechazar_caso' solicitud.id %}" method="POST" style="display: inline-block;">
-                            {% csrf_token %}
-                            <button type="submit" class="btn-accion btn-ajuste btn-accion-small"
-                                    onclick="return confirm('¿Está seguro de DEVOLVER este caso al Asesor Pedagógico para su revisión?');">
-                                <i class="fas fa-undo-alt"></i> Devolver
-                            </button>
-                        </form>
+                            <i class="fas fa-eye"></i> Ver Caso
+                        </a>
                     </td>
                 </tr>
                 {% empty %}

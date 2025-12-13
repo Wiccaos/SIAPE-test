@@ -7,6 +7,7 @@
 
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -27,137 +28,254 @@
         </a>
     </nav>
 
-    <section class="kpi-container">
-        
-        <div class="kpi-card">
-            <div class="kpi-icon icon-proceso">
-                <i class="fas fa-user-shield"></i>
+    <!-- ===== KPIs PRINCIPALES ===== -->
+    <section class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon users">
+                <i class="fas fa-users"></i>
             </div>
-            <div class="kpi-info">
-                <span class="kpi-value">{{ kpis.total_asesores|default:0 }}</span>
-                <span class="kpi-label">Asesores</span>
-            </div>
-        </div>
-
-        <div class="kpi-card">
-            <div class="kpi-icon icon-proceso">
-                <i class="fas fa-user-tie"></i>
-            </div>
-            <div class="kpi-info">
-                <span class="kpi-value">{{ kpis.total_directores|default:0 }}</span>
-                <span class="kpi-label">Directores</span>
+            <div class="stat-info">
+                <span class="stat-value">{{ kpis.total_usuarios|default:0 }}</span>
+                <span class="stat-label">Usuarios Totales</span>
             </div>
         </div>
 
-        <div class="kpi-card">
-            <div class="kpi-icon icon-proceso">
-                <i class="fas fa-chalkboard-teacher"></i>
-            </div>
-            <div class="kpi-info">
-                <span class="kpi-value">{{ kpis.total_docentes|default:0 }}</span>
-                <span class="kpi-label">Docentes</span>
-            </div>
-        </div>
-        
-        <div class="kpi-card">
-            <div class="kpi-icon icon-proceso">
+        <div class="stat-card">
+            <div class="stat-icon students">
                 <i class="fas fa-user-graduate"></i>
             </div>
-            <div class="kpi-info">
-                <span class="kpi-value">{{ kpis.total_estudiantes|default:0 }}</span>
-                <span class="kpi-label">Estudiantes</span>
+            <div class="stat-info">
+                <span class="stat-value">{{ kpis.total_estudiantes|default:0 }}</span>
+                <span class="stat-label">Estudiantes</span>
             </div>
         </div>
 
-    </section>
-    
-    <section class="kpi-container">
-
-        <div class="kpi-card">
-            <div class="kpi-icon icon-solicitudes">
-                <i class="fas fa-file-alt"></i>
+        <div class="stat-card">
+            <div class="stat-icon active">
+                <i class="fas fa-signal"></i>
             </div>
-            <div class="kpi-info">
-                <span class="kpi-value">{{ kpis.total_solicitudes|default:0 }}</span>
-                <span class="kpi-label">Total Solicitudes</span>
+            <div class="stat-info">
+                <span class="stat-value">{{ usuarios_activos_7d|default:0 }}</span>
+                <span class="stat-label">Usuarios Activos (7 días)</span>
             </div>
         </div>
 
-        <div class="kpi-card">
-            <div class="kpi-icon icon-proceso">
-                <i class="fas fa-clock"></i>
+        <div class="stat-card">
+            <div class="stat-icon cases">
+                <i class="fas fa-folder-open"></i>
             </div>
-            <div class="kpi-info">
-                <span class="kpi-value">{{ kpis.solicitudes_en_proceso|default:0 }}</span>
-                <span class="kpi-label">Casos Pendientes</span>
+            <div class="stat-info">
+                <span class="stat-value">{{ kpis.total_solicitudes|default:0 }}</span>
+                <span class="stat-label">Total Solicitudes</span>
             </div>
         </div>
 
-        <div class="kpi-card">
-            <div class="kpi-icon icon-resueltos">
+        <div class="stat-card">
+            <div class="stat-icon approved">
                 <i class="fas fa-check-circle"></i>
             </div>
-            <div class="kpi-info">
-                <span class="kpi-value">{{ kpis.solicitudes_aprobadas|default:0 }}</span>
-                <span class="kpi-label">Aprobadas</span>
+            <div class="stat-info">
+                <span class="stat-value">{{ kpis.solicitudes_aprobadas|default:0 }}</span>
+                <span class="stat-label">Casos Aprobados</span>
             </div>
         </div>
 
-        <div class="kpi-card">
-            <div class="kpi-icon icon-citas"> <i class="fas fa-times-circle"></i>
+        <div class="stat-card">
+            <div class="stat-icon pending">
+                <i class="fas fa-clock"></i>
             </div>
-            <div class="kpi-info">
-                <span class="kpi-value">{{ kpis.solicitudes_rechazadas|default:0 }}</span>
-                <span class="kpi-label">Rechazadas</span>
+            <div class="stat-info">
+                <span class="stat-value">{{ kpis.solicitudes_en_proceso|default:0 }}</span>
+                <span class="stat-label">Casos en Proceso</span>
+                {% if variacion_solicitudes != 0 %}
+                <span class="stat-trend {% if variacion_solicitudes > 0 %}up{% elif variacion_solicitudes < 0 %}down{% else %}neutral{% endif %}" style="font-size: 0.6em; margin-top: 2px;">
+                    <i class="fas fa-{% if variacion_solicitudes > 0 %}arrow-up{% elif variacion_solicitudes < 0 %}arrow-down{% else %}minus{% endif %}"></i>
+                    {{ variacion_solicitudes }}% esta semana
+                </span>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== RESUMEN SEMANAL ===== -->
+    <section class="weekly-summary">
+        <div class="summary-card">
+            <div class="value">{{ solicitudes_esta_semana|default:0 }}</div>
+            <div class="label">Nuevas Solicitudes</div>
+            <div class="comparison">Esta semana</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ usuarios_nuevos_semana|default:0 }}</div>
+            <div class="label">Usuarios Nuevos</div>
+            <div class="comparison">
+                {% if usuarios_nuevos_anterior > 0 %}
+                    vs {{ usuarios_nuevos_anterior }} semana anterior
+                {% else %}
+                    Esta semana
+                {% endif %}
+            </div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ kpis.solicitudes_rechazadas|default:0 }}</div>
+            <div class="label">Casos Rechazados</div>
+            <div class="comparison">Total acumulado</div>
+        </div>
+    </section>
+
+    <!-- ===== GRÁFICOS ===== -->
+    <section class="charts-grid">
+        
+        <!-- Gráfico de Actividad del Sistema -->
+        <div class="chart-card full-width">
+            <div class="chart-header">
+                <h3 class="chart-title">
+                    <i class="fas fa-chart-line"></i>
+                    Actividad del Sistema (Últimos {{ dias_actividad|default:30 }} días)
+                </h3>
+            </div>
+            <div class="chart-canvas-container">
+                <canvas id="activityChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Gráfico de Estados -->
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3 class="chart-title">
+                    <i class="fas fa-chart-pie"></i>
+                    Distribución por Estado
+                </h3>
+            </div>
+            <div class="chart-canvas-container small">
+                <canvas id="statusChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Gráfico de Usuarios por Rol -->
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3 class="chart-title">
+                    <i class="fas fa-chart-bar"></i>
+                    Usuarios por Rol
+                </h3>
+            </div>
+            <div class="chart-canvas-container small">
+                <canvas id="rolesChart"></canvas>
             </div>
         </div>
 
     </section>
 
-    <section class="table-container table-mt-30">
-        <div class="table-header">
-            <h2 class="casos-pendientes-titulo"><i class="fas fa-exclamation-triangle"></i> Casos Pendientes de Asignación</h2>
-        </div>
+    <!-- ===== TABLAS DE ACTIVIDAD ===== -->
+    <section class="charts-grid">
         
-        <table class="custom-table">
-            <thead>
-                <tr>
-                    <th>Estudiante</th>
-                    <th>Carrera</th>
-                    <th>Asunto</th>
-                    <th>Fecha Solicitud</th>
-                    <th>Estado</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for solicitud in solicitudes_sin_asignar %}
-                <tr>
-                    <td>{{ solicitud.estudiantes.nombres }} {{ solicitud.estudiantes.apellidos }}</td>
-                    <td>{{ solicitud.estudiantes.carreras.nombre }}</td>
-                    <td>{{ solicitud.asunto }}</td>
-                    <td>{{ solicitud.created_at|date:"d/m/Y H:i" }}</td>
-                    <td>
-                        <span class="status status-en_proceso">{{ solicitud.get_estado_display }}</span>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="5">
-                        <div class="empty-state">
-                            <i class="fas fa-check-circle icono-check"></i>
-                            <p>¡Excelente! No hay solicitudes pendientes de asignación.</p>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        
-        <div class="table-footer">
-            <span>Mostrando {{ total_sin_asignar|default:0 }} entradas</span>
+        <!-- Últimos Accesos -->
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3 class="chart-title">
+                    <i class="fas fa-history"></i>
+                    Últimos Accesos al Sistema
+                </h3>
+            </div>
+            {% if ultimos_accesos %}
+            <table class="activity-table">
+                <thead>
+                    <tr>
+                        <th>Usuario</th>
+                        <th>Último Acceso</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for usuario in ultimos_accesos %}
+                    <tr>
+                        <td>
+                            <div class="user-info">
+                                <div class="user-avatar">
+                                    {{ usuario.first_name|slice:":1"|upper }}{{ usuario.last_name|slice:":1"|upper }}
+                                </div>
+                                <div class="user-details">
+                                    <div class="user-name">{{ usuario.first_name }} {{ usuario.last_name }}</div>
+                                    <div class="user-role">
+                                        {% if usuario.perfil.rol %}
+                                            {{ usuario.perfil.rol.nombre_rol }}
+                                        {% else %}
+                                            Sin rol asignado
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="time-ago">
+                                {{ usuario.last_login|timesince }} atrás
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-activity">
+                <i class="fas fa-user-clock"></i>
+                <p>No hay registros de acceso recientes</p>
+            </div>
+            {% endif %}
         </div>
+
+        <!-- Solicitudes Recientes -->
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3 class="chart-title">
+                    <i class="fas fa-file-alt"></i>
+                    Solicitudes Recientes
+                </h3>
+            </div>
+            {% if solicitudes_recientes %}
+            <table class="activity-table">
+                <thead>
+                    <tr>
+                        <th>Estudiante</th>
+                        <th>Estado</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for solicitud in solicitudes_recientes %}
+                    <tr>
+                        <td>
+                            <div class="user-info">
+                                <div class="user-avatar" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+                                    {{ solicitud.estudiantes.nombres|slice:":1"|upper }}{{ solicitud.estudiantes.apellidos|slice:":1"|upper }}
+                                </div>
+                                <div class="user-details">
+                                    <div class="user-name">{{ solicitud.estudiantes.nombres }} {{ solicitud.estudiantes.apellidos }}</div>
+                                    <div class="user-role">{{ solicitud.estudiantes.carreras.nombre|truncatechars:25 }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="status status-{{ solicitud.estado }}">
+                                {{ solicitud.get_estado_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="time-ago">{{ solicitud.created_at|date:"d/m/Y" }}</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-activity">
+                <i class="fas fa-inbox"></i>
+                <p>No hay solicitudes recientes</p>
+            </div>
+            {% endif %}
+        </div>
+
     </section>
 
+    <!-- ===== DISTRIBUCIÓN POR ÁREA ===== -->
     <section class="support-grid-container support-mt-30">
         <h2>Distribución de Solicitudes por Área Académica</h2>
 
@@ -183,4 +301,26 @@
     </section>
 
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'JS/dashboard_admin_charts.js' %}"></script>
+<script>
+    // Datos desde Django
+    const actividadLabels = {{ actividad_labels_json|safe }};
+    const actividadData = {{ actividad_data_json|safe }};
+    const estadosLabels = {{ estados_labels_json|safe }};
+    const estadosData = {{ estados_data_json|safe }};
+    const rolesLabels = {{ roles_labels_json|safe }};
+    const rolesData = {{ roles_data_json|safe }};
+
+    // Inicializar gráficos cuando el DOM esté listo
+    document.addEventListener('DOMContentLoaded', function() {
+        initDashboardCharts(
+            actividadLabels, actividadData,
+            estadosLabels, estadosData,
+            rolesLabels, rolesData
+        );
+    });
+</script>
 {% endblock %}

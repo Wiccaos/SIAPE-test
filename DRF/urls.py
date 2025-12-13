@@ -119,21 +119,32 @@ urlpatterns = [
     path('dashboard/coordinador-tecnico-pedagogico/ajustes/<int:ajuste_asignado_id>/eliminar/', views.eliminar_ajuste_coordinador_tecnico_pedagogico, name='eliminar_ajuste_coordinador_tecnico_pedagogico'),
     path('dashboard/coordinador-tecnico-pedagogico/casos/<int:solicitud_id>/enviar-asesor-pedagogico/', views.enviar_a_asesor_pedagogico, name='enviar_a_asesor_pedagogico'),
     path('dashboard/coordinador-tecnico-pedagogico/casos/<int:solicitud_id>/devolver-encargado-inclusion/', views.devolver_a_encargado_inclusion, name='devolver_a_encargado_inclusion'),
+    path('dashboard/coordinador-tecnico-pedagogico/categorias/', views.gestion_categorias_ajustes, name='gestion_categorias_ajustes'),
+    path('dashboard/coordinador-tecnico-pedagogico/estadisticas/', views.estadisticas_ajustes_coordinador_tecnico, name='estadisticas_ajustes_coordinador_tecnico'),
     
     # URLs de Asesor Pedagógico
     path('dashboard/asesor/', views.dashboard_asesor, name='dashboard_asesor'),
     path('dashboard/asesor/casos/<int:solicitud_id>/enviar-director/', views.enviar_a_director, name='enviar_a_director'),
     path('dashboard/asesor/casos/<int:solicitud_id>/devolver-coordinador-tecnico-pedagogico/', views.devolver_a_coordinador_tecnico_pedagogico, name='devolver_a_coordinador_tecnico_pedagogico'),
+    path('dashboard/asesor/estadisticas/', views.estadisticas_asesor_pedagogico, name='estadisticas_asesor_pedagogico'),
+    path('dashboard/asesor/estadisticas/reporte-pdf/', views.generar_reporte_pdf_asesor, name='generar_reporte_pdf_asesor'),
+    path('dashboard/asesor/estadisticas/reporte-powerbi/', views.generar_reporte_powerbi_asesor, name='generar_reporte_powerbi_asesor'),
     path('dashboard/asesor/ajustes/<int:ajuste_asignado_id>/editar/', views.editar_ajuste_asesor, name='editar_ajuste_asesor'),
     path('dashboard/asesor/ajustes/<int:ajuste_asignado_id>/eliminar/', views.eliminar_ajuste_asesor, name='eliminar_ajuste_asesor'),
     
     # URLs de Director de Carrera
     path('dashboard/director/casos/<int:solicitud_id>/aprobar/', views.aprobar_caso, name='aprobar_caso'),
     path('dashboard/director/casos/<int:solicitud_id>/rechazar/', views.rechazar_caso, name='rechazar_caso'),
+    path('dashboard/director/casos/<int:solicitud_id>/desactivar/', views.desactivar_caso, name='desactivar_caso'),
     path('dashboard/director/ajustes/<int:ajuste_asignado_id>/aprobar/', views.aprobar_ajuste_director, name='aprobar_ajuste_director'),
     path('dashboard/director/ajustes/<int:ajuste_asignado_id>/rechazar/', views.rechazar_ajuste_director, name='rechazar_ajuste_director'),
     path('dashboard/director/carreras/', views.carreras_director, name='carreras_director'),
     path('dashboard/director/carreras/<int:carrera_id>/estudiantes/', views.estudiantes_por_carrera_director, name='estudiantes_carrera_director'),
+    
+    # URLs de Gestión de Asignaturas (Director)
+    path('dashboard/director/asignaturas/', views.gestion_asignaturas_director, name='gestion_asignaturas_director'),
+    path('dashboard/director/asignaturas/<int:asignatura_id>/toggle/', views.toggle_asignatura_estado, name='toggle_asignatura_estado'),
+    path('dashboard/director/asignaturas/bulk-toggle/', views.bulk_toggle_asignaturas, name='bulk_toggle_asignaturas'),
     path('dashboard/director/estadisticas/', views.estadisticas_director, name='estadisticas_director'),
     
     # URLs de Carga Masiva (Director)
