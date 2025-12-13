@@ -175,10 +175,15 @@ if USE_S3:
     AWS_QUERYSTRING_AUTH = True  # URLs firmadas para archivos privados
     
     # Ubicación de archivos media en S3
-    # Para Django 5.2+ usar STORAGES, para versiones anteriores usar DEFAULT_FILE_STORAGE
+    # Para Django 5.2+ usar STORAGES
+    # 'default' = archivos media (evidencias, documentos) -> S3
+    # 'staticfiles' = archivos estáticos (CSS, JS) -> local
     STORAGES = {
         'default': {
-            'BACKEND': 'SIAPE.storages.MediaStorage',
+            'BACKEND': 'SIAPE.storages.MediaStorage',  # Media files van a S3
+        },
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',  # Static files locales
         },
     }
     # Mantener DEFAULT_FILE_STORAGE para compatibilidad con versiones anteriores
@@ -192,6 +197,16 @@ else:
     # Configuración local para desarrollo
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
     MEDIA_URL = '/media/'
+    
+    # Configuración de STORAGES para desarrollo (todo local)
+    STORAGES = {
+        'default': {
+            'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        },
+    }
 
 # Redireccionar al inicio despues de login
 LOGIN_REDIRECT_URL = '/home/' 
