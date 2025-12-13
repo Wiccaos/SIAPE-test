@@ -160,6 +160,33 @@
                             <p class="text-small">No hay evidencias adjuntas.</p>
                         </div>
                     {% endif %}
+                    
+                    {% if puede_subir_archivo %}
+                        <div class="upload-file-section">
+                            <h4 class="upload-file-title">
+                                <i class="fas fa-upload"></i> Subir Nuevo Archivo
+                            </h4>
+                            <form method="post" action="{% url 'subir_archivo_caso' solicitud.id %}" enctype="multipart/form-data" class="upload-file-form">
+                                {% csrf_token %}
+                                <div class="file-upload-wrapper">
+                                    <label for="archivo_caso" class="file-upload-label">
+                                        <i class="fas fa-folder-open"></i>
+                                        <span class="file-upload-text">Seleccionar archivo</span>
+                                    </label>
+                                    <input type="file" name="archivo" id="archivo_caso" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.txt" required class="file-input-hidden">
+                                    <div class="file-name-display" id="file-name-display">
+                                        <i class="fas fa-file"></i> <span>Ningún archivo seleccionado</span>
+                                    </div>
+                                </div>
+                                <small class="file-input-hint">
+                                    <i class="fas fa-info-circle"></i> Formatos permitidos: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, GIF, TXT (máx. 10 MB)
+                                </small>
+                                <button type="submit" class="btn-upload-submit">
+                                    <i class="fas fa-upload"></i> Subir Archivo
+                                </button>
+                            </form>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -1317,6 +1344,25 @@
             cerrarModalRechazarAjuste();
         }
         {% endif %}
+    }
+
+    // Mostrar nombre del archivo seleccionado
+    const fileInput = document.getElementById('archivo_caso');
+    const fileNameDisplay = document.getElementById('file-name-display');
+    
+    if (fileInput && fileNameDisplay) {
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const fileName = file.name;
+                const fileIcon = '<i class="fas fa-file"></i>';
+                fileNameDisplay.innerHTML = fileIcon + ' <span>' + fileName + '</span>';
+                fileNameDisplay.style.color = '#333';
+            } else {
+                fileNameDisplay.innerHTML = '<i class="fas fa-file"></i> <span>Ningún archivo seleccionado</span>';
+                fileNameDisplay.style.color = '#666';
+            }
+        });
     }
 </script>
 

@@ -249,7 +249,9 @@ class Solicitudes(models.Model):
             return f"Solicitud de {self.estudiantes}: {self.asunto}"
 
 class Evidencias(models.Model):
-    archivo = models.FileField(upload_to='evidencias/') 
+    # No especificar storage aquí - Django usará DEFAULT_FILE_STORAGE de settings.py
+    # Si USE_S3=True, usará MediaStorage (S3), si no, usará el storage local por defecto
+    archivo = models.FileField(upload_to='evidencias/')
     estudiantes = models.ForeignKey(Estudiantes, on_delete=models.CASCADE)
     solicitudes = models.ForeignKey(Solicitudes, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -95,6 +95,7 @@ urlpatterns = [
     path('dashboard/encargado-inclusion/horarios-bloqueados/<int:horario_id>/eliminar/', views.eliminar_horario_bloqueado, name='eliminar_horario_bloqueado'),
     path('dashboard/encargado-inclusion/citas/<int:entrevista_id>/cancelar/', views.cancelar_cita_dashboard, name='cancelar_cita_dashboard'),
     path('dashboard/encargado-inclusion/casos/<int:solicitud_id>/actualizar-descripcion/', views.actualizar_descripcion_caso, name='actualizar_descripcion_caso'),
+    path('dashboard/encargado-inclusion/casos/<int:solicitud_id>/subir-archivo/', views.subir_archivo_caso, name='subir_archivo_caso'),
     path('dashboard/encargado-inclusion/casos/<int:solicitud_id>/enviar-coordinador-tecnico-pedagogico/', views.enviar_a_coordinador_tecnico_pedagogico, name='enviar_a_coordinador_tecnico_pedagogico'),
     path('dashboard/encargado-inclusion/confirmar-cita/<int:entrevista_id>/', 
          views.confirmar_cita_coordinadora, 

@@ -1938,7 +1938,86 @@ def detalle_casos_encargado_inclusion(request, solicitud_id):
         'es_docente': es_docente,  # Para ocultar acciones de edición en el template
     }
     
+    # Permiso para subir archivos (solo Encargado de Inclusión)
+    puede_subir_archivo = rol_nombre == ROL_COORDINADORA
+    
+    context['puede_subir_archivo'] = puede_subir_archivo
+    
     return render(request, 'SIAPE/detalle_casos_encargado_inclusion.html', context)
+
+@require_POST
+@login_required
+def subir_archivo_caso(request, solicitud_id):
+    """
+    Permite al Encargado de Inclusión subir un archivo al caso.
+    """
+    # 1. Verificar Permiso
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_COORDINADORA:
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+    except AttributeError:
+        messages.error(request, 'No tienes permisos para realizar esta acción.')
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+    
+    # 2. Obtener la solicitud
+    solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
+    
+    # 3. Validar que el encargado de inclusión tenga acceso a este caso
+    if solicitud.coordinadora_asignada != perfil and not request.user.is_superuser:
+        messages.error(request, 'No tienes permisos para subir archivos a este caso.')
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+    
+    # 4. Obtener el archivo
+    archivo = request.FILES.get('archivo')
+    if not archivo:
+        messages.error(request, 'Debe seleccionar un archivo.')
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+    
+    # 5. Validar el archivo (usar la misma validación del serializer)
+    import os
+    
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+    ALLOWED_EXTENSIONS = [
+        '.pdf', '.doc', '.docx', '.xls', '.xlsx', 
+        '.jpg', '.jpeg', '.png', '.gif', '.txt'
+    ]
+    
+    # Verificar tamaño
+    if archivo.size > MAX_FILE_SIZE:
+        messages.error(request, f'El archivo es demasiado grande. Tamaño máximo: 10 MB.')
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+    
+    # Verificar extensión
+    ext = os.path.splitext(archivo.name)[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        messages.error(
+            request, 
+            f'Tipo de archivo no permitido. Extensiones permitidas: {", ".join(ALLOWED_EXTENSIONS)}'
+        )
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+    
+    # Verificar nombre del archivo (prevenir path traversal)
+    filename = os.path.basename(archivo.name)
+    if '..' in filename or '/' in filename or '\\' in filename:
+        messages.error(request, 'Nombre de archivo inválido.')
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+    
+    # 6. Crear la evidencia
+    try:
+        estudiante = solicitud.estudiantes
+        evidencia = Evidencias.objects.create(
+            archivo=archivo,
+            estudiantes=estudiante,
+            solicitudes=solicitud
+        )
+        messages.success(request, f'Archivo "{filename}" subido exitosamente.')
+    except Exception as e:
+        logger.error(f"Error al subir archivo: {str(e)}")
+        messages.error(request, f'Error al subir el archivo: {str(e)}')
+    
+    return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
 
 @login_required
 def detalle_casos_coordinador_tecnico_pedagogico(request, solicitud_id):

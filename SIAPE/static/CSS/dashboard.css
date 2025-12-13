@@ -2464,6 +2464,270 @@ body.dark-mode .btn-accion-orange:hover {
     margin: 0;
 }
 
+/* Estilos para formulario de subida de archivos en detalle de caso */
+.detalle-card-content form {
+    margin-top: 0;
+}
+
+.detalle-card-content .form-group {
+    margin-bottom: 15px;
+}
+
+.detalle-card-content input[type="file"] {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #fff;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.detalle-card-content input[type="file"]:hover {
+    border-color: #cc0000;
+}
+
+.detalle-card-content input[type="file"]:focus {
+    outline: none;
+    border-color: #cc0000;
+    box-shadow: 0 0 0 2px rgba(204, 0, 0, 0.1);
+}
+
+.detalle-card-content small {
+    display: block;
+    margin-top: 5px;
+    color: #666;
+    font-size: 0.85rem;
+}
+
+.detalle-card-content h4 {
+    margin-bottom: 10px;
+    font-size: 1rem;
+    color: #333;
+    font-weight: 600;
+}
+
+.detalle-card-content h4 i {
+    margin-right: 8px;
+    color: #cc0000;
+}
+
+/* Modo oscuro para formulario de subida */
+body.dark-mode .detalle-card-content input[type="file"] {
+    background-color: #2a2a2a;
+    border-color: #444;
+    color: #e0e0e0;
+}
+
+body.dark-mode .detalle-card-content input[type="file"]:hover {
+    border-color: #cc0000;
+}
+
+body.dark-mode .detalle-card-content input[type="file"]:focus {
+    border-color: #cc0000;
+    box-shadow: 0 0 0 2px rgba(204, 0, 0, 0.3);
+}
+
+body.dark-mode .detalle-card-content small {
+    color: #b0b0b0;
+}
+
+body.dark-mode .detalle-card-content h4 {
+    color: #ffffff;
+}
+
+body.dark-mode .detalle-card-content h4 i {
+    color: #cc0000;
+}
+
+/* Sección de subida de archivos */
+.upload-file-section {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+}
+
+body.dark-mode .upload-file-section {
+    border-top-color: #444;
+}
+
+.upload-file-title {
+    margin-bottom: 15px;
+    font-size: 1rem;
+    color: #333;
+    font-weight: 600;
+}
+
+.upload-file-title i {
+    margin-right: 8px;
+    color: #cc0000;
+}
+
+body.dark-mode .upload-file-title {
+    color: #ffffff;
+}
+
+.upload-file-form {
+    margin-top: 10px;
+}
+
+/* Wrapper personalizado para el input de archivo */
+.file-upload-wrapper {
+    position: relative;
+    margin-bottom: 12px;
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+}
+
+.file-input-hidden {
+    position: absolute;
+    width: 0.1px;
+    height: 0.1px;
+    opacity: 0;
+    overflow: hidden;
+    z-index: -1;
+}
+
+.file-upload-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background-color: #f5f5f5;
+    border: 2px dashed #ccc;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.9rem;
+    color: #555;
+    font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.file-upload-label:hover {
+    background-color: #e8e8e8;
+    border-color: #cc0000;
+    color: #cc0000;
+}
+
+.file-upload-label i {
+    color: #cc0000;
+    font-size: 1rem;
+}
+
+.file-upload-text {
+    user-select: none;
+}
+
+.file-name-display {
+    padding: 10px 12px;
+    background-color: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    color: #666;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-height: 40px;
+}
+
+.file-name-display i {
+    color: #cc0000;
+    flex-shrink: 0;
+}
+
+.file-name-display span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-input-hint {
+    display: block;
+    margin-top: 10px;
+    margin-bottom: 15px;
+    color: #666;
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+.file-input-hint i {
+    color: #cc0000;
+    margin-right: 5px;
+}
+
+.btn-upload-submit {
+    width: 100%;
+    padding: 12px 20px;
+    background-color: #cc0000;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-upload-submit:hover {
+    background-color: #a00000;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(204, 0, 0, 0.2);
+}
+
+.btn-upload-submit:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(204, 0, 0, 0.2);
+}
+
+.btn-upload-submit i {
+    font-size: 1rem;
+}
+
+/* Modo oscuro */
+body.dark-mode .file-upload-label {
+    background-color: #2a2a2a;
+    border-color: #444;
+    color: #e0e0e0;
+}
+
+body.dark-mode .file-upload-label:hover {
+    background-color: #3a3a3a;
+    border-color: #cc0000;
+    color: #ffffff;
+}
+
+body.dark-mode .file-name-display {
+    background-color: #2a2a2a;
+    border-color: #444;
+    color: #d0d0d0;
+}
+
+body.dark-mode .file-name-display span {
+    color: #d0d0d0;
+}
+
+body.dark-mode .file-input-hint {
+    color: #b0b0b0;
+}
+
+body.dark-mode .btn-upload-submit {
+    background-color: #cc0000;
+    color: #ffffff;
+}
+
+body.dark-mode .btn-upload-submit:hover {
+    background-color: #a00000;
+}
+
 /* Tarjetas anidadas (para entrevistas, ajustes) */
 .detalle-sub-card {
     background-color: #f9f9f9;

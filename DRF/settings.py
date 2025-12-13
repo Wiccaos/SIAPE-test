@@ -159,7 +159,8 @@ if USE_S3:
     # Configuración de AWS S3
     AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID')
     AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY')
-    AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME')
+    # Nombre del bucket S3 - debe ser 'siape-docs'
+    AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default='siape-docs')
     AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='us-east-1')
     AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
     
@@ -174,6 +175,13 @@ if USE_S3:
     AWS_QUERYSTRING_AUTH = True  # URLs firmadas para archivos privados
     
     # Ubicación de archivos media en S3
+    # Para Django 5.2+ usar STORAGES, para versiones anteriores usar DEFAULT_FILE_STORAGE
+    STORAGES = {
+        'default': {
+            'BACKEND': 'SIAPE.storages.MediaStorage',
+        },
+    }
+    # Mantener DEFAULT_FILE_STORAGE para compatibilidad con versiones anteriores
     DEFAULT_FILE_STORAGE = 'SIAPE.storages.MediaStorage'
     MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
     
