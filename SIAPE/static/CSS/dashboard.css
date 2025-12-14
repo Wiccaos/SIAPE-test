@@ -478,15 +478,34 @@ body.dark-mode .detalle-card li {
     margin-bottom: 30px;
 }
 
-/* Estilo unificado para todos los contenedores de KPIs */
-.kpi-container,
-.stats-grid {
+/* Estilo unificado para contenedores de KPIs (excepto admin) */
+.kpi-container {
     grid-template-columns: repeat(4, 1fr);
     gap: 12px 15px;
     margin-bottom: 20px;
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
+}
+
+/* Estilos originales del admin - diferentes a los KPIs unificados */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+@media (max-width: 1200px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .kpi-container-asesor {
@@ -500,7 +519,6 @@ body.dark-mode .detalle-card li {
 
 @media (max-width: 1200px) {
     .kpi-container,
-    .stats-grid,
     .kpi-container-asesor {
         grid-template-columns: repeat(4, 1fr);
         gap: 12px 15px;
@@ -509,7 +527,6 @@ body.dark-mode .detalle-card li {
 
 @media (max-width: 768px) {
     .kpi-container,
-    .stats-grid,
     .kpi-container-asesor {
         grid-template-columns: repeat(2, 1fr);
         gap: 12px 15px;
@@ -518,7 +535,6 @@ body.dark-mode .detalle-card li {
 
 @media (max-width: 480px) {
     .kpi-container,
-    .stats-grid,
     .kpi-container-asesor {
         grid-template-columns: 1fr;
         gap: 12px 15px;
@@ -536,9 +552,8 @@ body.dark-mode .detalle-card li {
     min-height: 100px;
 }
 
-/* Estilo unificado para todas las tarjetas KPI */
+/* Estilo unificado para tarjetas KPI (excepto admin) */
 .kpi-container .kpi-card,
-.stats-grid .stat-card,
 .kpi-container-asesor .kpi-card {
     flex-direction: row;
     text-align: left;
@@ -552,8 +567,24 @@ body.dark-mode .detalle-card li {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
+/* Estilos originales de las tarjetas del admin */
+.stats-grid .stat-card {
+    background-color: #ffffff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stats-grid .stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
 .kpi-container .kpi-icon,
-.stats-grid .stat-icon,
 .kpi-container-asesor .kpi-icon {
     margin: 0;
     font-size: 1.1rem;
@@ -563,8 +594,19 @@ body.dark-mode .detalle-card li {
     flex-shrink: 0;
 }
 
+/* Estilos originales del icono del admin */
+.stats-grid .stat-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    flex-shrink: 0;
+}
+
 .kpi-container .kpi-info,
-.stats-grid .stat-info,
 .kpi-container-asesor .kpi-info {
     display: flex;
     flex-direction: column;
@@ -573,7 +615,6 @@ body.dark-mode .detalle-card li {
 }
 
 .kpi-container .kpi-value,
-.stats-grid .stat-value,
 .kpi-container-asesor .kpi-value {
     font-size: 1.2rem;
     font-weight: 700;
@@ -581,11 +622,32 @@ body.dark-mode .detalle-card li {
 }
 
 .kpi-container .kpi-label,
-.stats-grid .stat-label,
 .kpi-container-asesor .kpi-label {
     font-size: 0.65em;
     line-height: 1.1;
     word-break: break-word;
+}
+
+/* Estilos originales del info del admin */
+.stats-grid .stat-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex: 1;
+}
+
+.stats-grid .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #2c3e50;
+}
+
+.stats-grid .stat-label {
+    font-size: 0.9rem;
+    color: #7f8c8d;
+    font-weight: 500;
+    line-height: 1.3;
 }
 
 .kpi-icon {
@@ -868,6 +930,90 @@ body.dark-mode .detalle-card li {
 }
 .custom-table tr:not(:last-child) td {
     border-bottom: 1px solid #ececec;
+}
+
+/* Tabla de Casos por Estado - Más espacio para Estado */
+.table-estados th:nth-child(1),
+.table-estados td:nth-child(1) {
+    width: 60% !important; /* Estado - más espacio */
+}
+
+.table-estados th:nth-child(2),
+.table-estados td:nth-child(2) {
+    width: 20% !important; /* Cantidad - menos espacio */
+}
+
+.table-estados th:nth-child(3),
+.table-estados td:nth-child(3) {
+    width: 20% !important; /* Porcentaje - menos espacio */
+}
+
+/* Tabla de Estadísticas por Carrera - Más espacio para Carrera */
+.table-carreras th:nth-child(1),
+.table-carreras td:nth-child(1) {
+    width: 50% !important; /* Carrera - más espacio */
+}
+
+.table-carreras th:nth-child(2),
+.table-carreras td:nth-child(2) {
+    width: 17% !important; /* Total - menos espacio */
+}
+
+.table-carreras th:nth-child(3),
+.table-carreras td:nth-child(3) {
+    width: 17% !important; /* Aprobados - menos espacio */
+}
+
+.table-carreras th:nth-child(4),
+.table-carreras td:nth-child(4) {
+    width: 16% !important; /* Tasa - menos espacio */
+}
+
+/* Tabla de Gestión de Áreas - Más espacio para Nombre del Área */
+.table-areas th:nth-child(1),
+.table-areas td:nth-child(1) {
+    width: 50% !important; /* Nombre del Área - más espacio */
+}
+
+.table-areas th:nth-child(2),
+.table-areas td:nth-child(2) {
+    width: 15% !important; /* Carreras - menos espacio */
+}
+
+.table-areas th:nth-child(3),
+.table-areas td:nth-child(3) {
+    width: 15% !important; /* Docentes - menos espacio */
+}
+
+.table-areas th:nth-child(4),
+.table-areas td:nth-child(4) {
+    width: 20% !important; /* Acción - espacio moderado */
+}
+
+/* Tabla de Gestión de Carreras - Más espacio para Nombre y Área */
+.table-carreras-admin th:nth-child(1),
+.table-carreras-admin td:nth-child(1) {
+    width: 35% !important; /* Nombre Carrera - más espacio */
+}
+
+.table-carreras-admin th:nth-child(2),
+.table-carreras-admin td:nth-child(2) {
+    width: 25% !important; /* Área - más espacio */
+}
+
+.table-carreras-admin th:nth-child(3),
+.table-carreras-admin td:nth-child(3) {
+    width: 10% !important; /* Estudiantes - menos espacio */
+}
+
+.table-carreras-admin th:nth-child(4),
+.table-carreras-admin td:nth-child(4) {
+    width: 15% !important; /* Director Asignado - menos espacio */
+}
+
+.table-carreras-admin th:nth-child(5),
+.table-carreras-admin td:nth-child(5) {
+    width: 15% !important; /* Acción - espacio moderado */
 }
 
 /* Link rojo "Ver mÃ¡s" */

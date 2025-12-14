@@ -1,0 +1,145 @@
+{% extends "plantilla.html" %}
+{% load static %}
+
+{% block title %}
+    Opciones de Usuario | SIAPE
+{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'CSS/formulario.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    
+    <h1 class="page-title"><i class="fas fa-user-cog"></i> Opciones de Usuario</h1>
+    <p class="text-muted" style="margin-bottom: 30px;">Gestiona tu información personal y configuración de cuenta.</p>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} custom-alert-{{ message.tags }}" style="margin-bottom: 20px;">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px;">
+        
+        <!-- Sección 1: Datos Personales -->
+        <section class="table-container">
+            <div class="table-header">
+                <h3><i class="fas fa-user"></i> Datos Personales</h3>
+            </div>
+            
+            <form method="POST" action="{% url 'opciones_usuario' %}" style="padding: 20px;">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="actualizar_datos">
+                
+                <div class="form-group">
+                    <label for="first_name">Nombre:</label>
+                    <input type="text" id="first_name" name="first_name" value="{{ usuario.first_name }}" required maxlength="150">
+                </div>
+                
+                <div class="form-group">
+                    <label for="last_name">Apellido:</label>
+                    <input type="text" id="last_name" name="last_name" value="{{ usuario.last_name }}" required maxlength="150">
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Correo Electrónico:</label>
+                    <input type="email" id="email" name="email" value="{{ usuario.email }}" required maxlength="191">
+                </div>
+                
+                <div class="form-group">
+                    <label for="numero">Número de Teléfono:</label>
+                    <input type="tel" id="numero" name="numero" value="{{ usuario.numero|default:'' }}" placeholder="Opcional">
+                    <small style="color: #666; font-size: 0.85em;">Opcional</small>
+                </div>
+                
+                <div class="form-group">
+                    <label>RUT:</label>
+                    <input type="text" value="{{ usuario.rut }}" disabled style="background-color: #f5f5f5; color: #666;">
+                    <small style="color: #666; font-size: 0.85em;">El RUT no se puede modificar</small>
+                </div>
+                
+                <div class="form-group">
+                    <label>Rol:</label>
+                    <input type="text" value="{{ rol }}" disabled style="background-color: #f5f5f5; color: #666;">
+                    <small style="color: #666; font-size: 0.85em;">El rol es asignado por el administrador</small>
+                </div>
+                
+                <div class="form-actions" style="margin-top: 20px;">
+                    <button type="submit" class="btn-accion btn-asignar">
+                        <i class="fas fa-save"></i> Guardar Cambios
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Sección 2: Cambiar Contraseña -->
+        <section class="table-container">
+            <div class="table-header">
+                <h3><i class="fas fa-lock"></i> Cambiar Contraseña</h3>
+            </div>
+            
+            <form method="POST" action="{% url 'opciones_usuario' %}" style="padding: 20px;">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="cambiar_password">
+                
+                <div class="form-group">
+                    <label for="password_actual">Contraseña Actual:</label>
+                    <input type="password" id="password_actual" name="password_actual" required>
+                    <small style="color: #666; font-size: 0.85em;">Ingresa tu contraseña actual para verificar tu identidad</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password_nueva">Nueva Contraseña:</label>
+                    <input type="password" id="password_nueva" name="password_nueva" required>
+                    <small style="color: #666; font-size: 0.85em;">Mínimo 8 caracteres, al menos una letra y un número</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password_confirmar">Confirmar Nueva Contraseña:</label>
+                    <input type="password" id="password_confirmar" name="password_confirmar" required>
+                    <small style="color: #666; font-size: 0.85em;">Repite la nueva contraseña</small>
+                </div>
+                
+                <div class="form-actions" style="margin-top: 20px;">
+                    <button type="submit" class="btn-accion btn-asignar">
+                        <i class="fas fa-key"></i> Cambiar Contraseña
+                    </button>
+                </div>
+            </form>
+        </section>
+
+    </div>
+
+    <!-- Información Adicional -->
+    <section class="table-container">
+        <div class="table-header">
+            <h3><i class="fas fa-info-circle"></i> Información de la Cuenta</h3>
+        </div>
+        <div style="padding: 20px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div>
+                    <strong>Fecha de Registro:</strong>
+                    <p style="color: #666; margin-top: 5px;">{{ usuario.date_joined|date:"d/m/Y H:i" }}</p>
+                </div>
+                <div>
+                    <strong>Último Acceso:</strong>
+                    <p style="color: #666; margin-top: 5px;">
+                        {% if usuario.last_login %}
+                            {{ usuario.last_login|date:"d/m/Y H:i" }}
+                        {% else %}
+                            Nunca
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+</div>
+{% endblock %}
+

@@ -26,5 +26,6 @@ urlpatterns = [
     path('solicitud-publica/', PublicSolicitudCreateView.as_view(), name='solicitud-publica'),
     path('seguimiento-caso/', views.seguimiento_caso_estudiante, name='seguimiento_caso'),
     path('api/', include(router.urls)),
-    path('panel-control-coordinadora/', views.panel_control_encargado_inclusion, name='panel_control_encargado_inclusion'), 
+    path('panel-control-coordinadora/', views.panel_control_encargado_inclusion, name='panel_control_encargado_inclusion'),
+    path('opciones-usuario/', views.opciones_usuario, name='opciones_usuario'),
 ]

@@ -128,7 +128,7 @@ urlpatterns = [
     path('dashboard/asesor/casos/<int:solicitud_id>/devolver-coordinador-tecnico-pedagogico/', views.devolver_a_coordinador_tecnico_pedagogico, name='devolver_a_coordinador_tecnico_pedagogico'),
     path('dashboard/asesor/estadisticas/', views.estadisticas_asesor_pedagogico, name='estadisticas_asesor_pedagogico'),
     path('dashboard/asesor/estadisticas/reporte-pdf/', views.generar_reporte_pdf_asesor, name='generar_reporte_pdf_asesor'),
-    path('dashboard/asesor/estadisticas/reporte-powerbi/', views.generar_reporte_powerbi_asesor, name='generar_reporte_powerbi_asesor'),
+    path('dashboard/asesor/estadisticas/reporte-excel/', views.generar_reporte_excel_asesor, name='generar_reporte_excel_asesor'),
     path('dashboard/asesor/ajustes/<int:ajuste_asignado_id>/editar/', views.editar_ajuste_asesor, name='editar_ajuste_asesor'),
     path('dashboard/asesor/ajustes/<int:ajuste_asignado_id>/eliminar/', views.eliminar_ajuste_asesor, name='eliminar_ajuste_asesor'),
     
@@ -146,6 +146,8 @@ urlpatterns = [
     path('dashboard/director/asignaturas/<int:asignatura_id>/toggle/', views.toggle_asignatura_estado, name='toggle_asignatura_estado'),
     path('dashboard/director/asignaturas/bulk-toggle/', views.bulk_toggle_asignaturas, name='bulk_toggle_asignaturas'),
     path('dashboard/director/estadisticas/', views.estadisticas_director, name='estadisticas_director'),
+    path('dashboard/director/estadisticas/reporte-pdf/', views.generar_reporte_pdf_director, name='generar_reporte_pdf_director'),
+    path('dashboard/director/estadisticas/reporte-excel/', views.generar_reporte_excel_director, name='generar_reporte_excel_director'),
     
     # URLs de Carga Masiva (Director)
     path('dashboard/director/carga-masiva/', views.gestion_carga_masiva_director, name='gestion_carga_masiva_director'),
