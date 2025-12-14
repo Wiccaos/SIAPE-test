@@ -1,0 +1,226 @@
+{% extends "plantilla.html" %}
+{% load static %}
+
+{% block title %}
+    Estadísticas de Ajustes | SIAPE
+{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="main-content"> 
+    
+    <nav class="dashboard-nav">
+        <a href="{% url 'dashboard_coordinador_tecnico_pedagogico' %}" class="nav-item">
+            <i class="fas fa-home"></i>
+            Panel Principal
+        </a>
+        <a href="{% url 'casos_generales' %}" class="nav-item">
+            <i class="fas fa-folder-open"></i>
+            Casos
+        </a>
+        <a href="{% url 'gestion_categorias_ajustes' %}" class="nav-item">
+            <i class="fas fa-tags"></i>
+            Categorías
+        </a>
+        <a href="{% url 'estadisticas_ajustes_coordinador_tecnico' %}" class="nav-item active">
+            <i class="fas fa-chart-bar"></i>
+            Estadísticas
+        </a>
+    </nav>
+
+    <h1 class="page-title"><i class="fas fa-chart-bar"></i> Estadísticas de Ajustes Formulados</h1>
+    
+    <!-- KPIs -->
+    <section class="kpi-container">
+        <div class="kpi-card">
+            <div class="kpi-icon icon-solicitudes">
+                <i class="fas fa-list"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ total_ajustes }}</span>
+                <span class="kpi-label">Total</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-resueltos">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ ajustes_aprobados }}</span>
+                <span class="kpi-label">Aprobados</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-proceso">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ ajustes_pendientes }}</span>
+                <span class="kpi-label">Pendientes</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-canceladas">
+                <i class="fas fa-times-circle"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ ajustes_rechazados }}</span>
+                <span class="kpi-label">Rechazados</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Gráfico por Categoría -->
+    {% if estadisticas_categoria %}
+    <section class="table-container">
+        <div class="table-header">
+            <h3><i class="fas fa-chart-pie"></i> Distribución por Categoría</h3>
+        </div>
+        <div style="padding: 20px;">
+            <canvas id="graficoCategorias" style="max-height: 400px;"></canvas>
+        </div>
+    </section>
+
+    <!-- Tabla de Estadísticas por Categoría -->
+    <section class="table-container">
+        <div class="table-header">
+            <h3><i class="fas fa-table"></i> Detalle por Categoría</h3>
+        </div>
+        
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Categoría</th>
+                    <th style="text-align: center;">Total</th>
+                    <th style="text-align: center;">Aprobados</th>
+                    <th style="text-align: center;">Pendientes</th>
+                    <th style="text-align: center;">Rechazados</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for categoria, stats in estadisticas_categoria.items %}
+                <tr>
+                    <td><strong>{{ categoria }}</strong></td>
+                    <td style="text-align: center;">{{ stats.total }}</td>
+                    <td style="text-align: center;">
+                        <span class="badge-estado badge-activa">{{ stats.aprobados }}</span>
+                    </td>
+                    <td style="text-align: center;">
+                        <span class="badge-estado" style="background: #fff3cd; color: #856404;">{{ stats.pendientes }}</span>
+                    </td>
+                    <td style="text-align: center;">
+                        <span class="badge-estado badge-inactiva">{{ stats.rechazados }}</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+
+    <!-- Ajustes Recientes -->
+    <section class="table-container">
+        <div class="table-header">
+            <h3><i class="fas fa-history"></i> Ajustes Recientes</h3>
+        </div>
+        
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Estudiante</th>
+                    <th>Categoría</th>
+                    <th>Descripción</th>
+                    <th style="text-align: center;">Estado</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ajuste in ajustes_recientes %}
+                <tr>
+                    <td>{{ ajuste.solicitudes.estudiantes.nombres }} {{ ajuste.solicitudes.estudiantes.apellidos }}</td>
+                    <td>
+                        {% if ajuste.ajuste_razonable.categorias_ajustes %}
+                            <span class="badge-semestre">{{ ajuste.ajuste_razonable.categorias_ajustes.nombre_categoria }}</span>
+                        {% else %}
+                            <span class="text-muted-light">Sin categoría</span>
+                        {% endif %}
+                    </td>
+                    <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        {{ ajuste.ajuste_razonable.descripcion|truncatewords:15 }}
+                    </td>
+                    <td style="text-align: center;">
+                        {% if ajuste.estado_aprobacion == 'aprobado' %}
+                            <span class="badge-estado badge-activa"><i class="fas fa-check"></i> Aprobado</span>
+                        {% elif ajuste.estado_aprobacion == 'rechazado' %}
+                            <span class="badge-estado badge-inactiva"><i class="fas fa-times"></i> Rechazado</span>
+                        {% else %}
+                            <span class="badge-estado" style="background: #fff3cd; color: #856404;"><i class="fas fa-clock"></i> Pendiente</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ ajuste.created_at|date:"d/m/Y" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5">
+                        <div class="empty-state">
+                            <i class="fas fa-chart-bar"></i>
+                            <p>No hay ajustes formulados aún.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    {% if estadisticas_categoria %}
+    const ctx = document.getElementById('graficoCategorias').getContext('2d');
+    const categorias = [{% for categoria in estadisticas_categoria.keys %}'{{ categoria|escapejs }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+    const totales = [{% for stats in estadisticas_categoria.values %}{{ stats.total }}{% if not forloop.last %},{% endif %}{% endfor %}];
+    
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: categorias,
+            datasets: [{
+                label: 'Total de Ajustes',
+                data: totales,
+                backgroundColor: 'rgba(0, 123, 255, 0.6)',
+                borderColor: 'rgba(0, 123, 255, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+    {% endif %}
+});
+</script>
+{% endblock %}
+

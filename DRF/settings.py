@@ -35,8 +35,10 @@ DEBUG = config('DEBUG', default=True, cast=bool)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=lambda v: [s.strip() for s in v.split(',')])
 
 
-# Application definition
+# Verificar si estamos usando S3 (definido aquí para configurar INSTALLED_APPS)
+USE_S3 = config('USE_S3', default='False', cast=bool)
 
+# Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -50,11 +52,14 @@ INSTALLED_APPS = [
 
     # APLICACIONES DE TERCEROS
     'rest_framework',
-    'storages',  # Para almacenamiento en S3
 
     # DOCUMENTACION API
     'drf_yasg',
 ]
+
+# Solo agregar storages si se usa S3
+if USE_S3:
+    INSTALLED_APPS.append('storages')
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -151,9 +156,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # ============================================
 # CONFIGURACIÓN DE ALMACENAMIENTO EN S3
 # ============================================
-
-# Verificar si estamos en producción (usando S3) o desarrollo (almacenamiento local)
-USE_S3 = config('USE_S3', default='False', cast=bool)
 
 if USE_S3:
     # Configuración de AWS S3

@@ -4,8 +4,10 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import logout, login
+from django.contrib.auth import update_session_auth_hash
 from django.utils import timezone
 from django.urls import reverse
+from django.http import HttpResponse
 from datetime import timedelta, datetime, time, date
 from django.db.models import Count, Q
 from django.views.decorators.http import require_POST
@@ -14,6 +16,13 @@ import json
 import calendar  # Importar para el calendario mensual
 import logging
 import holidays  # Feriados de Chile
+import csv
+from io import BytesIO
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
 
 # Django REST Framework
 from rest_framework import viewsets, mixins, status
@@ -49,6 +58,63 @@ ROL_DOCENTE = 'Docente'
 ROL_ADMIN = 'Administrador'
 ROL_COORDINADORA = 'Encargado de Inclusión'
 ROL_COORDINADOR_TECNICO_PEDAGOGICO = 'Coordinador Técnico Pedagógico'
+
+
+# ------------ FUNCIONES UTILITARIAS ------------
+
+def desactivar_asignaturas_semestre_vencido():
+    """
+    Desactiva automáticamente las asignaturas cuyo semestre ha terminado.
+    
+    Semestres:
+    - Otoño (otono): Marzo - Julio (termina el 31 de julio)
+    - Primavera (primavera): Agosto - Diciembre (termina el 31 de diciembre)
+    
+    Esta función se ejecuta automáticamente cuando se accede al sistema.
+    """
+    hoy = timezone.localtime().date()
+    mes_actual = hoy.month
+    anio_actual = hoy.year
+    
+    asignaturas_desactivadas = 0
+    
+    # Si estamos en agosto o después, desactivar Otoño del año actual
+    if mes_actual >= 8:
+        count = Asignaturas.objects.filter(
+            is_active=True,
+            semestre='otono',
+            anio=anio_actual
+        ).update(is_active=False)
+        asignaturas_desactivadas += count
+    
+    # Si estamos en enero o febrero, desactivar Primavera del año anterior
+    if mes_actual <= 2:
+        count = Asignaturas.objects.filter(
+            is_active=True,
+            semestre='primavera',
+            anio=anio_actual - 1
+        ).update(is_active=False)
+        asignaturas_desactivadas += count
+    
+    # Desactivar cualquier asignatura de años anteriores que siga activa
+    # (Otoño de años pasados)
+    count = Asignaturas.objects.filter(
+        is_active=True,
+        semestre='otono',
+        anio__lt=anio_actual
+    ).update(is_active=False)
+    asignaturas_desactivadas += count
+    
+    # (Primavera de años pasados, excepto el año actual si estamos en enero-febrero)
+    anio_limite = anio_actual - 1 if mes_actual <= 2 else anio_actual
+    count = Asignaturas.objects.filter(
+        is_active=True,
+        semestre='primavera',
+        anio__lt=anio_limite
+    ).update(is_active=False)
+    asignaturas_desactivadas += count
+    
+    return asignaturas_desactivadas
 
 
 # ----------------------------------------------
@@ -807,8 +873,10 @@ def casos_generales(request):
 def dashboard_admin(request):
     """
     Dashboard para Administradores del Sistema.
-    Muestra KPIs globales y casos que requieren acción.
+    Muestra estadísticas globales del sistema y métricas de actividad.
     """
+    import json
+    from collections import Counter
     
     # Verificar permisos
     rol = None
@@ -819,27 +887,125 @@ def dashboard_admin(request):
     if not request.user.is_superuser and rol != ROL_ADMIN:
         return redirect('home')
 
-    # --- KPIs ---
+    # --- Fechas de referencia ---
+    hoy = timezone.now()
+    # Usar inicio del día para comparaciones más precisas
+    inicio_hoy = hoy.replace(hour=0, minute=0, second=0, microsecond=0)
+    hace_7_dias = inicio_hoy - timedelta(days=7)
+    hace_14_dias = inicio_hoy - timedelta(days=14)
+    hace_30_dias = inicio_hoy - timedelta(days=30)
+    inicio_mes = hoy.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    # --- KPIs Principales ---
     kpis = {
-        'total_asesores': PerfilUsuario.objects.filter(rol__nombre_rol=ROL_ASESOR).count(),
-        'total_directores': PerfilUsuario.objects.filter(rol__nombre_rol=ROL_DIRECTOR).count(),
-        'total_docentes': PerfilUsuario.objects.filter(rol__nombre_rol=ROL_DOCENTE).count(),
+        'total_usuarios': Usuario.objects.filter(is_active=True).count(),
         'total_estudiantes': Estudiantes.objects.count(),
         'total_solicitudes': Solicitudes.objects.count(),
-        'solicitudes_en_proceso': Solicitudes.objects.exclude(estado__in=['aprobado', 'rechazado']).count(),  # Todos los casos no aprobados
+        'solicitudes_en_proceso': Solicitudes.objects.exclude(estado__in=['aprobado', 'rechazado']).count(),
         'solicitudes_aprobadas': Solicitudes.objects.filter(estado='aprobado').count(),
         'solicitudes_rechazadas': Solicitudes.objects.filter(estado='rechazado').count(),
     }
-
-    # --- Tabla: Casos Críticos (Sin Asignar) ---
-    solicitudes_sin_asignar = Solicitudes.objects.filter(
-        asesor_pedagogico_asignado__isnull=True,
-        estado='en_proceso'
-    ).select_related(
-        'estudiantes', 
-        'estudiantes__carreras'
-    ).order_by('created_at') # <-- Más antiguas primero
-
+    
+    # --- Usuarios Activos (últimos 7 días) ---
+    usuarios_activos_7d = Usuario.objects.filter(
+        last_login__gte=hace_7_dias,
+        is_active=True
+    ).count()
+    
+    # --- Estadísticas comparativas (esta semana vs anterior) ---
+    solicitudes_esta_semana = Solicitudes.objects.filter(created_at__gte=hace_7_dias).count()
+    solicitudes_semana_anterior = Solicitudes.objects.filter(
+        created_at__gte=hace_14_dias,
+        created_at__lt=hace_7_dias
+    ).count()
+    
+    # Calcular variación porcentual
+    if solicitudes_semana_anterior > 0:
+        variacion_solicitudes = round(((solicitudes_esta_semana - solicitudes_semana_anterior) / solicitudes_semana_anterior) * 100, 1)
+    else:
+        variacion_solicitudes = 100 if solicitudes_esta_semana > 0 else 0
+    
+    # Usuarios nuevos esta semana vs anterior
+    usuarios_nuevos_semana = Usuario.objects.filter(date_joined__gte=hace_7_dias).count()
+    usuarios_nuevos_anterior = Usuario.objects.filter(
+        date_joined__gte=hace_14_dias,
+        date_joined__lt=hace_7_dias
+    ).count()
+    
+    # --- Gráfico: Actividad del Sistema ---
+    # Primero verificamos si hay solicitudes en los últimos 30 días
+    total_solicitudes_30d = Solicitudes.objects.filter(created_at__gte=hace_30_dias).count()
+    
+    # Si no hay solicitudes en 30 días, buscamos la fecha de la solicitud más antigua
+    if total_solicitudes_30d == 0:
+        solicitud_mas_antigua = Solicitudes.objects.order_by('created_at').first()
+        if solicitud_mas_antigua:
+            dias_desde_primera = (hoy.date() - solicitud_mas_antigua.created_at.date()).days
+            dias_a_mostrar = min(dias_desde_primera + 1, 90)
+            fecha_inicio_grafico = inicio_hoy - timedelta(days=dias_a_mostrar)
+        else:
+            dias_a_mostrar = 30
+            fecha_inicio_grafico = hace_30_dias
+    else:
+        dias_a_mostrar = 30
+        fecha_inicio_grafico = hace_30_dias
+    
+    # Obtener solicitudes y procesar fechas en Python (evita problemas de TruncDate con MySQL)
+    solicitudes_periodo = Solicitudes.objects.filter(
+        created_at__gte=fecha_inicio_grafico
+    ).values_list('created_at', flat=True)
+    
+    # Contar solicitudes por día usando Python
+    actividad_dict = Counter()
+    for fecha_creacion in solicitudes_periodo:
+        if fecha_creacion:
+            # Convertir a fecha local y luego a string
+            fecha_local = timezone.localtime(fecha_creacion) if timezone.is_aware(fecha_creacion) else fecha_creacion
+            fecha_key = fecha_local.strftime('%Y-%m-%d')
+            actividad_dict[fecha_key] += 1
+    
+    # Crear lista de todos los días (incluyendo días sin actividad)
+    actividad_labels = []
+    actividad_data = []
+    
+    for i in range(dias_a_mostrar, -1, -1):
+        dia = (hoy - timedelta(days=i)).date()
+        dia_key = dia.strftime('%Y-%m-%d')
+        actividad_labels.append(dia.strftime('%d/%m'))
+        actividad_data.append(actividad_dict.get(dia_key, 0))
+    
+    # --- Gráfico: Distribución por Estado ---
+    estados_count = {
+        'En Proceso': Solicitudes.objects.filter(estado='en_proceso').count(),
+        'Pendiente Entrevista': Solicitudes.objects.filter(estado='pendiente_entrevista').count(),
+        'Pendiente Formulación': Solicitudes.objects.filter(estado='pendiente_formulacion_ajustes').count(),
+        'Pendiente Preaprobación': Solicitudes.objects.filter(estado='pendiente_preaprobacion').count(),
+        'Pendiente Aprobación': Solicitudes.objects.filter(estado='pendiente_aprobacion').count(),
+        'Aprobado': Solicitudes.objects.filter(estado='aprobado').count(),
+        'Rechazado': Solicitudes.objects.filter(estado='rechazado').count(),
+    }
+    
+    estados_labels = list(estados_count.keys())
+    estados_data = list(estados_count.values())
+    
+    # --- Distribución de usuarios por rol ---
+    roles_count = PerfilUsuario.objects.values('rol__nombre_rol').annotate(
+        total=Count('id')
+    ).order_by('-total')
+    
+    roles_labels = [r['rol__nombre_rol'] or 'Sin Rol' for r in roles_count]
+    roles_data = [r['total'] for r in roles_count]
+    
+    # --- Últimos accesos al sistema ---
+    ultimos_accesos = Usuario.objects.filter(
+        last_login__isnull=False
+    ).select_related('perfil', 'perfil__rol').order_by('-last_login')[:10]
+    
+    # --- Solicitudes recientes (últimas 5) ---
+    solicitudes_recientes = Solicitudes.objects.select_related(
+        'estudiantes', 'estudiantes__carreras'
+    ).order_by('-created_at')[:5]
+    
     # --- Gráfico: Distribución de Solicitudes por Área ---
     distribucion_areas = Areas.objects.annotate(
         total_solicitudes=Count('carreras__estudiantes__solicitudes')
@@ -860,8 +1026,23 @@ def dashboard_admin(request):
 
     context = {
         'kpis': kpis,
-        'solicitudes_sin_asignar': solicitudes_sin_asignar,
-        'total_sin_asignar': solicitudes_sin_asignar.count(),
+        # Estadísticas de actividad
+        'usuarios_activos_7d': usuarios_activos_7d,
+        'solicitudes_esta_semana': solicitudes_esta_semana,
+        'variacion_solicitudes': variacion_solicitudes,
+        'usuarios_nuevos_semana': usuarios_nuevos_semana,
+        'usuarios_nuevos_anterior': usuarios_nuevos_anterior,
+        # Datos para gráficos (JSON)
+        'actividad_labels_json': json.dumps(actividad_labels),
+        'actividad_data_json': json.dumps(actividad_data),
+        'dias_actividad': dias_a_mostrar,  # Para el título dinámico
+        'estados_labels_json': json.dumps(estados_labels),
+        'estados_data_json': json.dumps(estados_data),
+        'roles_labels_json': json.dumps(roles_labels),
+        'roles_data_json': json.dumps(roles_data),
+        # Tablas
+        'ultimos_accesos': ultimos_accesos,
+        'solicitudes_recientes': solicitudes_recientes,
         'distribucion_apoyos': distribucion_con_porcentaje,
     }
     
@@ -1149,9 +1330,14 @@ def gestion_institucional_admin(request):
         return redirect('home')
     
     # Obtener querysets base
-    carreras = Carreras.objects.select_related('director__usuario', 'area').all().order_by('nombre')
+    carreras = Carreras.objects.select_related('director__usuario', 'area').annotate(
+        total_estudiantes=Count('estudiantes')
+    ).order_by('area__nombre', 'nombre')
     asignaturas = Asignaturas.objects.select_related('carreras', 'docente__usuario').all().order_by('nombre')
-    areas = Areas.objects.all().order_by('nombre')
+    areas = Areas.objects.annotate(
+        total_carreras=Count('carreras', distinct=True),
+        total_docentes=Count('perfilusuario', distinct=True)
+    ).order_by('nombre')
     directores = PerfilUsuario.objects.select_related('usuario').filter(rol__nombre_rol=ROL_DIRECTOR).order_by('usuario__first_name')
     docentes = PerfilUsuario.objects.select_related('usuario').filter(rol__nombre_rol=ROL_DOCENTE).order_by('usuario__first_name')
     
@@ -1599,8 +1785,28 @@ def agregar_asignatura_admin(request):
             docente_id = request.POST.get('docente_id')
             carrera = get_object_or_404(Carreras, id=carrera_id)
             docente = get_object_or_404(PerfilUsuario, id=docente_id, rol__nombre_rol=ROL_DOCENTE)
-            Asignaturas.objects.create(nombre=nombre, seccion=seccion, carreras=carrera, docente=docente)
-            messages.success(request, f'Asignatura "{nombre} - {seccion}" creada y asignada a {carrera.nombre}.', extra_tags='asignaturas')
+            
+            # Determinar semestre y año actual
+            hoy = timezone.localtime().date()
+            anio_actual = hoy.year
+            mes_actual = hoy.month
+            # Otoño: Marzo-Julio (meses 3-7), Primavera: Agosto-Diciembre (meses 8-12)
+            # Enero-Febrero se considera Primavera del año actual para inscripciones
+            if mes_actual >= 3 and mes_actual <= 7:
+                semestre_actual = 'otono'
+            else:
+                semestre_actual = 'primavera'
+            
+            Asignaturas.objects.create(
+                nombre=nombre, 
+                seccion=seccion, 
+                carreras=carrera, 
+                docente=docente,
+                semestre=semestre_actual,
+                anio=anio_actual,
+                is_active=True  # Activa por defecto al crearse
+            )
+            messages.success(request, f'Asignatura "{nombre} - {seccion}" creada para {semestre_actual.capitalize()} {anio_actual}.', extra_tags='asignaturas')
         except Exception as e:
             messages.error(request, f'Error al crear la asignatura: {str(e)}', extra_tags='asignaturas')
     return redirect(reverse('gestion_institucional_admin') + '#seccion-asignaturas')
@@ -1892,28 +2098,60 @@ def detalle_casos_encargado_inclusion(request, solicitud_id):
     categorias_ajustes = CategoriasAjustes.objects.all().order_by('nombre_categoria')
     # Permisos de edición: Solo Encargado de Inclusión, Asesor Pedagógico y Admin pueden editar la descripción del caso
     # El Coordinador Técnico Pedagógico NO puede editar el caso formulado por el Encargado de Inclusión
+    # Estados editables por el Encargado de Inclusión
+    ESTADOS_EDITABLES_ENCARGADO = ['pendiente_entrevista', 'pendiente_formulacion_caso']
+    caso_editable_encargado = solicitud.estado in ESTADOS_EDITABLES_ENCARGADO
+    
     # El Docente solo puede VER, no editar
-    puede_editar_descripcion = rol_nombre in [ROL_COORDINADORA, ROL_ASESOR, ROL_ADMIN]
+    # El Encargado de Inclusión solo puede editar si el caso está en sus estados
     es_docente = rol_nombre == ROL_DOCENTE
-    puede_agendar_cita = rol_nombre == ROL_COORDINADORA
+    if rol_nombre == ROL_COORDINADORA:
+        puede_editar_descripcion = caso_editable_encargado
+        puede_agendar_cita = caso_editable_encargado
+    elif rol_nombre == ROL_ASESOR:
+        puede_editar_descripcion = solicitud.estado == 'pendiente_preaprobacion'
+        puede_agendar_cita = False
+    elif rol_nombre == ROL_ADMIN or request.user.is_superuser:
+        puede_editar_descripcion = True
+        puede_agendar_cita = True
+    else:
+        puede_editar_descripcion = False
+        puede_agendar_cita = False
     
     # Acciones de Encargado de Inclusión
     puede_formular_caso = rol_nombre == ROL_COORDINADORA and solicitud.estado == 'pendiente_formulacion_caso'
     puede_enviar_coordinador_tecnico_pedagogico = rol_nombre == ROL_COORDINADORA and solicitud.estado == 'pendiente_formulacion_caso'
     
+    # Estados editables por el Coordinador Técnico Pedagógico
+    ESTADOS_EDITABLES_COORDINADOR_TECNICO = ['pendiente_formulacion_ajustes']
+    caso_editable_coordinador_tecnico = solicitud.estado in ESTADOS_EDITABLES_COORDINADOR_TECNICO
+    
     # Acciones de Coordinador Técnico Pedagógico
-    puede_formular_ajustes = rol_nombre == ROL_COORDINADOR_TECNICO_PEDAGOGICO and solicitud.estado == 'pendiente_formulacion_ajustes'
-    puede_enviar_asesor_pedagogico = rol_nombre == ROL_COORDINADOR_TECNICO_PEDAGOGICO and solicitud.estado == 'pendiente_formulacion_ajustes'
-    puede_devolver_a_encargado_inclusion = rol_nombre == ROL_COORDINADOR_TECNICO_PEDAGOGICO and solicitud.estado == 'pendiente_formulacion_ajustes'
+    puede_formular_ajustes = rol_nombre == ROL_COORDINADOR_TECNICO_PEDAGOGICO and caso_editable_coordinador_tecnico
+    puede_enviar_asesor_pedagogico = rol_nombre == ROL_COORDINADOR_TECNICO_PEDAGOGICO and caso_editable_coordinador_tecnico
+    puede_devolver_a_encargado_inclusion = rol_nombre == ROL_COORDINADOR_TECNICO_PEDAGOGICO and caso_editable_coordinador_tecnico
+    puede_editar_ajustes_coordinador = rol_nombre == ROL_COORDINADOR_TECNICO_PEDAGOGICO and caso_editable_coordinador_tecnico
+    puede_eliminar_ajustes_coordinador = rol_nombre == ROL_COORDINADOR_TECNICO_PEDAGOGICO and caso_editable_coordinador_tecnico
+    
+    # Estados editables por el Asesor Pedagógico
+    ESTADOS_EDITABLES_ASESOR = ['pendiente_preaprobacion']
+    caso_editable_asesor = solicitud.estado in ESTADOS_EDITABLES_ASESOR
     
     # Acciones de Asesor Pedagógico
-    puede_enviar_a_director = rol_nombre == ROL_ASESOR and solicitud.estado == 'pendiente_preaprobacion'
-    puede_devolver_a_coordinador_tecnico_pedagogico = rol_nombre == ROL_ASESOR and solicitud.estado == 'pendiente_preaprobacion'
-    puede_editar_ajustes_asesor = rol_nombre == ROL_ASESOR and solicitud.estado == 'pendiente_preaprobacion'  # Asesora Pedagógica puede editar ajustes antes de enviar a Director
+    puede_enviar_a_director = rol_nombre == ROL_ASESOR and caso_editable_asesor
+    puede_devolver_a_coordinador_tecnico_pedagogico = rol_nombre == ROL_ASESOR and caso_editable_asesor
+    puede_editar_ajustes_asesor = rol_nombre == ROL_ASESOR and caso_editable_asesor
+    puede_eliminar_ajustes_asesor = rol_nombre == ROL_ASESOR and caso_editable_asesor
+    
+    # Estados editables por el Director
+    ESTADOS_EDITABLES_DIRECTOR = ['pendiente_aprobacion']
+    caso_editable_director = solicitud.estado in ESTADOS_EDITABLES_DIRECTOR
     
     # Acciones de Director
-    puede_aprobar = rol_nombre == ROL_DIRECTOR and solicitud.estado == 'pendiente_aprobacion'
-    puede_rechazar = rol_nombre == ROL_DIRECTOR and solicitud.estado == 'pendiente_aprobacion'
+    puede_aprobar = rol_nombre == ROL_DIRECTOR and caso_editable_director
+    puede_rechazar = rol_nombre == ROL_DIRECTOR and caso_editable_director
+    # El Director puede desactivar casos aprobados para enviarlos a revisión
+    puede_desactivar_caso = rol_nombre == ROL_DIRECTOR and solicitud.estado == 'aprobado'
 
     context = {
         'solicitud': solicitud,
@@ -1938,10 +2176,18 @@ def detalle_casos_encargado_inclusion(request, solicitud_id):
         'es_docente': es_docente,  # Para ocultar acciones de edición en el template
     }
     
-    # Permiso para subir archivos (solo Encargado de Inclusión)
-    puede_subir_archivo = rol_nombre == ROL_COORDINADORA
+    # Permiso para subir archivos (solo Encargado de Inclusión y solo en estados editables)
+    puede_subir_archivo = rol_nombre == ROL_COORDINADORA and caso_editable_encargado
     
     context['puede_subir_archivo'] = puede_subir_archivo
+    context['caso_editable_encargado'] = caso_editable_encargado
+    context['caso_editable_coordinador_tecnico'] = caso_editable_coordinador_tecnico
+    context['puede_editar_ajustes_coordinador'] = puede_editar_ajustes_coordinador
+    context['puede_eliminar_ajustes_coordinador'] = puede_eliminar_ajustes_coordinador
+    context['caso_editable_asesor'] = caso_editable_asesor
+    context['puede_eliminar_ajustes_asesor'] = puede_eliminar_ajustes_asesor
+    context['caso_editable_director'] = caso_editable_director
+    context['puede_desactivar_caso'] = puede_desactivar_caso
     
     return render(request, 'SIAPE/detalle_casos_encargado_inclusion.html', context)
 
@@ -1950,7 +2196,11 @@ def detalle_casos_encargado_inclusion(request, solicitud_id):
 def subir_archivo_caso(request, solicitud_id):
     """
     Permite al Encargado de Inclusión subir un archivo al caso.
+    Solo puede hacerlo cuando el caso está en estados que le corresponden.
     """
+    # Estados permitidos para edición del Encargado de Inclusión
+    ESTADOS_EDITABLES_ENCARGADO = ['pendiente_entrevista', 'pendiente_formulacion_caso']
+    
     # 1. Verificar Permiso
     try:
         perfil = request.user.perfil
@@ -1964,7 +2214,12 @@ def subir_archivo_caso(request, solicitud_id):
     # 2. Obtener la solicitud
     solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
     
-    # 3. Validar que el encargado de inclusión tenga acceso a este caso
+    # 3. Verificar que el caso esté en un estado editable para el Encargado de Inclusión
+    if solicitud.estado not in ESTADOS_EDITABLES_ENCARGADO and not request.user.is_superuser:
+        messages.error(request, 'No puedes modificar este caso porque ya fue enviado al siguiente rol.')
+        return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+    
+    # 4. Validar que el encargado de inclusión tenga acceso a este caso
     if solicitud.coordinadora_asignada != perfil and not request.user.is_superuser:
         messages.error(request, 'No tienes permisos para subir archivos a este caso.')
         return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
@@ -2678,6 +2933,47 @@ def rechazar_caso(request, solicitud_id):
 
 @require_POST
 @login_required
+def desactivar_caso(request, solicitud_id):
+    """
+    Vista para que el Director desactive un caso aprobado y lo envíe a revisión.
+    Cambia el estado del caso de 'aprobado' a 'pendiente_preaprobacion'.
+    Esto permite que un caso ya aprobado sea reevaluado por el equipo.
+    """
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para realizar esta acción.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+        perfil = None
+
+    # 2. --- Obtener la Solicitud ---
+    solicitud = get_object_or_404(Solicitudes, id=solicitud_id)
+    
+    # 3. --- Verificar que el caso está en estado aprobado ---
+    if solicitud.estado != 'aprobado':
+        messages.error(request, 'Solo se pueden desactivar casos que estén aprobados.')
+        return redirect('detalle_caso', solicitud_id=solicitud_id)
+    
+    try:
+        # 4. --- Cambiar el estado del caso (vuelve a Asesoría Pedagógica para revisión) ---
+        solicitud.estado = 'pendiente_preaprobacion'
+        solicitud.save()
+        
+        messages.warning(request, 'Caso desactivado. El caso ha sido enviado a revisión por Asesoría Pedagógica.')
+        
+    except Exception as e:
+        logger.error(f"Error al desactivar caso: {str(e)}")
+        messages.error(request, f'Error al desactivar el caso: {str(e)}')
+    
+    # 5. --- Redirigir de vuelta al detalle ---
+    return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+
+@require_POST
+@login_required
 def aprobar_ajuste_director(request, ajuste_asignado_id):
     """
     Vista para que el Director apruebe un ajuste individual.
@@ -2964,7 +3260,11 @@ def confirmar_cita_coordinadora(request, entrevista_id):
     """
     Permite al Encargado de Inclusión confirmar la asistencia (realizada o no asistió) 
     de una entrevista que ella gestiona.
+    Solo puede hacerlo cuando el caso está en estados que le corresponden.
     """
+    # Estados permitidos para edición del Encargado de Inclusión
+    ESTADOS_EDITABLES_ENCARGADO = ['pendiente_entrevista', 'pendiente_formulacion_caso']
+    
     # 1. Verificar Permiso
     try:
         if request.user.perfil.rol.nombre_rol != ROL_COORDINADORA:
@@ -2972,6 +3272,16 @@ def confirmar_cita_coordinadora(request, entrevista_id):
             return redirect('panel_control_encargado_inclusion')
     except AttributeError:
         return redirect('home')
+    
+    # 1.1 Verificar estado del caso
+    try:
+        entrevista_temp = Entrevistas.objects.select_related('solicitudes').get(id=entrevista_id)
+        if entrevista_temp.solicitudes.estado not in ESTADOS_EDITABLES_ENCARGADO and not request.user.is_superuser:
+            messages.error(request, 'No puedes confirmar citas para este caso porque ya fue enviado al siguiente rol.')
+            return redirect('panel_control_encargado_inclusion')
+    except Entrevistas.DoesNotExist:
+        messages.error(request, 'La cita no existe.')
+        return redirect('panel_control_encargado_inclusion')
 
     # 2. Lógica de la Acción
     if request.method == 'POST':
@@ -3125,7 +3435,11 @@ def eliminar_horario_bloqueado(request, horario_id):
 def editar_notas_cita_coordinadora(request, entrevista_id):
     """
     Permite al Encargado de Inclusión editar las notas de una cita que él gestiona.
+    Solo puede hacerlo cuando el caso está en estados que le corresponden.
     """
+    # Estados permitidos para edición del Encargado de Inclusión
+    ESTADOS_EDITABLES_ENCARGADO = ['pendiente_entrevista', 'pendiente_formulacion_caso']
+    
     # 1. Verificar Permiso
     try:
         if request.user.perfil.rol.nombre_rol != ROL_COORDINADORA:
@@ -3133,6 +3447,16 @@ def editar_notas_cita_coordinadora(request, entrevista_id):
             return redirect('panel_control_encargado_inclusion')
     except AttributeError:
         return redirect('home')
+    
+    # 1.1 Verificar estado del caso
+    try:
+        entrevista_temp = Entrevistas.objects.select_related('solicitudes').get(id=entrevista_id)
+        if entrevista_temp.solicitudes.estado not in ESTADOS_EDITABLES_ENCARGADO and not request.user.is_superuser:
+            messages.error(request, 'No puedes editar notas de citas para este caso porque ya fue enviado al siguiente rol.')
+            return redirect('panel_control_encargado_inclusion')
+    except Entrevistas.DoesNotExist:
+        messages.error(request, 'La cita no existe.')
+        return redirect('panel_control_encargado_inclusion')
 
     # 2. Lógica de la Acción
     if request.method == 'POST':
@@ -3154,7 +3478,11 @@ def editar_notas_cita_coordinadora(request, entrevista_id):
 def agendar_cita_coordinadora(request):
     """
     Permite al Encargado de Inclusión agendar una nueva cita para un caso.
+    Solo puede hacerlo cuando el caso está en estados que le corresponden.
     """
+    # Estados permitidos para edición del Encargado de Inclusión
+    ESTADOS_EDITABLES_ENCARGADO = ['pendiente_entrevista', 'pendiente_formulacion_caso']
+    
     # 1. Verificar Permiso
     try:
         if request.user.perfil.rol.nombre_rol != ROL_COORDINADORA:
@@ -3166,6 +3494,16 @@ def agendar_cita_coordinadora(request):
     # 2. Lógica de la Acción
     if request.method == 'POST':
         solicitud_id = request.POST.get('solicitud_id')
+        
+        # Verificar estado del caso antes de agendar
+        if solicitud_id:
+            try:
+                solicitud_check = Solicitudes.objects.get(id=solicitud_id)
+                if solicitud_check.estado not in ESTADOS_EDITABLES_ENCARGADO and not request.user.is_superuser:
+                    messages.error(request, 'No puedes agendar citas para este caso porque ya fue enviado al siguiente rol.')
+                    return redirect('detalle_casos_encargado_inclusion', solicitud_id=solicitud_id)
+            except Solicitudes.DoesNotExist:
+                pass  # Se manejará más adelante en el flujo
         # Obtener valores y asegurarse de que sean strings (no listas)
         fecha_raw = request.POST.get('fecha_agendar', '')
         hora_raw = request.POST.get('hora_agendar', '')
@@ -3296,7 +3634,11 @@ def reagendar_cita_coordinadora(request, entrevista_id):
     """
     Permite al Encargado de Inclusión reagendar una cita (usualmente una que 'no asistió').
     Crea una nueva entrevista y actualiza la antigua.
+    Solo puede hacerlo cuando el caso está en estados que le corresponden.
     """
+    # Estados permitidos para edición del Encargado de Inclusión
+    ESTADOS_EDITABLES_ENCARGADO = ['pendiente_entrevista', 'pendiente_formulacion_caso']
+    
     # 1. Verificar Permiso
     try:
         if request.user.perfil.rol.nombre_rol != ROL_COORDINADORA:
@@ -3304,6 +3646,16 @@ def reagendar_cita_coordinadora(request, entrevista_id):
             return redirect('panel_control_encargado_inclusion')
     except AttributeError:
         return redirect('home')
+    
+    # 1.1 Verificar estado del caso
+    try:
+        entrevista_temp = Entrevistas.objects.select_related('solicitudes').get(id=entrevista_id)
+        if entrevista_temp.solicitudes.estado not in ESTADOS_EDITABLES_ENCARGADO and not request.user.is_superuser:
+            messages.error(request, 'No puedes reagendar citas para este caso porque ya fue enviado al siguiente rol.')
+            return redirect('detalle_casos_encargado_inclusion', solicitud_id=entrevista_temp.solicitudes.id)
+    except Entrevistas.DoesNotExist:
+        messages.error(request, 'La cita no existe.')
+        return redirect('panel_control_encargado_inclusion')
 
     # 2. Lógica de la Acción
     if request.method == 'POST':
@@ -3469,6 +3821,1116 @@ def dashboard_asesor(request):
     }
     
     return render(request, 'SIAPE/dashboard_asesor.html', context)
+
+
+@login_required
+def estadisticas_asesor_pedagogico(request):
+    """
+    Vista completa de estadísticas para el Asesor Pedagógico.
+    Incluye estadísticas por roles, ajustes, fechas, carreras y rendimiento del sistema.
+    """
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_ASESOR:
+            messages.error(request, 'No tienes permisos para acceder a esta página.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+    
+    # 2. --- Obtener Rango de Tiempo Seleccionado ---
+    rango_seleccionado = request.GET.get('rango', 'mes')  # mes, semestre, año, historico
+    
+    # 3. --- Configuración de Fechas según Rango ---
+    now = timezone.localtime(timezone.now())
+    today = now.date()
+    
+    fecha_inicio = None
+    fecha_fin_dt = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+    
+    if rango_seleccionado == 'mes':
+        # Último mes (30 días)
+        fecha_inicio = today - timedelta(days=30)
+        fecha_inicio_dt = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+        rango_nombre = 'Último Mes'
+    elif rango_seleccionado == 'semestre':
+        # Último semestre (6 meses)
+        fecha_inicio = today - timedelta(days=180)
+        fecha_inicio_dt = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+        rango_nombre = 'Último Semestre'
+    elif rango_seleccionado == 'año':
+        # Último año
+        fecha_inicio = today.replace(month=1, day=1)
+        fecha_inicio_dt = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+        rango_nombre = 'Último Año'
+    else:  # historico
+        # Todo el histórico (sin filtro de fecha)
+        fecha_inicio_dt = None
+        rango_nombre = 'Histórico Completo'
+    
+    # Rango de fechas para análisis
+    start_of_week = today - timedelta(days=today.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
+    start_of_month = today.replace(day=1)
+    start_of_year = today.replace(month=1, day=1)
+    
+    # 3. --- ESTADÍSTICAS POR ESTADO ---
+    total_casos_sistema = Solicitudes.objects.count()
+    estados_stats = []
+    for estado_valor, estado_nombre in Solicitudes.ESTADO_CHOICES:
+        cantidad = Solicitudes.objects.filter(estado=estado_valor).count()
+        porcentaje = round((cantidad / total_casos_sistema * 100) if total_casos_sistema > 0 else 0, 1)
+        estados_stats.append({
+            'valor': estado_valor,
+            'nombre': estado_nombre,
+            'cantidad': cantidad,
+            'porcentaje': porcentaje
+        })
+    
+    # 4. --- ESTADÍSTICAS POR ROLES (casos asignados) ---
+    # Encargado de Inclusión
+    casos_encargado_inclusion = Solicitudes.objects.filter(
+        coordinadora_asignada__isnull=False
+    ).count()
+    
+    # Coordinador Técnico Pedagógico
+    casos_coordinador_tecnico = Solicitudes.objects.filter(
+        coordinador_tecnico_pedagogico_asignado__isnull=False
+    ).count()
+    
+    # Asesor Pedagógico
+    casos_asesor_pedagogico = Solicitudes.objects.filter(
+        asesor_pedagogico_asignado__isnull=False
+    ).count()
+    
+    # Sin asignar
+    casos_sin_asignar = Solicitudes.objects.filter(
+        coordinadora_asignada__isnull=True,
+        coordinador_tecnico_pedagogico_asignado__isnull=True,
+        asesor_pedagogico_asignado__isnull=True
+    ).count()
+    
+    roles_stats = {
+        'encargado_inclusion': casos_encargado_inclusion,
+        'coordinador_tecnico': casos_coordinador_tecnico,
+        'asesor_pedagogico': casos_asesor_pedagogico,
+        'sin_asignar': casos_sin_asignar,
+    }
+    
+    # 5. --- ESTADÍSTICAS POR AJUSTES ---
+    total_ajustes = AjusteAsignado.objects.count()
+    ajustes_aprobados = AjusteAsignado.objects.filter(estado_aprobacion='aprobado').count()
+    ajustes_rechazados = AjusteAsignado.objects.filter(estado_aprobacion='rechazado').count()
+    ajustes_pendientes = AjusteAsignado.objects.filter(estado_aprobacion='pendiente').count()
+    
+    # Por categoría
+    ajustes_por_categoria = {}
+    for categoria in CategoriasAjustes.objects.all():
+        total_cat = AjusteRazonable.objects.filter(categorias_ajustes=categoria).count()
+        aprobados_cat = AjusteAsignado.objects.filter(
+            ajuste_razonable__categorias_ajustes=categoria,
+            estado_aprobacion='aprobado'
+        ).count()
+        ajustes_por_categoria[categoria.nombre_categoria] = {
+            'total': total_cat,
+            'aprobados': aprobados_cat,
+            'tasa_aprobacion': round((aprobados_cat / total_cat * 100) if total_cat > 0 else 0, 1)
+        }
+    
+    # 6. --- ESTADÍSTICAS POR FECHA (Tendencias) según Rango ---
+    casos_por_mes = []
+    casos_por_dia = []
+    
+    if rango_seleccionado == 'mes':
+        # Último mes: mostrar por día
+        for i in range(29, -1, -1):
+            fecha_dia = today - timedelta(days=i)
+            dia_inicio_dt = timezone.make_aware(datetime.combine(fecha_dia, datetime.min.time()))
+            dia_fin_dt = timezone.make_aware(datetime.combine(fecha_dia, datetime.max.time()))
+            
+            cantidad = Solicitudes.objects.filter(
+                created_at__range=(dia_inicio_dt, dia_fin_dt)
+            ).count()
+            
+            casos_por_dia.append({
+                'fecha': fecha_dia.strftime('%d/%m'),
+                'cantidad': cantidad
+            })
+        
+        # También por semana para el gráfico de mes
+        semanas_en_mes = 4
+        for i in range(semanas_en_mes - 1, -1, -1):
+            semana_inicio = today - timedelta(days=(i * 7) + today.weekday())
+            semana_fin = semana_inicio + timedelta(days=6)
+            if semana_fin > today:
+                semana_fin = today
+            
+            semana_inicio_dt = timezone.make_aware(datetime.combine(semana_inicio, datetime.min.time()))
+            semana_fin_dt = timezone.make_aware(datetime.combine(semana_fin, datetime.max.time()))
+            
+            cantidad = Solicitudes.objects.filter(
+                created_at__range=(semana_inicio_dt, semana_fin_dt)
+            ).count()
+            
+            casos_por_mes.append({
+                'mes': f'Sem {i+1}',
+                'cantidad': cantidad
+            })
+    
+    elif rango_seleccionado == 'semestre':
+        # Último semestre: mostrar por mes
+        for i in range(5, -1, -1):
+            fecha_mes = today - timedelta(days=30 * i)
+            mes_inicio = fecha_mes.replace(day=1)
+            if i == 0:
+                mes_fin = today
+            else:
+                siguiente_mes = mes_inicio + timedelta(days=32)
+                mes_fin = siguiente_mes.replace(day=1) - timedelta(days=1)
+            
+            mes_inicio_dt = timezone.make_aware(datetime.combine(mes_inicio, datetime.min.time()))
+            mes_fin_dt = timezone.make_aware(datetime.combine(mes_fin, datetime.max.time()))
+            
+            cantidad = Solicitudes.objects.filter(
+                created_at__range=(mes_inicio_dt, mes_fin_dt)
+            ).count()
+            
+            casos_por_mes.append({
+                'mes': mes_inicio.strftime('%b %Y'),
+                'cantidad': cantidad
+            })
+        
+        # Por semana para el gráfico diario
+        for i in range(25, -1, -1):  # Últimas 26 semanas
+            semana_inicio = today - timedelta(days=(i * 7) + today.weekday())
+            semana_fin = semana_inicio + timedelta(days=6)
+            if semana_fin > today:
+                semana_fin = today
+            
+            semana_inicio_dt = timezone.make_aware(datetime.combine(semana_inicio, datetime.min.time()))
+            semana_fin_dt = timezone.make_aware(datetime.combine(semana_fin, datetime.max.time()))
+            
+            cantidad = Solicitudes.objects.filter(
+                created_at__range=(semana_inicio_dt, semana_fin_dt)
+            ).count()
+            
+            casos_por_dia.append({
+                'fecha': semana_inicio.strftime('%d/%m'),
+                'cantidad': cantidad
+            })
+    
+    elif rango_seleccionado == 'año':
+        # Último año: mostrar por mes
+        for i in range(11, -1, -1):
+            fecha_mes = today - timedelta(days=30 * i)
+            mes_inicio = fecha_mes.replace(day=1)
+            if i == 0:
+                mes_fin = today
+            else:
+                siguiente_mes = mes_inicio + timedelta(days=32)
+                mes_fin = siguiente_mes.replace(day=1) - timedelta(days=1)
+            
+            mes_inicio_dt = timezone.make_aware(datetime.combine(mes_inicio, datetime.min.time()))
+            mes_fin_dt = timezone.make_aware(datetime.combine(mes_fin, datetime.max.time()))
+            
+            cantidad = Solicitudes.objects.filter(
+                created_at__range=(mes_inicio_dt, mes_fin_dt)
+            ).count()
+            
+            casos_por_mes.append({
+                'mes': mes_inicio.strftime('%b %Y'),
+                'cantidad': cantidad
+            })
+        
+        # Por mes para el gráfico diario también
+        casos_por_dia = casos_por_mes.copy()
+    
+    else:  # historico
+        # Histórico completo: mostrar por año
+        # Obtener el año más antiguo
+        primer_caso = Solicitudes.objects.order_by('created_at').first()
+        if primer_caso:
+            año_inicio = primer_caso.created_at.year
+            año_actual = today.year
+            
+            # Por año
+            for año in range(año_inicio, año_actual + 1):
+                año_inicio_dt = timezone.make_aware(datetime(año, 1, 1))
+                if año == año_actual:
+                    año_fin_dt = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+                else:
+                    año_fin_dt = timezone.make_aware(datetime(año + 1, 1, 1)) - timedelta(seconds=1)
+                
+                cantidad = Solicitudes.objects.filter(
+                    created_at__range=(año_inicio_dt, año_fin_dt)
+                ).count()
+                
+                casos_por_mes.append({
+                    'mes': str(año),
+                    'cantidad': cantidad
+                })
+            
+            # Por mes (últimos 24 meses)
+            for i in range(23, -1, -1):
+                fecha_mes = today - timedelta(days=30 * i)
+                mes_inicio = fecha_mes.replace(day=1)
+                if i == 0:
+                    mes_fin = today
+                else:
+                    siguiente_mes = mes_inicio + timedelta(days=32)
+                    mes_fin = siguiente_mes.replace(day=1) - timedelta(days=1)
+                
+                mes_inicio_dt = timezone.make_aware(datetime.combine(mes_inicio, datetime.min.time()))
+                mes_fin_dt = timezone.make_aware(datetime.combine(mes_fin, datetime.max.time()))
+                
+                cantidad = Solicitudes.objects.filter(
+                    created_at__range=(mes_inicio_dt, mes_fin_dt)
+                ).count()
+                
+                casos_por_dia.append({
+                    'fecha': mes_inicio.strftime('%b %Y'),
+                    'cantidad': cantidad
+                })
+    
+    # 7. --- ESTADÍSTICAS POR CARRERA ---
+    carreras_stats = []
+    for carrera in Carreras.objects.all():
+        total_casos = Solicitudes.objects.filter(estudiantes__carreras=carrera).count()
+        casos_aprobados = Solicitudes.objects.filter(
+            estudiantes__carreras=carrera,
+            estado='aprobado'
+        ).count()
+        casos_pendientes = Solicitudes.objects.filter(
+            estudiantes__carreras=carrera
+        ).exclude(estado__in=['aprobado', 'rechazado']).count()
+        
+        if total_casos > 0:
+            carreras_stats.append({
+                'nombre': carrera.nombre,
+                'total': total_casos,
+                'aprobados': casos_aprobados,
+                'pendientes': casos_pendientes,
+                'tasa_aprobacion': round((casos_aprobados / total_casos * 100), 1)
+            })
+    
+    # Ordenar por total de casos
+    carreras_stats.sort(key=lambda x: x['total'], reverse=True)
+    
+    # 8. --- ESTADÍSTICAS DE RENDIMIENTO ---
+    # Tiempo promedio de resolución (casos aprobados)
+    casos_aprobados_completos = Solicitudes.objects.filter(estado='aprobado')
+    tiempos_resolucion = []
+    for caso in casos_aprobados_completos:
+        if caso.created_at and caso.updated_at:
+            tiempo = (caso.updated_at - caso.created_at).days
+            tiempos_resolucion.append(tiempo)
+    
+    tiempo_promedio = round(sum(tiempos_resolucion) / len(tiempos_resolucion), 1) if tiempos_resolucion else 0
+    
+    # Casos resueltos esta semana
+    start_of_week_dt = timezone.make_aware(datetime.combine(start_of_week, datetime.min.time()))
+    end_of_week_dt = timezone.make_aware(datetime.combine(end_of_week, datetime.max.time()))
+    
+    casos_resueltos_semana = Solicitudes.objects.filter(
+        estado__in=['aprobado', 'rechazado'],
+        updated_at__range=(start_of_week_dt, end_of_week_dt)
+    ).count()
+    
+    # Tasa de aprobación general (valores iniciales, se filtrarán después si aplica)
+    total_resueltos = Solicitudes.objects.filter(estado__in=['aprobado', 'rechazado']).count()
+    total_aprobados = Solicitudes.objects.filter(estado='aprobado').count()
+    tasa_aprobacion_general = round((total_aprobados / total_resueltos * 100) if total_resueltos > 0 else 0, 1)
+    
+    # Valores iniciales para totales
+    total_casos = Solicitudes.objects.count()
+    
+    # 9. --- ESTADÍSTICAS DE USUARIOS ACTIVOS ---
+    # Usuarios activos por rol (últimos 30 días)
+    usuarios_activos_por_rol = {}
+    for rol_nombre in [ROL_COORDINADORA, ROL_COORDINADOR_TECNICO_PEDAGOGICO, ROL_ASESOR, ROL_DIRECTOR]:
+        usuarios_rol = PerfilUsuario.objects.filter(rol__nombre_rol=rol_nombre).count()
+        usuarios_activos_por_rol[rol_nombre] = usuarios_rol
+    
+    # 10. --- ESTADÍSTICAS DE AJUSTES POR ESTADO ---
+    ajustes_stats = {
+        'total': total_ajustes,
+        'aprobados': ajustes_aprobados,
+        'rechazados': ajustes_rechazados,
+        'pendientes': ajustes_pendientes,
+        'tasa_aprobacion': round((ajustes_aprobados / total_ajustes * 100) if total_ajustes > 0 else 0, 1)
+    }
+    
+    # 11. --- Filtrar Estadísticas por Rango de Tiempo (si aplica) ---
+    if rango_seleccionado != 'historico' and fecha_inicio_dt:
+        # Filtrar estados por rango
+        estados_stats_filtrados = []
+        total_filtrado = Solicitudes.objects.filter(created_at__gte=fecha_inicio_dt).count()
+        for estado_valor, estado_nombre in Solicitudes.ESTADO_CHOICES:
+            cantidad = Solicitudes.objects.filter(
+                estado=estado_valor,
+                created_at__gte=fecha_inicio_dt
+            ).count()
+            porcentaje = round((cantidad / total_filtrado * 100) if total_filtrado > 0 else 0, 1)
+            estados_stats_filtrados.append({
+                'valor': estado_valor,
+                'nombre': estado_nombre,
+                'cantidad': cantidad,
+                'porcentaje': porcentaje
+            })
+        estados_stats = estados_stats_filtrados
+        
+        # Filtrar roles por rango
+        casos_encargado_inclusion_filtrado = Solicitudes.objects.filter(
+            coordinadora_asignada__isnull=False,
+            created_at__gte=fecha_inicio_dt
+        ).count()
+        
+        casos_coordinador_tecnico_filtrado = Solicitudes.objects.filter(
+            coordinador_tecnico_pedagogico_asignado__isnull=False,
+            created_at__gte=fecha_inicio_dt
+        ).count()
+        
+        casos_asesor_pedagogico_filtrado = Solicitudes.objects.filter(
+            asesor_pedagogico_asignado__isnull=False,
+            created_at__gte=fecha_inicio_dt
+        ).count()
+        
+        casos_sin_asignar_filtrado = Solicitudes.objects.filter(
+            coordinadora_asignada__isnull=True,
+            coordinador_tecnico_pedagogico_asignado__isnull=True,
+            asesor_pedagogico_asignado__isnull=True,
+            created_at__gte=fecha_inicio_dt
+        ).count()
+        
+        roles_stats = {
+            'encargado_inclusion': casos_encargado_inclusion_filtrado,
+            'coordinador_tecnico': casos_coordinador_tecnico_filtrado,
+            'asesor_pedagogico': casos_asesor_pedagogico_filtrado,
+            'sin_asignar': casos_sin_asignar_filtrado,
+        }
+    
+    # 12. --- Filtrar KPIs por Rango de Tiempo ---
+    if rango_seleccionado != 'historico' and fecha_inicio_dt:
+        total_casos_filtrado = Solicitudes.objects.filter(created_at__gte=fecha_inicio_dt).count()
+        total_ajustes_filtrado = AjusteAsignado.objects.filter(
+            created_at__gte=fecha_inicio_dt
+        ).count() if fecha_inicio_dt else total_ajustes
+        ajustes_aprobados_filtrado = AjusteAsignado.objects.filter(
+            estado_aprobacion='aprobado',
+            created_at__gte=fecha_inicio_dt
+        ).count() if fecha_inicio_dt else ajustes_aprobados
+        ajustes_rechazados_filtrado = AjusteAsignado.objects.filter(
+            estado_aprobacion='rechazado',
+            created_at__gte=fecha_inicio_dt
+        ).count() if fecha_inicio_dt else ajustes_rechazados
+        ajustes_pendientes_filtrado = AjusteAsignado.objects.filter(
+            estado_aprobacion='pendiente',
+            created_at__gte=fecha_inicio_dt
+        ).count() if fecha_inicio_dt else ajustes_pendientes
+        
+        ajustes_stats = {
+            'total': total_ajustes_filtrado,
+            'aprobados': ajustes_aprobados_filtrado,
+            'rechazados': ajustes_rechazados_filtrado,
+            'pendientes': ajustes_pendientes_filtrado,
+            'tasa_aprobacion': round((ajustes_aprobados_filtrado / total_ajustes_filtrado * 100) if total_ajustes_filtrado > 0 else 0, 1)
+        }
+        
+        # Tiempo promedio y casos resueltos filtrados
+        casos_aprobados_filtrados = Solicitudes.objects.filter(
+            estado='aprobado',
+            created_at__gte=fecha_inicio_dt
+        ) if fecha_inicio_dt else Solicitudes.objects.filter(estado='aprobado')
+        
+        tiempos_resolucion_filtrados = []
+        for caso in casos_aprobados_filtrados:
+            if caso.created_at and caso.updated_at:
+                tiempo = (caso.updated_at - caso.created_at).days
+                tiempos_resolucion_filtrados.append(tiempo)
+        
+        tiempo_promedio = round(sum(tiempos_resolucion_filtrados) / len(tiempos_resolucion_filtrados), 1) if tiempos_resolucion_filtrados else 0
+        
+        # Casos resueltos en el rango
+        casos_resueltos_rango = Solicitudes.objects.filter(
+            estado__in=['aprobado', 'rechazado'],
+            updated_at__gte=fecha_inicio_dt
+        ).count() if fecha_inicio_dt else casos_resueltos_semana
+        
+        total_resueltos_filtrado = Solicitudes.objects.filter(
+            estado__in=['aprobado', 'rechazado'],
+            created_at__gte=fecha_inicio_dt
+        ).count() if fecha_inicio_dt else total_resueltos
+        
+        total_aprobados_filtrado = Solicitudes.objects.filter(
+            estado='aprobado',
+            created_at__gte=fecha_inicio_dt
+        ).count() if fecha_inicio_dt else total_aprobados
+        
+        tasa_aprobacion_general = round((total_aprobados_filtrado / total_resueltos_filtrado * 100) if total_resueltos_filtrado > 0 else 0, 1)
+        
+        total_casos = total_casos_filtrado
+        total_ajustes = total_ajustes_filtrado
+        casos_resueltos_semana = casos_resueltos_rango
+    
+    # 13. --- Preparar Contexto ---
+    context = {
+        'rango_seleccionado': rango_seleccionado,
+        'rango_nombre': rango_nombre,
+        'estados_stats': estados_stats,
+        'roles_stats': roles_stats,
+        'ajustes_stats': ajustes_stats,
+        'ajustes_por_categoria': ajustes_por_categoria,
+        'casos_por_mes': casos_por_mes,
+        'casos_por_dia': casos_por_dia,
+        'carreras_stats': carreras_stats[:10],  # Top 10
+        'tiempo_promedio': tiempo_promedio,
+        'casos_resueltos_semana': casos_resueltos_semana,
+        'tasa_aprobacion_general': tasa_aprobacion_general,
+        'usuarios_activos_por_rol': usuarios_activos_por_rol,
+        'total_casos': total_casos,
+        'total_ajustes': total_ajustes,
+    }
+    
+    return render(request, 'SIAPE/estadisticas_asesor_pedagogico.html', context)
+
+
+def obtener_datos_estadisticas_por_rango(rango_seleccionado):
+    """
+    Función auxiliar para obtener datos de estadísticas según el rango de tiempo.
+    Reutiliza la lógica de estadisticas_asesor_pedagogico.
+    """
+    now = timezone.localtime(timezone.now())
+    today = now.date()
+    
+    fecha_inicio_dt = None
+    rango_nombre = ''
+    
+    if rango_seleccionado == 'mes':
+        fecha_inicio = today - timedelta(days=30)
+        fecha_inicio_dt = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+        rango_nombre = 'Último Mes'
+    elif rango_seleccionado == 'semestre':
+        fecha_inicio = today - timedelta(days=180)
+        fecha_inicio_dt = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+        rango_nombre = 'Último Semestre'
+    elif rango_seleccionado == 'año':
+        fecha_inicio = today.replace(month=1, day=1)
+        fecha_inicio_dt = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+        rango_nombre = 'Último Año'
+    else:  # historico
+        fecha_inicio_dt = None
+        rango_nombre = 'Histórico Completo'
+    
+    # Obtener datos filtrados
+    if rango_seleccionado != 'historico' and fecha_inicio_dt:
+        queryset_casos = Solicitudes.objects.filter(created_at__gte=fecha_inicio_dt)
+        queryset_ajustes = AjusteAsignado.objects.filter(created_at__gte=fecha_inicio_dt)
+    else:
+        queryset_casos = Solicitudes.objects.all()
+        queryset_ajustes = AjusteAsignado.objects.all()
+    
+    total_casos = queryset_casos.count()
+    total_ajustes = queryset_ajustes.count()
+    
+    # Casos por estado
+    casos_por_estado = {}
+    for estado_valor, estado_nombre in Solicitudes.ESTADO_CHOICES:
+        cantidad = queryset_casos.filter(estado=estado_valor).count()
+        casos_por_estado[estado_nombre] = cantidad
+    
+    # Roles stats
+    roles_stats = {
+        'encargado_inclusion': queryset_casos.filter(coordinadora_asignada__isnull=False).count(),
+        'coordinador_tecnico': queryset_casos.filter(coordinador_tecnico_pedagogico_asignado__isnull=False).count(),
+        'asesor_pedagogico': queryset_casos.filter(asesor_pedagogico_asignado__isnull=False).count(),
+        'sin_asignar': queryset_casos.filter(
+            coordinadora_asignada__isnull=True,
+            coordinador_tecnico_pedagogico_asignado__isnull=True,
+            asesor_pedagogico_asignado__isnull=True
+        ).count(),
+    }
+    
+    # Ajustes stats
+    ajustes_stats = {
+        'total': total_ajustes,
+        'aprobados': queryset_ajustes.filter(estado_aprobacion='aprobado').count(),
+        'rechazados': queryset_ajustes.filter(estado_aprobacion='rechazado').count(),
+        'pendientes': queryset_ajustes.filter(estado_aprobacion='pendiente').count(),
+    }
+    
+    # Tiempo promedio de resolución
+    casos_aprobados = queryset_casos.filter(estado='aprobado')
+    tiempos_resolucion = []
+    for caso in casos_aprobados:
+        if caso.created_at and caso.updated_at:
+            tiempo = (caso.updated_at - caso.created_at).days
+            tiempos_resolucion.append(tiempo)
+    tiempo_promedio = round(sum(tiempos_resolucion) / len(tiempos_resolucion), 1) if tiempos_resolucion else 0
+    
+    # Tasa de aprobación
+    total_resueltos = queryset_casos.filter(estado__in=['aprobado', 'rechazado']).count()
+    total_aprobados = queryset_casos.filter(estado='aprobado').count()
+    tasa_aprobacion = round((total_aprobados / total_resueltos * 100) if total_resueltos > 0 else 0, 1)
+    
+    # Casos resueltos en el rango
+    casos_resueltos = queryset_casos.filter(estado__in=['aprobado', 'rechazado']).count()
+    
+    # Ajustes por categoría
+    ajustes_por_categoria = {}
+    for categoria in CategoriasAjustes.objects.all():
+        total_cat = queryset_ajustes.filter(ajuste_razonable__categorias_ajustes=categoria).count()
+        aprobados_cat = queryset_ajustes.filter(
+            ajuste_razonable__categorias_ajustes=categoria,
+            estado_aprobacion='aprobado'
+        ).count()
+        ajustes_por_categoria[categoria.nombre_categoria] = {
+            'total': total_cat,
+            'aprobados': aprobados_cat,
+            'tasa_aprobacion': round((aprobados_cat / total_cat * 100) if total_cat > 0 else 0, 1)
+        }
+    
+    # Estadísticas por carrera (top 10)
+    carreras_stats = []
+    for carrera in Carreras.objects.all():
+        total_casos_carrera = queryset_casos.filter(estudiantes__carreras=carrera).count()
+        casos_aprobados_carrera = queryset_casos.filter(
+            estudiantes__carreras=carrera,
+            estado='aprobado'
+        ).count()
+        if total_casos_carrera > 0:
+            carreras_stats.append({
+                'nombre': carrera.nombre,
+                'total': total_casos_carrera,
+                'aprobados': casos_aprobados_carrera,
+                'tasa_aprobacion': round((casos_aprobados_carrera / total_casos_carrera * 100), 1)
+            })
+    carreras_stats.sort(key=lambda x: x['total'], reverse=True)
+    carreras_stats = carreras_stats[:10]
+    
+    # Usuarios activos por rol
+    usuarios_activos_por_rol = {}
+    for rol_nombre in [ROL_COORDINADORA, ROL_COORDINADOR_TECNICO_PEDAGOGICO, ROL_ASESOR, ROL_DIRECTOR]:
+        usuarios_rol = PerfilUsuario.objects.filter(rol__nombre_rol=rol_nombre).count()
+        usuarios_activos_por_rol[rol_nombre] = usuarios_rol
+    
+    # Casos por mes (últimos 12 meses o según rango)
+    casos_por_mes = []
+    if rango_seleccionado == 'mes':
+        # Último mes: por semana
+        for i in range(3, -1, -1):
+            semana_inicio = today - timedelta(days=(i * 7) + today.weekday())
+            semana_fin = semana_inicio + timedelta(days=6)
+            if semana_fin > today:
+                semana_fin = today
+            semana_inicio_dt = timezone.make_aware(datetime.combine(semana_inicio, datetime.min.time()))
+            semana_fin_dt = timezone.make_aware(datetime.combine(semana_fin, datetime.max.time()))
+            cantidad = queryset_casos.filter(created_at__range=(semana_inicio_dt, semana_fin_dt)).count()
+            casos_por_mes.append({
+                'periodo': f'Sem {i+1}',
+                'cantidad': cantidad
+            })
+    elif rango_seleccionado == 'semestre':
+        # Último semestre: por mes
+        for i in range(5, -1, -1):
+            fecha_mes = today - timedelta(days=30 * i)
+            mes_inicio = fecha_mes.replace(day=1)
+            if i == 0:
+                mes_fin = today
+            else:
+                siguiente_mes = mes_inicio + timedelta(days=32)
+                mes_fin = siguiente_mes.replace(day=1) - timedelta(days=1)
+            mes_inicio_dt = timezone.make_aware(datetime.combine(mes_inicio, datetime.min.time()))
+            mes_fin_dt = timezone.make_aware(datetime.combine(mes_fin, datetime.max.time()))
+            cantidad = queryset_casos.filter(created_at__range=(mes_inicio_dt, mes_fin_dt)).count()
+            casos_por_mes.append({
+                'periodo': mes_inicio.strftime('%b %Y'),
+                'cantidad': cantidad
+            })
+    else:
+        # Año o histórico: por mes (últimos 12 meses)
+        for i in range(11, -1, -1):
+            fecha_mes = today - timedelta(days=30 * i)
+            mes_inicio = fecha_mes.replace(day=1)
+            if i == 0:
+                mes_fin = today
+            else:
+                siguiente_mes = mes_inicio + timedelta(days=32)
+                mes_fin = siguiente_mes.replace(day=1) - timedelta(days=1)
+            mes_inicio_dt = timezone.make_aware(datetime.combine(mes_inicio, datetime.min.time()))
+            mes_fin_dt = timezone.make_aware(datetime.combine(mes_fin, datetime.max.time()))
+            cantidad = queryset_casos.filter(created_at__range=(mes_inicio_dt, mes_fin_dt)).count()
+            casos_por_mes.append({
+                'periodo': mes_inicio.strftime('%b %Y'),
+                'cantidad': cantidad
+            })
+    
+    return {
+        'rango_nombre': rango_nombre,
+        'total_casos': total_casos,
+        'total_ajustes': total_ajustes,
+        'casos_por_estado': casos_por_estado,
+        'roles_stats': roles_stats,
+        'ajustes_stats': ajustes_stats,
+        'tiempo_promedio': tiempo_promedio,
+        'tasa_aprobacion': tasa_aprobacion,
+        'casos_resueltos': casos_resueltos,
+        'ajustes_por_categoria': ajustes_por_categoria,
+        'carreras_stats': carreras_stats,
+        'usuarios_activos_por_rol': usuarios_activos_por_rol,
+        'casos_por_mes': casos_por_mes,
+        'fecha_inicio_dt': fecha_inicio_dt
+    }
+
+
+@login_required
+def generar_reporte_pdf_asesor(request):
+    """
+    Genera un reporte PDF con las estadísticas del Asesor Pedagógico según el rango de tiempo seleccionado.
+    """
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_ASESOR:
+            messages.error(request, 'No tienes permisos para acceder a esta página.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+    
+    rango_seleccionado = request.GET.get('rango', 'mes')
+    datos = obtener_datos_estadisticas_por_rango(rango_seleccionado)
+    
+    # Crear el objeto HttpResponse con el tipo de contenido PDF
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="reporte_estadisticas_{rango_seleccionado}_{timezone.now().strftime("%Y%m%d")}.pdf"'
+    
+    # Crear el objeto PDF usando BytesIO
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+    
+    # Contenedor para los elementos del PDF
+    elements = []
+    
+    # Estilos con colores rojo, blanco y negro
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=20,
+        textColor=colors.HexColor('#dc3545'),  # Rojo
+        spaceAfter=20,
+        alignment=1,  # Centrado
+        fontName='Helvetica-Bold'
+    )
+    
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=14,
+        textColor=colors.HexColor('#000000'),  # Negro
+        spaceAfter=12,
+        fontName='Helvetica-Bold'
+    )
+    
+    # Colores del esquema
+    color_rojo = colors.HexColor('#dc3545')
+    color_negro = colors.HexColor('#000000')
+    color_blanco = colors.white
+    color_gris_claro = colors.HexColor('#f5f5f5')
+    
+    # Título
+    elements.append(Paragraph('Reporte de Estadísticas SIAPE', title_style))
+    elements.append(Paragraph(f'Rango de Tiempo: {datos["rango_nombre"]}', heading_style))
+    elements.append(Paragraph(f'Fecha de Generación: {timezone.now().strftime("%d/%m/%Y %H:%M")}', styles['Normal']))
+    elements.append(Spacer(1, 0.4*inch))
+    
+    # KPIs Principales
+    elements.append(Paragraph('Indicadores Principales', heading_style))
+    kpi_data = [
+        ['Indicador', 'Valor'],
+        ['Total Casos', str(datos['total_casos'])],
+        ['Total Ajustes', str(datos['total_ajustes'])],
+        ['Ajustes Aprobados', str(datos['ajustes_stats']['aprobados'])],
+        ['Ajustes Rechazados', str(datos['ajustes_stats']['rechazados'])],
+        ['Ajustes Pendientes', str(datos['ajustes_stats']['pendientes'])],
+        ['Casos Resueltos', str(datos['casos_resueltos'])],
+        ['Tasa de Aprobación', f"{datos['tasa_aprobacion']}%"],
+        ['Tiempo Promedio Resolución', f"{datos['tiempo_promedio']} días"],
+    ]
+    kpi_table = Table(kpi_data, colWidths=[4*inch, 2*inch])
+    kpi_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+        ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('TOPPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+        ('GRID', (0, 0), (-1, -1), 1, color_negro),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+    ]))
+    elements.append(kpi_table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Casos por Estado
+    elements.append(Paragraph('Casos por Estado', heading_style))
+    estado_data = [['Estado', 'Cantidad']]
+    for estado, cantidad in datos['casos_por_estado'].items():
+        estado_data.append([estado, str(cantidad)])
+    
+    estado_table = Table(estado_data, colWidths=[4*inch, 2*inch])
+    estado_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+        ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('TOPPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+        ('GRID', (0, 0), (-1, -1), 1, color_negro),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+    ]))
+    elements.append(estado_table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Casos por Rol
+    elements.append(Paragraph('Casos Asignados por Rol', heading_style))
+    rol_data = [
+        ['Rol', 'Cantidad'],
+        ['Encargado de Inclusión', str(datos['roles_stats']['encargado_inclusion'])],
+        ['Coordinador Técnico Pedagógico', str(datos['roles_stats']['coordinador_tecnico'])],
+        ['Asesor Pedagógico', str(datos['roles_stats']['asesor_pedagogico'])],
+        ['Sin Asignar', str(datos['roles_stats']['sin_asignar'])],
+    ]
+    rol_table = Table(rol_data, colWidths=[4*inch, 2*inch])
+    rol_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+        ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('TOPPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+        ('GRID', (0, 0), (-1, -1), 1, color_negro),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+    ]))
+    elements.append(rol_table)
+    elements.append(PageBreak())
+    
+    # Ajustes por Categoría
+    if datos['ajustes_por_categoria']:
+        elements.append(Paragraph('Ajustes por Categoría', heading_style))
+        categoria_data = [['Categoría', 'Total', 'Aprobados', 'Tasa Aprobación (%)']]
+        for categoria, stats in datos['ajustes_por_categoria'].items():
+            categoria_data.append([
+                categoria,
+                str(stats['total']),
+                str(stats['aprobados']),
+                f"{stats['tasa_aprobacion']}%"
+            ])
+        
+        categoria_table = Table(categoria_data, colWidths=[2.5*inch, 1.2*inch, 1.2*inch, 1.5*inch])
+        categoria_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+            ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('ALIGN', (1, 1), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('TOPPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+            ('GRID', (0, 0), (-1, -1), 1, color_negro),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+        ]))
+        elements.append(categoria_table)
+        elements.append(Spacer(1, 0.3*inch))
+    
+    # Estadísticas por Carrera (Top 10)
+    if datos['carreras_stats']:
+        elements.append(Paragraph('Estadísticas por Carrera (Top 10)', heading_style))
+        carrera_data = [['Carrera', 'Total Casos', 'Aprobados', 'Tasa Aprobación (%)']]
+        for carrera in datos['carreras_stats']:
+            carrera_data.append([
+                carrera['nombre'][:40],  # Limitar longitud
+                str(carrera['total']),
+                str(carrera['aprobados']),
+                f"{carrera['tasa_aprobacion']}%"
+            ])
+        
+        carrera_table = Table(carrera_data, colWidths=[3*inch, 1.2*inch, 1.2*inch, 1.5*inch])
+        carrera_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+            ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('ALIGN', (1, 1), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('FONTSIZE', (0, 1), (0, -1), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('TOPPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+            ('GRID', (0, 0), (-1, -1), 1, color_negro),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+        ]))
+        elements.append(carrera_table)
+        elements.append(Spacer(1, 0.3*inch))
+    
+    # Usuarios Activos por Rol
+    elements.append(Paragraph('Usuarios Activos por Rol', heading_style))
+    usuarios_data = [['Rol', 'Cantidad de Usuarios']]
+    for rol, cantidad in datos['usuarios_activos_por_rol'].items():
+        usuarios_data.append([rol, str(cantidad)])
+    
+    usuarios_table = Table(usuarios_data, colWidths=[4*inch, 2*inch])
+    usuarios_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+        ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('TOPPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+        ('GRID', (0, 0), (-1, -1), 1, color_negro),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+    ]))
+    elements.append(usuarios_table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Casos por Período
+    if datos['casos_por_mes']:
+        elements.append(Paragraph('Casos por Período', heading_style))
+        periodo_data = [['Período', 'Cantidad de Casos']]
+        for periodo in datos['casos_por_mes']:
+            periodo_data.append([periodo['periodo'], str(periodo['cantidad'])])
+        
+        periodo_table = Table(periodo_data, colWidths=[3*inch, 3*inch])
+        periodo_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+            ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('ALIGN', (1, 1), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('TOPPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+            ('GRID', (0, 0), (-1, -1), 1, color_negro),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+        ]))
+        elements.append(periodo_table)
+    
+    # Construir el PDF
+    doc.build(elements)
+    
+    # Obtener el valor del BytesIO buffer y escribirlo en la respuesta
+    pdf = buffer.getvalue()
+    buffer.close()
+    response.write(pdf)
+    
+    return response
+
+
+@login_required
+def generar_reporte_excel_asesor(request):
+    """
+    Genera un archivo Excel con los datos según el rango de tiempo seleccionado.
+    """
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+    
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_ASESOR:
+            # Si no tiene permisos, devolver un error HTTP en lugar de redirect
+            return HttpResponse('No tienes permisos para acceder a esta página.', status=403)
+    except AttributeError:
+        if not request.user.is_superuser:
+            return HttpResponse('No tienes permisos para acceder a esta página.', status=403)
+    
+    try:
+        rango_seleccionado = request.GET.get('rango', 'mes')
+        datos = obtener_datos_estadisticas_por_rango(rango_seleccionado)
+    except Exception as e:
+        # Si hay un error al obtener los datos, devolver un error HTTP
+        return HttpResponse(f'Error al generar el reporte: {str(e)}', status=500)
+    
+    # Crear libro de Excel
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Reporte Estadísticas"
+    
+    # Estilos
+    header_fill = PatternFill(start_color="CC0000", end_color="CC0000", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF", size=12)
+    title_font = Font(bold=True, size=14)
+    
+    row = 1
+    
+    # Título
+    ws.merge_cells(f'A{row}:D{row}')
+    cell = ws[f'A{row}']
+    cell.value = f"Reporte de Estadísticas - {datos['rango_nombre']}"
+    cell.font = title_font
+    cell.alignment = Alignment(horizontal='center')
+    row += 2
+    
+    # KPIs
+    ws.merge_cells(f'A{row}:D{row}')
+    ws[f'A{row}'].value = "Indicadores Principales (KPIs)"
+    ws[f'A{row}'].font = title_font
+    row += 1
+    
+    # Encabezados de KPIs
+    headers = ['KPI', 'Valor', 'Rango de Tiempo']
+    for col, header in enumerate(headers, start=1):
+        cell = ws.cell(row=row, column=col)
+        cell.value = header
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center')
+    row += 1
+    
+    # Datos de KPIs
+    kpis_data = [
+        ['Total Casos', datos['total_casos']],
+        ['Total Ajustes', datos['total_ajustes']],
+        ['Ajustes Aprobados', datos['ajustes_stats']['aprobados']],
+        ['Ajustes Rechazados', datos['ajustes_stats']['rechazados']],
+        ['Ajustes Pendientes', datos['ajustes_stats']['pendientes']],
+    ]
+    
+    for kpi, valor in kpis_data:
+        ws.cell(row=row, column=1).value = kpi
+        ws.cell(row=row, column=2).value = valor
+        ws.cell(row=row, column=3).value = datos['rango_nombre']
+        row += 1
+    
+    row += 1
+    
+    # Casos por Estado
+    ws.merge_cells(f'A{row}:C{row}')
+    ws[f'A{row}'].value = "Casos por Estado"
+    ws[f'A{row}'].font = title_font
+    row += 1
+    
+    headers = ['Estado', 'Cantidad', 'Rango de Tiempo']
+    for col, header in enumerate(headers, start=1):
+        cell = ws.cell(row=row, column=col)
+        cell.value = header
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center')
+    row += 1
+    
+    for estado, cantidad in datos['casos_por_estado'].items():
+        ws.cell(row=row, column=1).value = estado
+        ws.cell(row=row, column=2).value = cantidad
+        ws.cell(row=row, column=3).value = datos['rango_nombre']
+        row += 1
+    
+    row += 1
+    
+    # Casos por Rol
+    ws.merge_cells(f'A{row}:C{row}')
+    ws[f'A{row}'].value = "Casos por Rol"
+    ws[f'A{row}'].font = title_font
+    row += 1
+    
+    headers = ['Rol', 'Cantidad', 'Rango de Tiempo']
+    for col, header in enumerate(headers, start=1):
+        cell = ws.cell(row=row, column=col)
+        cell.value = header
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center')
+    row += 1
+    
+    roles_data = [
+        ['Encargado de Inclusión', datos['roles_stats']['encargado_inclusion']],
+        ['Coordinador Técnico Pedagógico', datos['roles_stats']['coordinador_tecnico']],
+        ['Asesor Pedagógico', datos['roles_stats']['asesor_pedagogico']],
+    ]
+    
+    for rol, cantidad in roles_data:
+        ws.cell(row=row, column=1).value = rol
+        ws.cell(row=row, column=2).value = cantidad
+        ws.cell(row=row, column=3).value = datos['rango_nombre']
+        row += 1
+    
+    row += 1
+    
+    # Detalle de Casos
+    ws.merge_cells(f'A{row}:F{row}')
+    ws[f'A{row}'].value = "Detalle de Casos"
+    ws[f'A{row}'].font = title_font
+    row += 1
+    
+    headers = ['ID', 'Estudiante', 'Carrera', 'Estado', 'Fecha Creación', 'Asunto']
+    for col, header in enumerate(headers, start=1):
+        cell = ws.cell(row=row, column=col)
+        cell.value = header
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center')
+    row += 1
+    
+    # Agregar datos detallados de casos
+    if datos['fecha_inicio_dt']:
+        casos = Solicitudes.objects.filter(created_at__gte=datos['fecha_inicio_dt']).select_related('estudiantes', 'estudiantes__carreras')[:1000]
+    else:
+        casos = Solicitudes.objects.all().select_related('estudiantes', 'estudiantes__carreras')[:1000]
+    
+    for caso in casos:
+        estudiante_nombre = f"{caso.estudiantes.nombres} {caso.estudiantes.apellidos}" if caso.estudiantes else "N/A"
+        carrera_nombre = caso.estudiantes.carreras.nombre if caso.estudiantes and caso.estudiantes.carreras else "N/A"
+        fecha_creacion = timezone.localtime(caso.created_at).strftime('%Y-%m-%d %H:%M:%S') if caso.created_at else "N/A"
+        
+        ws.cell(row=row, column=1).value = caso.id
+        ws.cell(row=row, column=2).value = estudiante_nombre
+        ws.cell(row=row, column=3).value = carrera_nombre
+        ws.cell(row=row, column=4).value = caso.get_estado_display()
+        ws.cell(row=row, column=5).value = fecha_creacion
+        ws.cell(row=row, column=6).value = caso.asunto[:50] if caso.asunto else "N/A"
+        row += 1
+    
+    # Ajustar ancho de columnas
+    from openpyxl.utils import get_column_letter
+    for col_idx, col in enumerate(ws.columns, start=1):
+        max_length = 0
+        column_letter = get_column_letter(col_idx)
+        for cell in col:
+            try:
+                # Saltar celdas fusionadas que no tienen valor directamente
+                if hasattr(cell, 'value') and cell.value is not None:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 50)
+        ws.column_dimensions[column_letter].width = adjusted_width
+    
+    # Crear respuesta HTTP usando BytesIO para evitar problemas
+    try:
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        response = HttpResponse(
+            output.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="reporte_excel_{rango_seleccionado}_{timezone.now().strftime("%Y%m%d")}.xlsx"'
+        
+        output.close()
+        return response
+    except Exception as e:
+        return HttpResponse(f'Error al generar el archivo Excel: {str(e)}', status=500)
+
 
 # ----------------------------------------------------
 #                VISTA DIRECTOR DE CARRERA
@@ -3659,7 +5121,7 @@ def estudiantes_por_carrera_director(request, carrera_id):
 def estadisticas_director(request):
     """
     Panel de Estadísticas para el Director de Carrera.
-    Muestra gráficos sobre el estado y tipo de ajustes.
+    Muestra gráficos sobre el estado y tipo de ajustes con filtros de tiempo.
     """
     
     # 1. --- Verificación de Permisos ---
@@ -3671,45 +5133,137 @@ def estadisticas_director(request):
     except AttributeError:
         return redirect('home')
 
-    # 2. --- Base Query ---
-    # Obtenemos todos los ajustes asignados a estudiantes de las carreras de este director
+    # 2. --- Obtener Rango de Tiempo Seleccionado ---
+    rango_seleccionado = request.GET.get('rango', 'mes')  # mes, semestre, año, historico
+    
+    # 3. --- Configuración de Fechas según Rango ---
+    now = timezone.localtime(timezone.now())
+    today = now.date()
+    
+    fecha_inicio_dt = None
+    fecha_fin_dt = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+    
+    if rango_seleccionado == 'mes':
+        fecha_inicio = today - timedelta(days=30)
+        fecha_inicio_dt = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+        rango_nombre = 'Último Mes'
+    elif rango_seleccionado == 'semestre':
+        fecha_inicio = today - timedelta(days=180)
+        fecha_inicio_dt = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+        rango_nombre = 'Último Semestre'
+    elif rango_seleccionado == 'año':
+        fecha_inicio = today.replace(month=1, day=1)
+        fecha_inicio_dt = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+        rango_nombre = 'Último Año'
+    else:  # historico
+        fecha_inicio_dt = None
+        rango_nombre = 'Histórico Completo'
+
+    # 4. --- Base Query ---
     carreras_del_director = Carreras.objects.filter(director=perfil_director)
+    
+    # Si no tiene carreras asignadas, retornar con datos vacíos
+    if not carreras_del_director.exists():
+        context = {
+            'nombre_usuario': request.user.first_name,
+            'rango_seleccionado': rango_seleccionado,
+            'rango_nombre': rango_nombre,
+            'total_casos': 0,
+            'casos_aprobados': 0,
+            'casos_pendientes': 0,
+            'total_ajustes': 0,
+            'ajustes_aprobados': 0,
+            'ajustes_rechazados': 0,
+            'ajustes_pendientes': 0,
+            'tasa_aprobacion': 0,
+            'tasa_aprobacion_ajustes': 0,
+            'casos_nuevos_semana': 0,
+            'pie_chart_data_json': json.dumps({'labels': [], 'datasets': [{'data': []}]}),
+            'bar_chart_tipos_json': json.dumps({'labels': [], 'datasets': [{'data': []}]}),
+            'bar_chart_secciones_json': json.dumps({'labels': [], 'datasets': [{'data': []}]}),
+            'chart_tendencia_json': json.dumps({'labels': [], 'datasets': [{'data': []}]}),
+            'carreras_stats': [],
+            'estados_stats': [],
+        }
+        return render(request, 'SIAPE/estadisticas_director.html', context)
+    
+    # Obtener IDs de las carreras para hacer el filtro más eficiente
+    carreras_ids = carreras_del_director.values_list('id', flat=True)
+    
+    # Base de solicitudes de sus carreras - usando IDs para mejor rendimiento
+    solicitudes_base = Solicitudes.objects.filter(
+        estudiantes__carreras__id__in=carreras_ids
+    ).select_related(
+        'estudiantes',
+        'estudiantes__carreras'
+    ).distinct()
+    
+    # Base de ajustes de sus carreras
     ajustes_base = AjusteAsignado.objects.filter(
-        solicitudes__estudiantes__carreras__in=carreras_del_director
-    )
+        solicitudes__estudiantes__carreras__id__in=carreras_ids
+    ).select_related(
+        'solicitudes',
+        'solicitudes__estudiantes',
+        'solicitudes__estudiantes__carreras'
+    ).distinct()
+    
+    # Aplicar filtro de tiempo (si está definido)
+    if fecha_inicio_dt:
+        solicitudes_base = solicitudes_base.filter(created_at__gte=fecha_inicio_dt, created_at__lte=fecha_fin_dt)
+        ajustes_base = ajustes_base.filter(solicitudes__created_at__gte=fecha_inicio_dt, solicitudes__created_at__lte=fecha_fin_dt)
 
-    # 3. --- Gráfico 1: Estado de Ajustes (Pie Chart) ---
-    # Esto responde a tu petición de "aprobados/rechazados/pendientes"
-    estado_ajustes = ajustes_base.values('estado_aprobacion').annotate(
-        total=Count('id')
-    ).order_by('estado_aprobacion')
+    # 5. --- KPIs ---
+    total_casos = solicitudes_base.count()
+    casos_aprobados = solicitudes_base.filter(estado='aprobado').count()
+    casos_pendientes = solicitudes_base.exclude(estado__in=['aprobado', 'rechazado']).count()
+    total_ajustes = ajustes_base.count()
+    ajustes_aprobados = ajustes_base.filter(estado_aprobacion='aprobado').count()
+    ajustes_rechazados = ajustes_base.filter(estado_aprobacion='rechazado').count()
+    ajustes_pendientes = ajustes_base.filter(estado_aprobacion='pendiente').count()
+    
+    tasa_aprobacion = round((casos_aprobados / total_casos * 100) if total_casos > 0 else 0, 1)
+    tasa_aprobacion_ajustes = round((ajustes_aprobados / total_ajustes * 100) if total_ajustes > 0 else 0, 1)
+    
+    # Casos nuevos esta semana (sin filtro de tiempo, siempre de los últimos 7 días)
+    semana_pasada = timezone.now() - timedelta(days=7)
+    casos_nuevos_semana = Solicitudes.objects.filter(
+        estudiantes__carreras__id__in=carreras_ids,
+        created_at__gte=semana_pasada
+    ).distinct().count()
 
-    # Formatear para Chart.js
-    pie_labels = [d['estado_aprobacion'].capitalize() for d in estado_ajustes]
-    pie_data = [d['total'] for d in estado_ajustes]
+    # 6. --- Gráfico 1: Estado de Ajustes (Doughnut Chart) ---
+    estado_ajustes = ajustes_base.values('estado_aprobacion').annotate(total=Count('id')).order_by('estado_aprobacion')
+    
+    pie_labels = []
+    pie_data = []
+    pie_colors = []
+    
+    for d in estado_ajustes:
+        estado = d['estado_aprobacion']
+        pie_labels.append(estado.capitalize())
+        pie_data.append(d['total'])
+        if estado == 'aprobado':
+            pie_colors.append('rgba(40, 167, 69, 0.7)')  # Verde
+        elif estado == 'rechazado':
+            pie_colors.append('rgba(220, 53, 69, 0.7)')  # Rojo
+        else:
+            pie_colors.append('rgba(253, 126, 20, 0.7)')  # Naranja
     
     pie_chart_data = {
         'labels': pie_labels,
         'datasets': [{
             'data': pie_data,
-            'backgroundColor': [
-                'rgba(40, 167, 69, 0.7)',  # Aprobado (Verde)
-                'rgba(253, 126, 20, 0.7)', # Pendiente (Naranja)
-                'rgba(220, 53, 69, 0.7)'   # Rechazado (Rojo)
-            ],
+            'backgroundColor': pie_colors,
             'borderColor': '#ffffff',
         }]
     }
 
-    # 4. --- Gráfico 2: Tipos de Apoyo (Idea Adicional) ---
-    # Muestra qué categorías de apoyo son más comunes.
+    # 7. --- Gráfico 2: Tipos de Apoyo por Categoría ---
     tipos_ajustes = ajustes_base.filter(estado_aprobacion='aprobado').values(
         'ajuste_razonable__categorias_ajustes__nombre_categoria'
-    ).annotate(
-        total=Count('id')
-    ).order_by('-total') # De más común a menos común
+    ).annotate(total=Count('id')).order_by('-total')[:10]  # Top 10
 
-    bar_labels_tipos = [d['ajuste_razonable__categorias_ajustes__nombre_categoria'] for d in tipos_ajustes]
+    bar_labels_tipos = [d['ajuste_razonable__categorias_ajustes__nombre_categoria'] or 'Sin categoría' for d in tipos_ajustes]
     bar_data_tipos = [d['total'] for d in tipos_ajustes]
 
     bar_chart_tipos = {
@@ -3717,43 +5271,1206 @@ def estadisticas_director(request):
         'datasets': [{
             'label': 'Ajustes Aprobados por Categoría',
             'data': bar_data_tipos,
-            'backgroundColor': 'rgba(0, 123, 255, 0.7)', # Azul
+            'backgroundColor': 'rgba(211, 47, 47, 0.7)',  # Rojo INACAP
         }]
     }
 
-    # 5. --- Gráfico 3: Eficiencia/Concentración por Sección (Tu petición) ---
-    # Muestra las 5 secciones (asignaturas) con más ajustes aprobados
-    secciones_data = AjusteAsignado.objects.filter(
-        solicitudes__estudiantes__carreras__in=carreras_del_director,
-        estado_aprobacion='aprobado'
-    ).values(
-        'solicitudes__asignaturas_solicitadas__nombre', # Agrupa por nombre de asignatura
-        'solicitudes__asignaturas_solicitadas__seccion' # y por sección
-    ).annotate(
-        total=Count('id')
-    ).order_by('-total')[:5] # Top 5
+    # 8. --- Gráfico 3: Secciones con Más Ajustes (Top 5) ---
+    secciones_data = ajustes_base.filter(estado_aprobacion='aprobado').values(
+        'solicitudes__asignaturas_solicitadas__nombre',
+        'solicitudes__asignaturas_solicitadas__seccion'
+    ).annotate(total=Count('id')).order_by('-total')[:5]
 
-    bar_labels_secciones = [f"{d['solicitudes__asignaturas_solicitadas__nombre']} ({d['solicitudes__asignaturas_solicitadas__seccion']})" for d in secciones_data]
-    bar_data_secciones = [d['total'] for d in secciones_data]
+    bar_labels_secciones = []
+    bar_data_secciones = []
+    for d in secciones_data:
+        nombre = d['solicitudes__asignaturas_solicitadas__nombre'] or 'Sin asignatura'
+        seccion = d['solicitudes__asignaturas_solicitadas__seccion'] or ''
+        bar_labels_secciones.append(f"{nombre} ({seccion})" if seccion else nombre)
+        bar_data_secciones.append(d['total'])
 
     bar_chart_secciones = {
         'labels': bar_labels_secciones,
         'datasets': [{
             'label': 'Ajustes Aprobados por Sección (Top 5)',
             'data': bar_data_secciones,
-            'backgroundColor': 'rgba(204, 0, 0, 0.7)', # Rojo INACAP
+            'backgroundColor': 'rgba(211, 47, 47, 0.7)',  # Rojo INACAP
         }]
     }
 
+    # 9. --- Gráfico 4: Tendencia de Casos por Tiempo ---
+    casos_por_tiempo = []
+    if rango_seleccionado == 'mes':
+        # Por día
+        for i in range(29, -1, -1):
+            fecha_dia = today - timedelta(days=i)
+            dia_inicio_dt = timezone.make_aware(datetime.combine(fecha_dia, datetime.min.time()))
+            dia_fin_dt = timezone.make_aware(datetime.combine(fecha_dia, datetime.max.time()))
+            # Usar la base sin filtro de tiempo para cada día específico
+            cantidad = Solicitudes.objects.filter(
+                estudiantes__carreras__id__in=carreras_ids,
+                created_at__range=(dia_inicio_dt, dia_fin_dt)
+            ).distinct().count()
+            casos_por_tiempo.append({'fecha': fecha_dia.strftime('%d/%m'), 'cantidad': cantidad})
+    elif rango_seleccionado == 'semestre':
+        # Por mes
+        for i in range(5, -1, -1):
+            fecha_mes = today - timedelta(days=30 * i)
+            mes_inicio = fecha_mes.replace(day=1)
+            if i == 0:
+                mes_fin = today
+            else:
+                siguiente_mes = mes_inicio + timedelta(days=32)
+                mes_fin = siguiente_mes.replace(day=1) - timedelta(days=1)
+            mes_inicio_dt = timezone.make_aware(datetime.combine(mes_inicio, datetime.min.time()))
+            mes_fin_dt = timezone.make_aware(datetime.combine(mes_fin, datetime.max.time()))
+            cantidad = Solicitudes.objects.filter(
+                estudiantes__carreras__id__in=carreras_ids,
+                created_at__range=(mes_inicio_dt, mes_fin_dt)
+            ).distinct().count()
+            casos_por_tiempo.append({'fecha': mes_inicio.strftime('%b %Y'), 'cantidad': cantidad})
+    elif rango_seleccionado == 'año':
+        # Por mes
+        for i in range(11, -1, -1):
+            fecha_mes = today - timedelta(days=30 * i)
+            mes_inicio = fecha_mes.replace(day=1)
+            if i == 0:
+                mes_fin = today
+            else:
+                siguiente_mes = mes_inicio + timedelta(days=32)
+                mes_fin = siguiente_mes.replace(day=1) - timedelta(days=1)
+            mes_inicio_dt = timezone.make_aware(datetime.combine(mes_inicio, datetime.min.time()))
+            mes_fin_dt = timezone.make_aware(datetime.combine(mes_fin, datetime.max.time()))
+            cantidad = Solicitudes.objects.filter(
+                estudiantes__carreras__id__in=carreras_ids,
+                created_at__range=(mes_inicio_dt, mes_fin_dt)
+            ).distinct().count()
+            casos_por_tiempo.append({'fecha': mes_inicio.strftime('%b %Y'), 'cantidad': cantidad})
+    else:  # historico
+        # Por año
+        primer_caso = solicitudes_base.order_by('created_at').first()
+        if primer_caso:
+            año_inicio = primer_caso.created_at.year
+            año_actual = today.year
+            for año in range(año_inicio, año_actual + 1):
+                año_inicio_dt = timezone.make_aware(datetime(año, 1, 1))
+                if año == año_actual:
+                    año_fin_dt = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+                else:
+                    año_fin_dt = timezone.make_aware(datetime(año + 1, 1, 1)) - timedelta(seconds=1)
+                cantidad = Solicitudes.objects.filter(
+                    estudiantes__carreras__id__in=carreras_ids,
+                    created_at__range=(año_inicio_dt, año_fin_dt)
+                ).distinct().count()
+                casos_por_tiempo.append({'fecha': str(año), 'cantidad': cantidad})
+
+    chart_tendencia_data = {
+        'labels': [d['fecha'] for d in casos_por_tiempo],
+        'datasets': [{
+            'label': 'Casos',
+            'data': [d['cantidad'] for d in casos_por_tiempo],
+            'borderColor': 'rgba(211, 47, 47, 1)',
+            'backgroundColor': 'rgba(211, 47, 47, 0.1)',
+            'tension': 0.4
+        }]
+    }
+
+    # 10. --- Estadísticas por Carrera ---
+    carreras_stats = []
+    for carrera in carreras_del_director:
+        casos_carrera = Solicitudes.objects.filter(
+            estudiantes__carreras=carrera
+        )
+        # Aplicar filtro de tiempo si existe
+        if fecha_inicio_dt:
+            casos_carrera = casos_carrera.filter(created_at__gte=fecha_inicio_dt, created_at__lte=fecha_fin_dt)
+        total_carrera = casos_carrera.distinct().count()
+        aprobados_carrera = casos_carrera.filter(estado='aprobado').distinct().count()
+        if total_carrera > 0:
+            carreras_stats.append({
+                'nombre': carrera.nombre,
+                'total': total_carrera,
+                'aprobados': aprobados_carrera,
+                'tasa_aprobacion': round((aprobados_carrera / total_carrera * 100), 1)
+            })
+    
+    carreras_stats.sort(key=lambda x: x['total'], reverse=True)
+
+    # 11. --- Estadísticas por Estado ---
+    estados_stats = []
+    total_casos_estados = solicitudes_base.count()
+    for estado_valor, estado_nombre in Solicitudes.ESTADO_CHOICES:
+        cantidad = solicitudes_base.filter(estado=estado_valor).count()
+        porcentaje = round((cantidad / total_casos_estados * 100) if total_casos_estados > 0 else 0, 1)
+        estados_stats.append({
+            'valor': estado_valor,
+            'nombre': estado_nombre,
+            'cantidad': cantidad,
+            'porcentaje': porcentaje
+        })
+
     context = {
         'nombre_usuario': request.user.first_name,
-        # Convertimos los datos a JSON para que JavaScript los pueda leer
+        'rango_seleccionado': rango_seleccionado,
+        'rango_nombre': rango_nombre,
+        # KPIs
+        'total_casos': total_casos,
+        'casos_aprobados': casos_aprobados,
+        'casos_pendientes': casos_pendientes,
+        'total_ajustes': total_ajustes,
+        'ajustes_aprobados': ajustes_aprobados,
+        'ajustes_rechazados': ajustes_rechazados,
+        'ajustes_pendientes': ajustes_pendientes,
+        'tasa_aprobacion': tasa_aprobacion,
+        'tasa_aprobacion_ajustes': tasa_aprobacion_ajustes,
+        'casos_nuevos_semana': casos_nuevos_semana,
+        # Gráficos
         'pie_chart_data_json': json.dumps(pie_chart_data),
         'bar_chart_tipos_json': json.dumps(bar_chart_tipos),
         'bar_chart_secciones_json': json.dumps(bar_chart_secciones),
+        'chart_tendencia_json': json.dumps(chart_tendencia_data),
+        # Estadísticas
+        'carreras_stats': carreras_stats,
+        'estados_stats': estados_stats,
     }
     
     return render(request, 'SIAPE/estadisticas_director.html', context)
+
+
+@login_required
+def generar_reporte_pdf_director(request):
+    """
+    Genera un reporte PDF con las estadísticas del Director de Carrera según el rango de tiempo seleccionado.
+    """
+    try:
+        perfil_director = request.user.perfil
+        if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para esta acción.')
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+    
+    rango_seleccionado = request.GET.get('rango', 'mes')
+    
+    # Obtener datos usando la misma lógica que estadisticas_director
+    now = timezone.localtime(timezone.now())
+    today = now.date()
+    
+    fecha_inicio_dt = None
+    fecha_fin_dt = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+    
+    if rango_seleccionado == 'mes':
+        fecha_inicio = today - timedelta(days=30)
+        fecha_inicio_dt = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+        rango_nombre = 'Último Mes'
+    elif rango_seleccionado == 'semestre':
+        fecha_inicio = today - timedelta(days=180)
+        fecha_inicio_dt = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+        rango_nombre = 'Último Semestre'
+    elif rango_seleccionado == 'año':
+        fecha_inicio = today.replace(month=1, day=1)
+        fecha_inicio_dt = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+        rango_nombre = 'Último Año'
+    else:
+        fecha_inicio_dt = None
+        rango_nombre = 'Histórico Completo'
+    
+    carreras_del_director = Carreras.objects.filter(director=perfil_director)
+    carreras_ids = carreras_del_director.values_list('id', flat=True)
+    
+    solicitudes_base = Solicitudes.objects.filter(estudiantes__carreras__id__in=carreras_ids).distinct()
+    ajustes_base = AjusteAsignado.objects.filter(solicitudes__estudiantes__carreras__id__in=carreras_ids).distinct()
+    
+    if fecha_inicio_dt:
+        solicitudes_base = solicitudes_base.filter(created_at__gte=fecha_inicio_dt, created_at__lte=fecha_fin_dt)
+        ajustes_base = ajustes_base.filter(solicitudes__created_at__gte=fecha_inicio_dt, solicitudes__created_at__lte=fecha_fin_dt)
+    
+    # Calcular estadísticas básicas
+    total_casos = solicitudes_base.count()
+    casos_aprobados = solicitudes_base.filter(estado='aprobado').count()
+    total_ajustes = ajustes_base.count()
+    ajustes_aprobados = ajustes_base.filter(estado_aprobacion='aprobado').count()
+    ajustes_rechazados = ajustes_base.filter(estado_aprobacion='rechazado').count()
+    ajustes_pendientes = ajustes_base.filter(estado_aprobacion='pendiente').count()
+    tasa_aprobacion = round((casos_aprobados / total_casos * 100) if total_casos > 0 else 0, 1)
+    
+    # Estadísticas de Asignaturas
+    asignaturas_base = Asignaturas.objects.filter(carreras__id__in=carreras_ids)
+    total_asignaturas = asignaturas_base.count()
+    asignaturas_activas = asignaturas_base.filter(is_active=True).count()
+    asignaturas_inactivas = asignaturas_base.filter(is_active=False).count()
+    
+    # Asignaturas por semestre
+    asignaturas_por_semestre = asignaturas_base.values('semestre', 'anio').annotate(
+        total=Count('id')
+    ).order_by('-anio', 'semestre')
+    
+    # Estadísticas de Estudiantes
+    estudiantes_base = Estudiantes.objects.filter(carreras__id__in=carreras_ids)
+    total_estudiantes = estudiantes_base.count()
+    estudiantes_con_ajustes = estudiantes_base.filter(
+        solicitudes__in=solicitudes_base
+    ).distinct().count()
+    
+    # Estudiantes por semestre
+    estudiantes_por_semestre = estudiantes_base.values('semestre_actual').annotate(
+        total=Count('id')
+    ).order_by('semestre_actual')
+    
+    # Estadísticas de Docentes
+    # Obtener docentes que tienen asignaturas en las carreras del director
+    docentes_ids = asignaturas_base.values_list('docente_id', flat=True).distinct()
+    docentes_base = PerfilUsuario.objects.filter(id__in=docentes_ids, rol__nombre_rol='Docente')
+    total_docentes = docentes_base.count()
+    
+    # Docentes que comentaron ajustes (más confiable)
+    docentes_que_comentaron = ajustes_base.filter(
+        docente_comentador__isnull=False,
+        docente_comentador__in=docentes_base
+    ).values('docente_comentador__usuario__first_name',
+             'docente_comentador__usuario__last_name').annotate(
+        total=Count('id')
+    ).order_by('-total')
+    
+    # Docentes por asignatura
+    docentes_por_asignatura = asignaturas_base.values(
+        'docente__usuario__first_name',
+        'docente__usuario__last_name'
+    ).annotate(
+        total_asignaturas=Count('id')
+    ).order_by('-total_asignaturas')
+    
+    # Docentes con ajustes aprobados/rechazados (a través de asignaturas relacionadas)
+    # Obtener ajustes que tienen asignaturas relacionadas
+    docentes_ajustes_aprobados = {}
+    docentes_ajustes_rechazados = {}
+    
+    # Obtener ajustes aprobados/rechazados con sus solicitudes y asignaturas
+    ajustes_aprobados_con_asignaturas = ajustes_base.filter(
+        estado_aprobacion='aprobado',
+        solicitudes__asignaturas_solicitadas__docente__in=docentes_base
+    ).select_related('solicitudes').prefetch_related('solicitudes__asignaturas_solicitadas__docente__usuario')
+    
+    ajustes_rechazados_con_asignaturas = ajustes_base.filter(
+        estado_aprobacion='rechazado',
+        solicitudes__asignaturas_solicitadas__docente__in=docentes_base
+    ).select_related('solicitudes').prefetch_related('solicitudes__asignaturas_solicitadas__docente__usuario')
+    
+    # Contar aprobados por docente
+    for ajuste in ajustes_aprobados_con_asignaturas:
+        asignaturas_solicitud = ajuste.solicitudes.asignaturas_solicitadas.filter(
+            docente__in=docentes_base
+        ).select_related('docente__usuario')
+        for asignatura in asignaturas_solicitud:
+            if asignatura.docente:
+                docente_nombre = f"{asignatura.docente.usuario.first_name} {asignatura.docente.usuario.last_name}"
+                docentes_ajustes_aprobados[docente_nombre] = docentes_ajustes_aprobados.get(docente_nombre, 0) + 1
+    
+    # Contar rechazados por docente
+    for ajuste in ajustes_rechazados_con_asignaturas:
+        asignaturas_solicitud = ajuste.solicitudes.asignaturas_solicitadas.filter(
+            docente__in=docentes_base
+        ).select_related('docente__usuario')
+        for asignatura in asignaturas_solicitud:
+            if asignatura.docente:
+                docente_nombre = f"{asignatura.docente.usuario.first_name} {asignatura.docente.usuario.last_name}"
+                docentes_ajustes_rechazados[docente_nombre] = docentes_ajustes_rechazados.get(docente_nombre, 0) + 1
+    
+    # Estadísticas de Inscripciones (AsignaturasEnCurso)
+    inscripciones_base = AsignaturasEnCurso.objects.filter(
+        asignaturas__carreras__id__in=carreras_ids
+    )
+    total_inscripciones = inscripciones_base.count()
+    inscripciones_activas = inscripciones_base.filter(estado=True).count()
+    
+    # Inscripciones por asignatura
+    inscripciones_por_asignatura = inscripciones_base.values(
+        'asignaturas__nombre',
+        'asignaturas__seccion'
+    ).annotate(
+        total=Count('id')
+    ).order_by('-total')[:20]  # Top 20
+    
+    # Crear el objeto HttpResponse con el tipo de contenido PDF
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="reporte_director_{rango_seleccionado}_{timezone.now().strftime("%Y%m%d")}.pdf"'
+    
+    # Crear el objeto PDF usando BytesIO
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+    
+    # Contenedor para los elementos del PDF
+    elements = []
+    
+    # Estilos con colores rojo, blanco y negro
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=20,
+        textColor=colors.HexColor('#D32F2F'),  # Rojo INACAP
+        spaceAfter=20,
+        alignment=1,  # Centrado
+        fontName='Helvetica-Bold'
+    )
+    
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=14,
+        textColor=colors.HexColor('#000000'),  # Negro
+        spaceAfter=12,
+        fontName='Helvetica-Bold'
+    )
+    
+    # Colores del esquema
+    color_rojo = colors.HexColor('#D32F2F')
+    color_negro = colors.HexColor('#000000')
+    color_blanco = colors.white
+    color_gris_claro = colors.HexColor('#f5f5f5')
+    
+    # Título
+    elements.append(Paragraph('Reporte de Estadísticas - Director de Carrera', title_style))
+    elements.append(Paragraph(f'Rango de Tiempo: {rango_nombre}', heading_style))
+    elements.append(Paragraph(f'Fecha de Generación: {timezone.now().strftime("%d/%m/%Y %H:%M")}', styles['Normal']))
+    elements.append(Paragraph(f'Generado por: {request.user.get_full_name()}', styles['Normal']))
+    elements.append(Spacer(1, 0.4*inch))
+    
+    # KPIs Principales
+    elements.append(Paragraph('Indicadores Principales', heading_style))
+    kpi_data = [
+        ['Indicador', 'Valor'],
+        ['Total Casos', str(total_casos)],
+        ['Casos Aprobados', str(casos_aprobados)],
+        ['Total Ajustes', str(total_ajustes)],
+        ['Ajustes Aprobados', str(ajustes_aprobados)],
+        ['Ajustes Rechazados', str(ajustes_rechazados)],
+        ['Ajustes Pendientes', str(ajustes_pendientes)],
+        ['Tasa de Aprobación', f"{tasa_aprobacion}%"],
+        ['Total Asignaturas', str(total_asignaturas)],
+        ['Asignaturas Activas', str(asignaturas_activas)],
+        ['Asignaturas Inactivas', str(asignaturas_inactivas)],
+        ['Total Estudiantes', str(total_estudiantes)],
+        ['Estudiantes con Ajustes', str(estudiantes_con_ajustes)],
+        ['Total Docentes', str(total_docentes)],
+        ['Total Inscripciones', str(total_inscripciones)],
+        ['Inscripciones Activas', str(inscripciones_activas)],
+    ]
+    kpi_table = Table(kpi_data, colWidths=[4*inch, 2*inch])
+    kpi_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+        ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('TOPPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+        ('GRID', (0, 0), (-1, -1), 1, color_negro),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+    ]))
+    elements.append(kpi_table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Casos por Estado
+    elements.append(Paragraph('Casos por Estado', heading_style))
+    estado_data = [['Estado', 'Cantidad', 'Porcentaje']]
+    for estado_valor, estado_nombre in Solicitudes.ESTADO_CHOICES:
+        cantidad = solicitudes_base.filter(estado=estado_valor).count()
+        porcentaje = round((cantidad / total_casos * 100) if total_casos > 0 else 0, 1)
+        estado_data.append([estado_nombre, str(cantidad), f"{porcentaje}%"])
+    
+    estado_table = Table(estado_data, colWidths=[3*inch, 1.5*inch, 1.5*inch])
+    estado_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+        ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('TOPPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+        ('GRID', (0, 0), (-1, -1), 1, color_negro),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+    ]))
+    elements.append(estado_table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Estadísticas por Carrera
+    elements.append(Paragraph('Estadísticas por Carrera', heading_style))
+    carrera_data = [['Carrera', 'Total Casos', 'Aprobados', 'Tasa Aprobación']]
+    for carrera in carreras_del_director:
+        casos_carrera = solicitudes_base.filter(estudiantes__carreras=carrera)
+        total_carrera = casos_carrera.count()
+        aprobados_carrera = casos_carrera.filter(estado='aprobado').count()
+        tasa_carrera = round((aprobados_carrera / total_carrera * 100) if total_carrera > 0 else 0, 1)
+        carrera_data.append([carrera.nombre, str(total_carrera), str(aprobados_carrera), f"{tasa_carrera}%"])
+    
+    carrera_table = Table(carrera_data, colWidths=[3*inch, 1.5*inch, 1.5*inch, 1*inch])
+    carrera_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+        ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('TOPPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+        ('GRID', (0, 0), (-1, -1), 1, color_negro),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+    ]))
+    elements.append(carrera_table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Estadísticas de Asignaturas
+    elements.append(Paragraph('Estadísticas de Asignaturas', heading_style))
+    asignaturas_data = [['Asignatura', 'Sección', 'Carrera', 'Docente', 'Estado', 'Semestre']]
+    for asignatura in asignaturas_base.select_related('carreras', 'docente__usuario')[:50]:  # Top 50
+        docente_nombre = f"{asignatura.docente.usuario.first_name} {asignatura.docente.usuario.last_name}" if asignatura.docente else "Sin docente"
+        estado = "Activa" if asignatura.is_active else "Inactiva"
+        semestre_str = asignatura.periodo_completo if asignatura.semestre else "Sin periodo"
+        asignaturas_data.append([
+            asignatura.nombre[:30],
+            asignatura.seccion,
+            asignatura.carreras.nombre[:25],
+            docente_nombre[:30],
+            estado,
+            semestre_str[:20]
+        ])
+    
+    asignaturas_table = Table(asignaturas_data, colWidths=[1.2*inch, 0.8*inch, 1.2*inch, 1.2*inch, 0.8*inch, 1*inch])
+    asignaturas_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+        ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 8),
+        ('FONTSIZE', (0, 1), (-1, -1), 7),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('TOPPADDING', (0, 0), (-1, 0), 8),
+        ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+        ('GRID', (0, 0), (-1, -1), 1, color_negro),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+    ]))
+    elements.append(asignaturas_table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Asignaturas por Semestre
+    if asignaturas_por_semestre:
+        elements.append(Paragraph('Asignaturas por Semestre', heading_style))
+        semestre_data = [['Semestre', 'Año', 'Total']]
+        for item in asignaturas_por_semestre:
+            semestre_nombre = dict(Asignaturas.SEMESTRE_CHOICES).get(item['semestre'], item['semestre']) if item['semestre'] else "Sin semestre"
+            semestre_data.append([semestre_nombre, str(item['anio']) if item['anio'] else "N/A", str(item['total'])])
+        
+        semestre_table = Table(semestre_data, colWidths=[2*inch, 1.5*inch, 1.5*inch])
+        semestre_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+            ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('TOPPADDING', (0, 0), (-1, 0), 10),
+            ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+            ('GRID', (0, 0), (-1, -1), 1, color_negro),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+        ]))
+        elements.append(semestre_table)
+        elements.append(Spacer(1, 0.3*inch))
+    
+    # Estadísticas de Estudiantes
+    elements.append(Paragraph('Estadísticas de Estudiantes', heading_style))
+    estudiantes_data = [['Carrera', 'Total Estudiantes', 'Con Ajustes', 'Porcentaje']]
+    for carrera in carreras_del_director:
+        estudiantes_carrera = estudiantes_base.filter(carreras=carrera)
+        total_est_carrera = estudiantes_carrera.count()
+        con_ajustes_carrera = estudiantes_carrera.filter(
+            solicitudes__in=solicitudes_base
+        ).distinct().count()
+        porcentaje_ajustes = round((con_ajustes_carrera / total_est_carrera * 100) if total_est_carrera > 0 else 0, 1)
+        estudiantes_data.append([
+            carrera.nombre[:40],
+            str(total_est_carrera),
+            str(con_ajustes_carrera),
+            f"{porcentaje_ajustes}%"
+        ])
+    
+    estudiantes_table = Table(estudiantes_data, colWidths=[3*inch, 1.5*inch, 1.5*inch, 1*inch])
+    estudiantes_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+        ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+        ('TOPPADDING', (0, 0), (-1, 0), 10),
+        ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+        ('GRID', (0, 0), (-1, -1), 1, color_negro),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+    ]))
+    elements.append(estudiantes_table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Estudiantes por Semestre
+    if estudiantes_por_semestre:
+        elements.append(Paragraph('Estudiantes por Semestre Actual', heading_style))
+        est_semestre_data = [['Semestre', 'Total Estudiantes']]
+        for item in estudiantes_por_semestre:
+            semestre_num = str(item['semestre_actual']) if item['semestre_actual'] else "Sin semestre"
+            est_semestre_data.append([f"Semestre {semestre_num}", str(item['total'])])
+        
+        est_semestre_table = Table(est_semestre_data, colWidths=[2*inch, 2*inch])
+        est_semestre_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+            ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('TOPPADDING', (0, 0), (-1, 0), 10),
+            ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+            ('GRID', (0, 0), (-1, -1), 1, color_negro),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+        ]))
+        elements.append(est_semestre_table)
+        elements.append(Spacer(1, 0.3*inch))
+    
+    # Estadísticas de Docentes
+    elements.append(Paragraph('Estadísticas de Docentes', heading_style))
+    docentes_data = [['Docente', 'Total Asignaturas', 'Ajustes Aprobados', 'Ajustes Rechazados', 'Comentarios']]
+    
+    # Combinar datos de docentes
+    docentes_dict = {}
+    for item in docentes_por_asignatura:
+        nombre = f"{item['docente__usuario__first_name']} {item['docente__usuario__last_name']}"
+        docentes_dict[nombre] = {
+            'asignaturas': item['total_asignaturas'],
+            'aprobados': 0,
+            'rechazados': 0,
+            'comentarios': 0
+        }
+    
+    # Agregar datos de aprobados y rechazados
+    for nombre, cantidad in docentes_ajustes_aprobados.items():
+        if nombre not in docentes_dict:
+            docentes_dict[nombre] = {'asignaturas': 0, 'aprobados': 0, 'rechazados': 0, 'comentarios': 0}
+        docentes_dict[nombre]['aprobados'] = cantidad
+    
+    for nombre, cantidad in docentes_ajustes_rechazados.items():
+        if nombre not in docentes_dict:
+            docentes_dict[nombre] = {'asignaturas': 0, 'aprobados': 0, 'rechazados': 0, 'comentarios': 0}
+        docentes_dict[nombre]['rechazados'] = cantidad
+    
+    for item in docentes_que_comentaron:
+        nombre = f"{item['docente_comentador__usuario__first_name']} {item['docente_comentador__usuario__last_name']}"
+        if nombre not in docentes_dict:
+            docentes_dict[nombre] = {'asignaturas': 0, 'aprobados': 0, 'rechazados': 0, 'comentarios': 0}
+        docentes_dict[nombre]['comentarios'] = item['total']
+    
+    for nombre, datos in sorted(docentes_dict.items(), key=lambda x: x[1]['asignaturas'], reverse=True)[:30]:  # Top 30
+        docentes_data.append([
+            nombre[:35],
+            str(datos['asignaturas']),
+            str(datos['aprobados']),
+            str(datos['rechazados']),
+            str(datos['comentarios'])
+        ])
+    
+    docentes_table = Table(docentes_data, colWidths=[2*inch, 1*inch, 1*inch, 1*inch, 1*inch])
+    docentes_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+        ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 8),
+        ('FONTSIZE', (0, 1), (-1, -1), 7),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('TOPPADDING', (0, 0), (-1, 0), 8),
+        ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+        ('GRID', (0, 0), (-1, -1), 1, color_negro),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+    ]))
+    elements.append(docentes_table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Inscripciones por Asignatura (Top 20)
+    if inscripciones_por_asignatura:
+        elements.append(Paragraph('Top 20 Asignaturas con Más Inscripciones', heading_style))
+        inscripciones_data = [['Asignatura', 'Sección', 'Total Inscripciones']]
+        for item in inscripciones_por_asignatura:
+            inscripciones_data.append([
+                item['asignaturas__nombre'][:40],
+                item['asignaturas__seccion'],
+                str(item['total'])
+            ])
+        
+        inscripciones_table = Table(inscripciones_data, colWidths=[3*inch, 1.5*inch, 1.5*inch])
+        inscripciones_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), color_rojo),
+            ('TEXTCOLOR', (0, 0), (-1, 0), color_blanco),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('ALIGN', (2, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('TOPPADDING', (0, 0), (-1, 0), 10),
+            ('BACKGROUND', (0, 1), (-1, -1), color_gris_claro),
+            ('GRID', (0, 0), (-1, -1), 1, color_negro),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
+        ]))
+        elements.append(inscripciones_table)
+    
+    # Construir el PDF
+    doc.build(elements)
+    
+    # Obtener el valor del buffer y escribirlo en la respuesta
+    pdf = buffer.getvalue()
+    buffer.close()
+    response.write(pdf)
+    
+    return response
+
+
+@login_required
+def generar_reporte_excel_director(request):
+    """
+    Genera un archivo Excel con los datos según el rango de tiempo seleccionado.
+    """
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+    
+    try:
+        perfil_director = request.user.perfil
+        if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para esta acción.')
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+    
+    rango_seleccionado = request.GET.get('rango', 'mes')
+    
+    # Obtener datos usando la misma lógica que estadisticas_director
+    now = timezone.localtime(timezone.now())
+    today = now.date()
+    
+    fecha_inicio_dt = None
+    fecha_fin_dt = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+    
+    if rango_seleccionado == 'mes':
+        fecha_inicio = today - timedelta(days=30)
+        fecha_inicio_dt = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+        rango_nombre = 'Último Mes'
+    elif rango_seleccionado == 'semestre':
+        fecha_inicio = today - timedelta(days=180)
+        fecha_inicio_dt = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+        rango_nombre = 'Último Semestre'
+    elif rango_seleccionado == 'año':
+        fecha_inicio = today.replace(month=1, day=1)
+        fecha_inicio_dt = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+        rango_nombre = 'Último Año'
+    else:
+        fecha_inicio_dt = None
+        rango_nombre = 'Histórico Completo'
+    
+    carreras_del_director = Carreras.objects.filter(director=perfil_director)
+    carreras_ids = carreras_del_director.values_list('id', flat=True)
+    
+    solicitudes_base = Solicitudes.objects.filter(estudiantes__carreras__id__in=carreras_ids).distinct()
+    ajustes_base = AjusteAsignado.objects.filter(solicitudes__estudiantes__carreras__id__in=carreras_ids).distinct()
+    
+    if fecha_inicio_dt:
+        solicitudes_base = solicitudes_base.filter(created_at__gte=fecha_inicio_dt, created_at__lte=fecha_fin_dt)
+        ajustes_base = ajustes_base.filter(solicitudes__created_at__gte=fecha_inicio_dt, solicitudes__created_at__lte=fecha_fin_dt)
+    
+    # Estadísticas adicionales (misma lógica que PDF)
+    asignaturas_base = Asignaturas.objects.filter(carreras__id__in=carreras_ids)
+    estudiantes_base = Estudiantes.objects.filter(carreras__id__in=carreras_ids)
+    docentes_ids = asignaturas_base.values_list('docente_id', flat=True).distinct()
+    docentes_base = PerfilUsuario.objects.filter(id__in=docentes_ids, rol__nombre_rol='Docente')
+    inscripciones_base = AsignaturasEnCurso.objects.filter(asignaturas__carreras__id__in=carreras_ids)
+    
+    # Crear libro de Excel
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Reporte Estadísticas"
+    
+    # Estilos
+    header_fill = PatternFill(start_color="CC0000", end_color="CC0000", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF", size=12)
+    title_font = Font(bold=True, size=14)
+    
+    row = 1
+    
+    # Título
+    ws.merge_cells(f'A{row}:G{row}')
+    cell = ws[f'A{row}']
+    cell.value = f"Reporte de Estadísticas Director - {rango_nombre}"
+    cell.font = title_font
+    cell.alignment = Alignment(horizontal='center')
+    row += 2
+    
+    # KPIs
+    ws.merge_cells(f'A{row}:C{row}')
+    ws[f'A{row}'].value = "Indicadores Principales (KPIs)"
+    ws[f'A{row}'].font = title_font
+    row += 1
+    
+    headers = ['KPI', 'Valor', 'Rango de Tiempo']
+    for col, header in enumerate(headers, start=1):
+        cell = ws.cell(row=row, column=col)
+        cell.value = header
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center')
+    row += 1
+    
+    # Calcular KPIs
+    total_casos = solicitudes_base.count()
+    casos_aprobados = solicitudes_base.filter(estado='aprobado').count()
+    total_ajustes = ajustes_base.count()
+    ajustes_aprobados = ajustes_base.filter(estado_aprobacion='aprobado').count()
+    ajustes_rechazados = ajustes_base.filter(estado_aprobacion='rechazado').count()
+    ajustes_pendientes = ajustes_base.filter(estado_aprobacion='pendiente').count()
+    total_asignaturas = asignaturas_base.count()
+    asignaturas_activas = asignaturas_base.filter(is_active=True).count()
+    asignaturas_inactivas = asignaturas_base.filter(is_active=False).count()
+    total_estudiantes = estudiantes_base.count()
+    estudiantes_con_ajustes = estudiantes_base.filter(solicitudes__in=solicitudes_base).distinct().count()
+    total_docentes = docentes_base.count()
+    total_inscripciones = inscripciones_base.count()
+    inscripciones_activas = inscripciones_base.filter(estado=True).count()
+    
+    kpis_data = [
+        ['Total Casos', total_casos],
+        ['Casos Aprobados', casos_aprobados],
+        ['Total Ajustes', total_ajustes],
+        ['Ajustes Aprobados', ajustes_aprobados],
+        ['Ajustes Rechazados', ajustes_rechazados],
+        ['Ajustes Pendientes', ajustes_pendientes],
+        ['Total Asignaturas', total_asignaturas],
+        ['Asignaturas Activas', asignaturas_activas],
+        ['Asignaturas Inactivas', asignaturas_inactivas],
+        ['Total Estudiantes', total_estudiantes],
+        ['Estudiantes con Ajustes', estudiantes_con_ajustes],
+        ['Total Docentes', total_docentes],
+        ['Total Inscripciones', total_inscripciones],
+        ['Inscripciones Activas', inscripciones_activas],
+    ]
+    
+    for kpi, valor in kpis_data:
+        ws.cell(row=row, column=1).value = kpi
+        ws.cell(row=row, column=2).value = valor
+        ws.cell(row=row, column=3).value = rango_nombre
+        row += 1
+    
+    row += 1
+    
+    # Casos por Estado
+    ws.merge_cells(f'A{row}:C{row}')
+    ws[f'A{row}'].value = "Casos por Estado"
+    ws[f'A{row}'].font = title_font
+    row += 1
+    
+    headers = ['Estado', 'Cantidad', 'Rango de Tiempo']
+    for col, header in enumerate(headers, start=1):
+        cell = ws.cell(row=row, column=col)
+        cell.value = header
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center')
+    row += 1
+    
+    for estado_valor, estado_nombre in Solicitudes.ESTADO_CHOICES:
+        cantidad = solicitudes_base.filter(estado=estado_valor).count()
+        ws.cell(row=row, column=1).value = estado_nombre
+        ws.cell(row=row, column=2).value = cantidad
+        ws.cell(row=row, column=3).value = rango_nombre
+        row += 1
+    
+    row += 1
+    
+    # Estadísticas por Carrera
+    ws.merge_cells(f'A{row}:G{row}')
+    ws[f'A{row}'].value = "Estadísticas por Carrera"
+    ws[f'A{row}'].font = title_font
+    row += 1
+    
+    headers = ['Carrera', 'Total Casos', 'Aprobados', 'Tasa Aprobación', 'Total Estudiantes', 'Estudiantes con Ajustes', 'Rango de Tiempo']
+    for col, header in enumerate(headers, start=1):
+        cell = ws.cell(row=row, column=col)
+        cell.value = header
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center')
+    row += 1
+    
+    for carrera in carreras_del_director:
+        casos_carrera = solicitudes_base.filter(estudiantes__carreras=carrera)
+        total_carrera = casos_carrera.count()
+        aprobados_carrera = casos_carrera.filter(estado='aprobado').count()
+        tasa_carrera = round((aprobados_carrera / total_carrera * 100) if total_carrera > 0 else 0, 1)
+        estudiantes_carrera = estudiantes_base.filter(carreras=carrera)
+        total_est_carrera = estudiantes_carrera.count()
+        est_con_ajustes = estudiantes_carrera.filter(solicitudes__in=solicitudes_base).distinct().count()
+        
+        ws.cell(row=row, column=1).value = carrera.nombre
+        ws.cell(row=row, column=2).value = total_carrera
+        ws.cell(row=row, column=3).value = aprobados_carrera
+        ws.cell(row=row, column=4).value = f"{tasa_carrera}%"
+        ws.cell(row=row, column=5).value = total_est_carrera
+        ws.cell(row=row, column=6).value = est_con_ajustes
+        ws.cell(row=row, column=7).value = rango_nombre
+        row += 1
+    
+    row += 1
+    
+    # Asignaturas por Semestre
+    ws.merge_cells(f'A{row}:D{row}')
+    ws[f'A{row}'].value = "Asignaturas por Semestre"
+    ws[f'A{row}'].font = title_font
+    row += 1
+    
+    headers = ['Semestre', 'Año', 'Total', 'Rango de Tiempo']
+    for col, header in enumerate(headers, start=1):
+        cell = ws.cell(row=row, column=col)
+        cell.value = header
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center')
+    row += 1
+    
+    asignaturas_por_semestre = asignaturas_base.values('semestre', 'anio').annotate(total=Count('id')).order_by('-anio', 'semestre')
+    for item in asignaturas_por_semestre:
+        semestre_nombre = dict(Asignaturas.SEMESTRE_CHOICES).get(item['semestre'], item['semestre']) if item['semestre'] else "Sin semestre"
+        ws.cell(row=row, column=1).value = semestre_nombre
+        ws.cell(row=row, column=2).value = str(item['anio']) if item['anio'] else "N/A"
+        ws.cell(row=row, column=3).value = item['total']
+        ws.cell(row=row, column=4).value = rango_nombre
+        row += 1
+    
+    row += 1
+    
+    # Estudiantes por Semestre
+    ws.merge_cells(f'A{row}:C{row}')
+    ws[f'A{row}'].value = "Estudiantes por Semestre Actual"
+    ws[f'A{row}'].font = title_font
+    row += 1
+    
+    headers = ['Semestre', 'Total Estudiantes', 'Rango de Tiempo']
+    for col, header in enumerate(headers, start=1):
+        cell = ws.cell(row=row, column=col)
+        cell.value = header
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center')
+    row += 1
+    
+    estudiantes_por_semestre = estudiantes_base.values('semestre_actual').annotate(total=Count('id')).order_by('semestre_actual')
+    for item in estudiantes_por_semestre:
+        semestre_num = f"Semestre {item['semestre_actual']}" if item['semestre_actual'] else "Sin semestre"
+        ws.cell(row=row, column=1).value = semestre_num
+        ws.cell(row=row, column=2).value = item['total']
+        ws.cell(row=row, column=3).value = rango_nombre
+        row += 1
+    
+    row += 1
+    
+    # Estadísticas de Docentes
+    ws.merge_cells(f'A{row}:F{row}')
+    ws[f'A{row}'].value = "Estadísticas de Docentes"
+    ws[f'A{row}'].font = title_font
+    row += 1
+    
+    headers = ['Docente', 'Total Asignaturas', 'Ajustes Aprobados', 'Ajustes Rechazados', 'Comentarios', 'Rango de Tiempo']
+    for col, header in enumerate(headers, start=1):
+        cell = ws.cell(row=row, column=col)
+        cell.value = header
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center')
+    row += 1
+    
+    # Obtener datos de docentes (similar a PDF)
+    docentes_por_asignatura = asignaturas_base.values(
+        'docente__usuario__first_name',
+        'docente__usuario__last_name'
+    ).annotate(total_asignaturas=Count('id')).order_by('-total_asignaturas')
+    
+    docentes_que_comentaron = ajustes_base.filter(
+        docente_comentador__isnull=False,
+        docente_comentador__in=docentes_base
+    ).values('docente_comentador__usuario__first_name',
+             'docente_comentador__usuario__last_name').annotate(total=Count('id')).order_by('-total')
+    
+    # Agrupar datos de docentes
+    docentes_dict = {}
+    for item in docentes_por_asignatura:
+        nombre = f"{item['docente__usuario__first_name']} {item['docente__usuario__last_name']}"
+        docentes_dict[nombre] = {
+            'asignaturas': item['total_asignaturas'],
+            'aprobados': 0,
+            'rechazados': 0,
+            'comentarios': 0
+        }
+    
+    # Agregar comentarios
+    for item in docentes_que_comentaron:
+        nombre = f"{item['docente_comentador__usuario__first_name']} {item['docente_comentador__usuario__last_name']}"
+        if nombre not in docentes_dict:
+            docentes_dict[nombre] = {'asignaturas': 0, 'aprobados': 0, 'rechazados': 0, 'comentarios': 0}
+        docentes_dict[nombre]['comentarios'] = item['total']
+    
+    # Agregar aprobados/rechazados (a través de asignaturas)
+    ajustes_con_asignaturas = ajustes_base.filter(solicitudes__asignaturas_solicitadas__docente__in=docentes_base)
+    for ajuste in ajustes_con_asignaturas.select_related('solicitudes'):
+        asignaturas_solicitud = ajuste.solicitudes.asignaturas_solicitadas.filter(docente__in=docentes_base)
+        for asignatura in asignaturas_solicitud:
+            docente_nombre = f"{asignatura.docente.usuario.first_name} {asignatura.docente.usuario.last_name}"
+            if docente_nombre not in docentes_dict:
+                docentes_dict[docente_nombre] = {'asignaturas': 0, 'aprobados': 0, 'rechazados': 0, 'comentarios': 0}
+            if ajuste.estado_aprobacion == 'aprobado':
+                docentes_dict[docente_nombre]['aprobados'] = docentes_dict[docente_nombre].get('aprobados', 0) + 1
+            elif ajuste.estado_aprobacion == 'rechazado':
+                docentes_dict[docente_nombre]['rechazados'] = docentes_dict[docente_nombre].get('rechazados', 0) + 1
+    
+    for nombre, datos in sorted(docentes_dict.items(), key=lambda x: x[1]['asignaturas'], reverse=True):
+        ws.cell(row=row, column=1).value = nombre
+        ws.cell(row=row, column=2).value = datos['asignaturas']
+        ws.cell(row=row, column=3).value = datos['aprobados']
+        ws.cell(row=row, column=4).value = datos['rechazados']
+        ws.cell(row=row, column=5).value = datos['comentarios']
+        ws.cell(row=row, column=6).value = rango_nombre
+        row += 1
+    
+    row += 1
+    
+    # Inscripciones por Asignatura (Top 20)
+    ws.merge_cells(f'A{row}:D{row}')
+    ws[f'A{row}'].value = "Top 20 Asignaturas con Más Inscripciones"
+    ws[f'A{row}'].font = title_font
+    row += 1
+    
+    headers = ['Asignatura', 'Sección', 'Total Inscripciones', 'Rango de Tiempo']
+    for col, header in enumerate(headers, start=1):
+        cell = ws.cell(row=row, column=col)
+        cell.value = header
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center')
+    row += 1
+    
+    inscripciones_por_asignatura = inscripciones_base.values(
+        'asignaturas__nombre',
+        'asignaturas__seccion'
+    ).annotate(total=Count('id')).order_by('-total')[:20]
+    for item in inscripciones_por_asignatura:
+        ws.cell(row=row, column=1).value = item['asignaturas__nombre']
+        ws.cell(row=row, column=2).value = item['asignaturas__seccion']
+        ws.cell(row=row, column=3).value = item['total']
+        ws.cell(row=row, column=4).value = rango_nombre
+        row += 1
+    
+    row += 1
+    
+    # Detalle de Casos
+    ws.merge_cells(f'A{row}:F{row}')
+    ws[f'A{row}'].value = "Detalle de Casos"
+    ws[f'A{row}'].font = title_font
+    row += 1
+    
+    headers = ['ID', 'Estudiante', 'Carrera', 'Estado', 'Fecha Creación', 'Asunto']
+    for col, header in enumerate(headers, start=1):
+        cell = ws.cell(row=row, column=col)
+        cell.value = header
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center')
+    row += 1
+    
+    casos = solicitudes_base.select_related('estudiantes', 'estudiantes__carreras')[:1000]
+    for caso in casos:
+        estudiante_nombre = f"{caso.estudiantes.nombres} {caso.estudiantes.apellidos}" if caso.estudiantes else "N/A"
+        carrera_nombre = caso.estudiantes.carreras.nombre if caso.estudiantes and caso.estudiantes.carreras else "N/A"
+        fecha_creacion = timezone.localtime(caso.created_at).strftime('%Y-%m-%d %H:%M:%S') if caso.created_at else "N/A"
+        
+        ws.cell(row=row, column=1).value = caso.id
+        ws.cell(row=row, column=2).value = estudiante_nombre
+        ws.cell(row=row, column=3).value = carrera_nombre
+        ws.cell(row=row, column=4).value = caso.get_estado_display()
+        ws.cell(row=row, column=5).value = fecha_creacion
+        ws.cell(row=row, column=6).value = caso.asunto[:50] if caso.asunto else "N/A"
+        row += 1
+    
+    # Ajustar ancho de columnas
+    from openpyxl.utils import get_column_letter
+    for col_idx, col in enumerate(ws.columns, start=1):
+        max_length = 0
+        column_letter = get_column_letter(col_idx)
+        for cell in col:
+            try:
+                # Saltar celdas fusionadas que no tienen valor directamente
+                if hasattr(cell, 'value') and cell.value is not None:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 50)
+        ws.column_dimensions[column_letter].width = adjusted_width
+    
+    # Crear respuesta HTTP usando BytesIO para evitar problemas
+    try:
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        response = HttpResponse(
+            output.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="reporte_excel_director_{rango_seleccionado}_{timezone.now().strftime("%Y%m%d")}.xlsx"'
+        
+        output.close()
+        return response
+    except Exception as e:
+        return HttpResponse(f'Error al generar el archivo Excel: {str(e)}', status=500)
+
+
+# ----------------------------------------------------
+#           GESTIÓN DE ASIGNATURAS (DIRECTOR)
+# ----------------------------------------------------
+
+@login_required
+def gestion_asignaturas_director(request):
+    """
+    Vista para que el Director gestione las asignaturas de sus carreras.
+    Permite ver, activar/desactivar y filtrar asignaturas.
+    """
+    try:
+        perfil_director = request.user.perfil
+        if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para esta acción.')
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+    
+    # Desactivar automáticamente asignaturas de semestres vencidos
+    asignaturas_desactivadas = desactivar_asignaturas_semestre_vencido()
+    if asignaturas_desactivadas > 0:
+        messages.info(request, f'Se desactivaron automáticamente {asignaturas_desactivadas} asignatura(s) de semestres anteriores.')
+    
+    # Obtener carreras del director
+    carreras_del_director = Carreras.objects.filter(director=perfil_director)
+    
+    # Filtros
+    filtro_estado = request.GET.get('estado', 'todas')  # todas, activas, inactivas
+    filtro_carrera = request.GET.get('carrera', '')
+    filtro_semestre = request.GET.get('semestre', '')
+    
+    # Obtener asignaturas
+    asignaturas = Asignaturas.objects.filter(
+        carreras__in=carreras_del_director
+    ).select_related('carreras', 'docente__usuario').order_by('-is_active', 'nombre', 'seccion')
+    
+    # Aplicar filtros
+    if filtro_estado == 'activas':
+        asignaturas = asignaturas.filter(is_active=True)
+    elif filtro_estado == 'inactivas':
+        asignaturas = asignaturas.filter(is_active=False)
+    
+    if filtro_carrera:
+        asignaturas = asignaturas.filter(carreras_id=filtro_carrera)
+    
+    if filtro_semestre:
+        asignaturas = asignaturas.filter(semestre=filtro_semestre)
+    
+    # Estadísticas
+    total_asignaturas = Asignaturas.objects.filter(carreras__in=carreras_del_director).count()
+    total_activas = Asignaturas.objects.filter(carreras__in=carreras_del_director, is_active=True).count()
+    total_inactivas = Asignaturas.objects.filter(carreras__in=carreras_del_director, is_active=False).count()
+    
+    context = {
+        'asignaturas': asignaturas,
+        'carreras': carreras_del_director,
+        'total_asignaturas': total_asignaturas,
+        'total_activas': total_activas,
+        'total_inactivas': total_inactivas,
+        'filtro_estado': filtro_estado,
+        'filtro_carrera': filtro_carrera,
+        'filtro_semestre': filtro_semestre,
+        'semestres': [('otono', 'Otoño (Marzo-Julio)'), ('primavera', 'Primavera (Agosto-Diciembre)')],
+    }
+    
+    return render(request, 'SIAPE/gestion_asignaturas_director.html', context)
+
+
+@login_required
+@require_POST
+def toggle_asignatura_estado(request, asignatura_id):
+    """
+    Activa o desactiva una asignatura.
+    """
+    try:
+        perfil_director = request.user.perfil
+        if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para esta acción.')
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+    
+    carreras_del_director = Carreras.objects.filter(director=perfil_director)
+    asignatura = get_object_or_404(Asignaturas, id=asignatura_id, carreras__in=carreras_del_director)
+    
+    # Toggle estado
+    asignatura.is_active = not asignatura.is_active
+    asignatura.save()
+    
+    estado_texto = "activada" if asignatura.is_active else "desactivada"
+    messages.success(request, f'Asignatura "{asignatura.nombre} - {asignatura.seccion}" {estado_texto} correctamente.')
+    
+    return redirect('gestion_asignaturas_director')
+
+
+@login_required
+@require_POST
+def bulk_toggle_asignaturas(request):
+    """
+    Activa o desactiva múltiples asignaturas a la vez.
+    """
+    try:
+        perfil_director = request.user.perfil
+        if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para esta acción.')
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+    
+    accion = request.POST.get('accion')  # 'activar' o 'desactivar'
+    asignaturas_ids = request.POST.getlist('asignaturas_ids')
+    
+    if not asignaturas_ids:
+        messages.warning(request, 'No se seleccionaron asignaturas.')
+        return redirect('gestion_asignaturas_director')
+    
+    carreras_del_director = Carreras.objects.filter(director=perfil_director)
+    
+    # Filtrar solo asignaturas del director
+    asignaturas = Asignaturas.objects.filter(
+        id__in=asignaturas_ids,
+        carreras__in=carreras_del_director
+    )
+    
+    nuevo_estado = accion == 'activar'
+    count = asignaturas.update(is_active=nuevo_estado)
+    
+    estado_texto = "activadas" if nuevo_estado else "desactivadas"
+    messages.success(request, f'{count} asignatura(s) {estado_texto} correctamente.')
+    
+    return redirect('gestion_asignaturas_director')
 
 
 # ----------------------------------------------------
@@ -4156,12 +6873,26 @@ def cargar_asignaturas_excel(request):
                         errores.append(f'Fila {row_num}: No se encontró el docente especificado')
                         continue
                     
+                    # Determinar semestre y año actual
+                    hoy = timezone.localtime().date()
+                    anio_actual = hoy.year
+                    mes_actual = hoy.month
+                    if mes_actual >= 3 and mes_actual <= 7:
+                        semestre_actual = 'otono'
+                    else:
+                        semestre_actual = 'primavera'
+                    
                     # Crear o actualizar asignatura
                     asignatura, created = Asignaturas.objects.update_or_create(
                         nombre=nombre,
                         seccion=seccion,
                         carreras=carrera,
-                        defaults={'docente': docente_perfil}
+                        defaults={
+                            'docente': docente_perfil,
+                            'semestre': semestre_actual,
+                            'anio': anio_actual,
+                            'is_active': True
+                        }
                     )
                     
                     if created:
@@ -4190,7 +6921,7 @@ def cargar_asignaturas_excel(request):
 def cargar_inscripciones_excel(request):
     """
     Procesa un archivo Excel para inscribir estudiantes en asignaturas.
-    Columnas esperadas: Estudiante_RUT, Asignatura_Nombre, Asignatura_Seccion (o Asignatura_ID)
+    Columnas esperadas: Estudiante_RUT, Asignatura_Nombre, Asignatura_Seccion
     """
     import openpyxl
     from django.db import transaction
@@ -4220,8 +6951,11 @@ def cargar_inscripciones_excel(request):
         
         headers = [cell.value.lower().strip() if cell.value else '' for cell in ws[1]]
         
-        if 'estudiante_rut' not in headers:
-            messages.error(request, 'El archivo debe contener la columna: ESTUDIANTE_RUT')
+        # Validar columnas requeridas
+        columnas_requeridas = ['estudiante_rut', 'asignatura_nombre', 'asignatura_seccion']
+        columnas_faltantes = [col for col in columnas_requeridas if col not in headers]
+        if columnas_faltantes:
+            messages.error(request, f'El archivo debe contener las columnas: {", ".join([c.upper() for c in columnas_faltantes])}')
             return redirect('gestion_carga_masiva_director')
         
         col_idx = {h: headers.index(h) for h in headers if h}
@@ -4233,25 +6967,123 @@ def cargar_inscripciones_excel(request):
         with transaction.atomic():
             for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
                 try:
-                    estudiante_rut = str(row[col_idx.get('estudiante_rut', 0)] or '').strip()
-                    asignatura_id = row[col_idx.get('asignatura_id', -1)] if 'asignatura_id' in col_idx else None
-                    asignatura_nombre = str(row[col_idx.get('asignatura_nombre', -1)] or '').strip() if 'asignatura_nombre' in col_idx else None
-                    asignatura_seccion = str(row[col_idx.get('asignatura_seccion', -1)] or '').strip() if 'asignatura_seccion' in col_idx else None
+                    # Obtener valores de las celdas, manejando None y valores vacíos
+                    estudiante_rut_celda = row[col_idx.get('estudiante_rut', 0)]
+                    asignatura_nombre_celda = row[col_idx.get('asignatura_nombre', 1)]
+                    asignatura_seccion_celda = row[col_idx.get('asignatura_seccion', 2)]
                     
-                    if not estudiante_rut:
+                    # Convertir a string y limpiar (manejar números del Excel)
+                    if estudiante_rut_celda is None:
+                        estudiante_rut_raw = ''
+                    elif isinstance(estudiante_rut_celda, (int, float)):
+                        # Si viene como número, convertirlo a string sin decimales
+                        estudiante_rut_raw = str(int(estudiante_rut_celda)).strip()
+                    else:
+                        estudiante_rut_raw = str(estudiante_rut_celda).strip()
+                    
+                    asignatura_nombre = str(asignatura_nombre_celda).strip() if asignatura_nombre_celda is not None else ''
+                    asignatura_seccion = str(asignatura_seccion_celda).strip() if asignatura_seccion_celda is not None else ''
+                    
+                    # Validar que no estén vacíos
+                    if not estudiante_rut_raw or estudiante_rut_raw.lower() in ['none', 'nan', '']:
                         errores.append(f'Fila {row_num}: RUT del estudiante requerido')
                         continue
                     
-                    # Validar RUT
-                    es_valido, mensaje_error = validar_rut_chileno(estudiante_rut)
-                    if not es_valido:
-                        errores.append(f'Fila {row_num}: {mensaje_error}')
+                    if not asignatura_nombre:
+                        errores.append(f'Fila {row_num}: Nombre de asignatura requerido')
                         continue
                     
-                    # Buscar estudiante
-                    estudiante = Estudiantes.objects.filter(rut=estudiante_rut).first()
+                    if not asignatura_seccion:
+                        errores.append(f'Fila {row_num}: Sección de asignatura requerida')
+                        continue
+                    
+                    # Normalizar RUT antes de validar (corregir dígitos verificadores de dos dígitos)
+                    import re
+                    rut_limpio = re.sub(r'[.\s]', '', estudiante_rut_raw).upper()
+                    
+                    # Si tiene guión, separar número y dígito verificador
+                    if '-' in rut_limpio:
+                        partes = rut_limpio.split('-')
+                        numero_rut = partes[0]
+                        digito_verificador = partes[1] if len(partes) > 1 else ''
+                    else:
+                        # Si no tiene guión, asumir que el último carácter es el dígito verificador
+                        if len(rut_limpio) >= 2:
+                            numero_rut = rut_limpio[:-1]
+                            digito_verificador = rut_limpio[-1]
+                        else:
+                            numero_rut = rut_limpio
+                            digito_verificador = ''
+                    
+                    # Corregir dígitos verificadores de dos dígitos (10 -> K, 11 -> 0)
+                    if digito_verificador == '10':
+                        digito_verificador = 'K'
+                    elif digito_verificador == '11':
+                        digito_verificador = '0'
+                    
+                    # Reconstruir RUT normalizado
+                    estudiante_rut_normalizado = f"{numero_rut}-{digito_verificador}" if digito_verificador else numero_rut
+                    
+                    # Validar RUT
+                    es_valido, mensaje_error = validar_rut_chileno(estudiante_rut_normalizado)
+                    if not es_valido:
+                        # Intentar también con el formato original por si acaso
+                        es_valido, mensaje_error = validar_rut_chileno(estudiante_rut_raw)
+                        if not es_valido:
+                            mensaje = mensaje_error if mensaje_error else "RUT inválido"
+                            errores.append(f'Fila {row_num}: {mensaje} (RUT recibido: "{estudiante_rut_raw}")')
+                            continue
+                        else:
+                            estudiante_rut_normalizado = estudiante_rut_raw
+                    else:
+                        estudiante_rut_raw = estudiante_rut_normalizado
+                    
+                    # Normalizar RUT para búsqueda en BD
+                    # Los RUTs pueden estar guardados en diferentes formatos en la BD
+                    # Intentar múltiples variaciones
+                    # Crear todas las variaciones posibles del RUT
+                    rut_variaciones = []
+                    
+                    # 1. Original
+                    rut_variaciones.append(estudiante_rut_raw)
+                    
+                    # 2. Sin puntos ni espacios, con guión
+                    rut_sin_puntos = re.sub(r'[.\s]', '', estudiante_rut_raw).upper()
+                    if '-' not in rut_sin_puntos and len(rut_sin_puntos) >= 2:
+                        rut_con_guion = rut_sin_puntos[:-1] + '-' + rut_sin_puntos[-1]
+                        rut_variaciones.append(rut_con_guion)
+                    else:
+                        rut_variaciones.append(rut_sin_puntos)
+                    
+                    # 3. Sin guión
+                    rut_sin_guion = rut_sin_puntos.replace('-', '')
+                    if rut_sin_guion != rut_sin_puntos:
+                        rut_variaciones.append(rut_sin_guion)
+                    
+                    # 4. Con puntos y guión (formato estándar)
+                    if len(rut_sin_guion) >= 2:
+                        numero = rut_sin_guion[:-1]
+                        dv = rut_sin_guion[-1]
+                        # Agregar puntos cada 3 dígitos desde la derecha
+                        numero_formateado = ""
+                        for i, digito in enumerate(reversed(numero)):
+                            if i > 0 and i % 3 == 0:
+                                numero_formateado = '.' + numero_formateado
+                            numero_formateado = digito + numero_formateado
+                        rut_con_puntos = f"{numero_formateado}-{dv}"
+                        rut_variaciones.append(rut_con_puntos)
+                    
+                    # Eliminar duplicados manteniendo el orden
+                    rut_variaciones = list(dict.fromkeys(rut_variaciones))
+                    
+                    # Buscar estudiante con todas las variaciones
+                    estudiante = None
+                    for rut_var in rut_variaciones:
+                        estudiante = Estudiantes.objects.filter(rut=rut_var).first()
+                        if estudiante:
+                            break
                     if not estudiante:
-                        errores.append(f'Fila {row_num}: Estudiante con RUT {estudiante_rut} no encontrado')
+                        errores.append(f'Fila {row_num}: Estudiante con RUT {estudiante_rut_raw} no encontrado (se intentó con formatos: {", ".join(rut_variaciones[:3])})')
                         continue
                     
                     # Verificar que el estudiante pertenece a una carrera del director
@@ -4259,23 +7091,26 @@ def cargar_inscripciones_excel(request):
                         errores.append(f'Fila {row_num}: El estudiante no pertenece a tus carreras')
                         continue
                     
-                    # Buscar asignatura
-                    asignatura = None
-                    if asignatura_id:
-                        try:
-                            asignatura = Asignaturas.objects.get(id=int(asignatura_id))
-                        except (ValueError, Asignaturas.DoesNotExist):
-                            errores.append(f'Fila {row_num}: Asignatura ID inválido')
-                            continue
-                    elif asignatura_nombre and asignatura_seccion:
-                        asignatura = Asignaturas.objects.filter(
-                            nombre=asignatura_nombre,
-                            seccion=asignatura_seccion,
-                            carreras__in=carreras_del_director
-                        ).first()
+                    # Buscar asignatura por nombre Y sección (dentro de las carreras del director, solo activas)
+                    asignatura = Asignaturas.objects.filter(
+                        nombre=asignatura_nombre,
+                        seccion=asignatura_seccion,
+                        carreras__in=carreras_del_director,
+                        is_active=True
+                    ).first()
                     
                     if not asignatura:
-                        errores.append(f'Fila {row_num}: No se encontró la asignatura')
+                        # Verificar si existe pero está inactiva
+                        asignatura_inactiva = Asignaturas.objects.filter(
+                            nombre=asignatura_nombre,
+                            seccion=asignatura_seccion,
+                            carreras__in=carreras_del_director,
+                            is_active=False
+                        ).first()
+                        if asignatura_inactiva:
+                            errores.append(f'Fila {row_num}: La asignatura "{asignatura_nombre}" - "{asignatura_seccion}" está inactiva')
+                        else:
+                            errores.append(f'Fila {row_num}: No se encontró asignatura con nombre "{asignatura_nombre}" y sección "{asignatura_seccion}"')
                         continue
                     
                     # Crear inscripción si no existe
@@ -4346,8 +7181,8 @@ def descargar_plantilla_excel(request, tipo):
         
     elif tipo == 'inscripciones':
         ws.title = 'Inscripciones'
-        ws.append(['Estudiante_RUT', 'Asignatura_ID', 'Asignatura_Nombre', 'Asignatura_Seccion'])
-        ws.append(['12345678-9', '', 'Cálculo I', 'A-001'])
+        ws.append(['Estudiante_RUT', 'Asignatura_Nombre', 'Asignatura_Seccion'])
+        ws.append(['12345678-9', 'Cálculo I', 'A-001'])
         filename = 'plantilla_inscripciones.xlsx'
         
     else:
@@ -4419,16 +7254,33 @@ def dashboard_coordinador_tecnico_pedagogico(request):
     kpi_casos_pendientes_total = casos_pendientes_formulacion.count()
     
     # KPI 3: Casos devueltos desde Asesora Pedagógica
-    # Casos que están en 'pendiente_formulacion_ajustes' y que tienen ajustes asignados
-    # (lo que indica que fueron formulados y luego devueltos)
-    # Esto es una aproximación: casos con ajustes que están pendientes de formulación
     casos_devueltos = Solicitudes.objects.filter(
         estado='pendiente_formulacion_ajustes',
         ajusteasignado__isnull=False
     ).distinct().count()
     
+    # KPI 4: Total de ajustes formulados por este coordinador
+    casos_asignados = Solicitudes.objects.filter(
+        coordinador_tecnico_pedagogico_asignado=perfil
+    )
+    total_ajustes_formulados = AjusteAsignado.objects.filter(
+        solicitudes__in=casos_asignados
+    ).count()
+    
+    # KPI 5: Ajustes aprobados
+    ajustes_aprobados = AjusteAsignado.objects.filter(
+        solicitudes__in=casos_asignados,
+        estado_aprobacion='aprobado'
+    ).count()
+    
+    # KPI 6: Casos enviados a Asesor Pedagógico esta semana
+    casos_enviados_semana = Solicitudes.objects.filter(
+        estado='pendiente_preaprobacion',
+        coordinador_tecnico_pedagogico_asignado=perfil,
+        updated_at__range=(start_of_week_dt, end_of_week_dt)
+    ).count()
+    
     # 4. --- Obtener Lista de Casos Pendientes de Formulación ---
-    # Los casos más recientes primero
     casos_pendientes_list = casos_pendientes_formulacion.order_by('-updated_at')[:10]
     
     # 5. --- Preparar Contexto ---
@@ -4438,12 +7290,172 @@ def dashboard_coordinador_tecnico_pedagogico(request):
             'casos_nuevos_semana': casos_nuevos_semana,
             'casos_pendientes_total': kpi_casos_pendientes_total,
             'casos_devueltos': casos_devueltos,
+            'total_ajustes_formulados': total_ajustes_formulados,
+            'ajustes_aprobados': ajustes_aprobados,
+            'casos_enviados_semana': casos_enviados_semana,
         },
         'casos_pendientes_list': casos_pendientes_list,
     }
     
     # 6. --- Renderizar Template ---
     return render(request, 'SIAPE/dashboard_coordinador_tecnico_pedagogico.html', context)
+
+
+# ----------------------------------------------------
+#           GESTIÓN DE CATEGORÍAS DE AJUSTES
+#           (Coordinador Técnico Pedagógico)
+# ----------------------------------------------------
+
+@login_required
+def gestion_categorias_ajustes(request):
+    """
+    Vista para que el Coordinador Técnico Pedagógico gestione las categorías de ajustes.
+    Permite crear, editar y eliminar categorías.
+    """
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_COORDINADOR_TECNICO_PEDAGOGICO:
+            messages.error(request, 'No tienes permisos para acceder a esta página.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+    
+    # 2. --- Obtener todas las categorías con conteo de uso ---
+    categorias = CategoriasAjustes.objects.annotate(
+        total_ajustes=Count('ajusterazonable')
+    ).order_by('nombre_categoria')
+    
+    # 3. --- Procesar formularios ---
+    if request.method == 'POST':
+        accion = request.POST.get('accion')
+        
+        if accion == 'crear':
+            nombre = request.POST.get('nombre', '').strip()
+            if nombre:
+                # Verificar si ya existe
+                if CategoriasAjustes.objects.filter(nombre_categoria__iexact=nombre).exists():
+                    messages.error(request, f'La categoría "{nombre}" ya existe.')
+                else:
+                    CategoriasAjustes.objects.create(nombre_categoria=nombre.capitalize())
+                    messages.success(request, f'Categoría "{nombre}" creada exitosamente.')
+            else:
+                messages.error(request, 'El nombre de la categoría es requerido.')
+        
+        elif accion == 'editar':
+            categoria_id = request.POST.get('categoria_id')
+            nuevo_nombre = request.POST.get('nuevo_nombre', '').strip()
+            if categoria_id and nuevo_nombre:
+                try:
+                    categoria = CategoriasAjustes.objects.get(id=categoria_id)
+                    # Verificar si el nuevo nombre ya existe (excepto la misma categoría)
+                    if CategoriasAjustes.objects.filter(nombre_categoria__iexact=nuevo_nombre).exclude(id=categoria_id).exists():
+                        messages.error(request, f'La categoría "{nuevo_nombre}" ya existe.')
+                    else:
+                        categoria.nombre_categoria = nuevo_nombre.capitalize()
+                        categoria.save()
+                        messages.success(request, 'Categoría actualizada exitosamente.')
+                except CategoriasAjustes.DoesNotExist:
+                    messages.error(request, 'Categoría no encontrada.')
+            else:
+                messages.error(request, 'Datos incompletos.')
+        
+        elif accion == 'eliminar':
+            categoria_id = request.POST.get('categoria_id')
+            if categoria_id:
+                try:
+                    categoria = CategoriasAjustes.objects.get(id=categoria_id)
+                    # Verificar si tiene ajustes asociados
+                    total_ajustes = AjusteRazonable.objects.filter(categorias_ajustes=categoria).count()
+                    if total_ajustes > 0:
+                        messages.error(request, f'No se puede eliminar la categoría "{categoria.nombre_categoria}" porque tiene {total_ajustes} ajuste(s) asociado(s).')
+                    else:
+                        nombre_categoria = categoria.nombre_categoria
+                        categoria.delete()
+                        messages.success(request, f'Categoría "{nombre_categoria}" eliminada exitosamente.')
+                except CategoriasAjustes.DoesNotExist:
+                    messages.error(request, 'Categoría no encontrada.')
+        
+        return redirect('gestion_categorias_ajustes')
+    
+    # 4. --- Preparar Contexto ---
+    context = {
+        'categorias': categorias,
+    }
+    
+    return render(request, 'SIAPE/gestion_categorias_ajustes.html', context)
+
+
+@login_required
+def estadisticas_ajustes_coordinador_tecnico(request):
+    """
+    Vista de estadísticas de ajustes formulados por el Coordinador Técnico Pedagógico.
+    """
+    # 1. --- Verificación de Permisos ---
+    try:
+        perfil = request.user.perfil
+        if perfil.rol.nombre_rol != ROL_COORDINADOR_TECNICO_PEDAGOGICO:
+            messages.error(request, 'No tienes permisos para acceder a esta página.')
+            return redirect('home')
+    except AttributeError:
+        if not request.user.is_superuser:
+            return redirect('home')
+    
+    # 2. --- Obtener ajustes formulados por este coordinador ---
+    # Aproximación: ajustes en casos asignados a este coordinador
+    casos_asignados = Solicitudes.objects.filter(
+        coordinador_tecnico_pedagogico_asignado=perfil
+    )
+    
+    ajustes_formulados = AjusteAsignado.objects.filter(
+        solicitudes__in=casos_asignados
+    ).select_related(
+        'ajuste_razonable__categorias_ajustes',
+        'solicitudes__estudiantes',
+        'solicitudes__estudiantes__carreras'
+    )
+    
+    # 3. --- Estadísticas por categoría ---
+    estadisticas_categoria = {}
+    for ajuste in ajustes_formulados:
+        categoria = ajuste.ajuste_razonable.categorias_ajustes
+        if categoria:
+            if categoria.nombre_categoria not in estadisticas_categoria:
+                estadisticas_categoria[categoria.nombre_categoria] = {
+                    'total': 0,
+                    'aprobados': 0,
+                    'rechazados': 0,
+                    'pendientes': 0
+                }
+            estadisticas_categoria[categoria.nombre_categoria]['total'] += 1
+            if ajuste.estado_aprobacion == 'aprobado':
+                estadisticas_categoria[categoria.nombre_categoria]['aprobados'] += 1
+            elif ajuste.estado_aprobacion == 'rechazado':
+                estadisticas_categoria[categoria.nombre_categoria]['rechazados'] += 1
+            else:
+                estadisticas_categoria[categoria.nombre_categoria]['pendientes'] += 1
+    
+    # 4. --- Estadísticas generales ---
+    total_ajustes = ajustes_formulados.count()
+    ajustes_aprobados = ajustes_formulados.filter(estado_aprobacion='aprobado').count()
+    ajustes_rechazados = ajustes_formulados.filter(estado_aprobacion='rechazado').count()
+    ajustes_pendientes = ajustes_formulados.filter(estado_aprobacion='pendiente').count()
+    
+    # 5. --- Ajustes recientes ---
+    ajustes_recientes = ajustes_formulados.order_by('-created_at')[:10]
+    
+    # 6. --- Preparar Contexto ---
+    context = {
+        'total_ajustes': total_ajustes,
+        'ajustes_aprobados': ajustes_aprobados,
+        'ajustes_rechazados': ajustes_rechazados,
+        'ajustes_pendientes': ajustes_pendientes,
+        'estadisticas_categoria': estadisticas_categoria,
+        'ajustes_recientes': ajustes_recientes,
+    }
+    
+    return render(request, 'SIAPE/estadisticas_ajustes_coordinador_tecnico.html', context)
 
 
 # ----------- Vistas para Docente ------------  
@@ -4591,10 +7603,25 @@ def dashboard_docente(request):
         asignaturas__in=mis_asignaturas
     ).values_list('estudiantes_id', flat=True).distinct()
     
-    # 3. Obtener todas las solicitudes aprobadas de estudiantes que están en las clases del docente
-    # Simplificado: si el estudiante está en las clases del docente y tiene solicitud aprobada, lo mostramos
+    # 3. Obtener solo solicitudes de estudiantes que tienen AJUSTES APROBADOS
+    #    Filtrar estudiantes que cursan las asignaturas del docente Y tienen ajustes aprobados
+    ajustes_aprobados = AjusteAsignado.objects.filter(
+        solicitudes__estudiantes_id__in=estudiantes_ids,
+        estado_aprobacion='aprobado'
+    ).select_related(
+        'solicitudes',
+        'solicitudes__estudiantes'
+    ).prefetch_related(
+        'ajuste_razonable__categorias_ajustes',
+        'solicitudes__asignaturas_solicitadas'
+    ).distinct()
+    
+    # Obtener IDs únicos de solicitudes con ajustes aprobados
+    solicitudes_ids_con_ajustes_aprobados = ajustes_aprobados.values_list('solicitudes_id', flat=True).distinct()
+    
+    # Obtener las solicitudes completas
     solicitudes_aprobadas = Solicitudes.objects.filter(
-        estudiantes_id__in=estudiantes_ids,
+        id__in=solicitudes_ids_con_ajustes_aprobados,
         estado='aprobado'
     ).select_related(
         'estudiantes'
@@ -4604,45 +7631,46 @@ def dashboard_docente(request):
     ).distinct()
 
     # 4. Crear un mapa de { asignatura_id -> [lista de detalles de caso] }
-    # Mostrar estudiantes con casos aprobados, incluso si no tienen ajustes asignados aún
+    # Solo mostrar estudiantes con ajustes aprobados
     mapa_casos_por_asignatura = {}
     total_estudiantes_con_caso = set() 
     mis_asignaturas_ids = set(mis_asignaturas.values_list('id', flat=True))
 
     for sol in solicitudes_aprobadas:
-        # Obtener ajustes aprobados si existen (puede estar vacío)
+        # Obtener ajustes aprobados (ya filtrados arriba, solo aprobados)
         ajustes_aprobados = sol.ajusteasignado_set.filter(estado_aprobacion='aprobado')
         
-        # Agregar el estudiante si tiene caso aprobado (aunque no tenga ajustes aún)
-        detalle_para_tabla = {
-            'estudiante': sol.estudiantes,
-            'ajustes': ajustes_aprobados,  # Puede estar vacío si no hay ajustes aprobados
-            'solicitud_id': sol.id  # ID de la solicitud original
-        }
-        
-        total_estudiantes_con_caso.add(sol.estudiantes.id)
-        
-        # Asignar este detalle a TODAS las asignaturas del docente donde el estudiante está inscrito
-        # (no solo las asignaturas de la solicitud)
-        for asig in mis_asignaturas:
-            # Verificar si el estudiante está inscrito en esta asignatura
-            estudiante_en_asignatura = AsignaturasEnCurso.objects.filter(
-                estudiantes=sol.estudiantes,
-                asignaturas=asig
-            ).exists()
+        # Solo agregar el estudiante si tiene ajustes aprobados
+        if ajustes_aprobados.exists():
+            detalle_para_tabla = {
+                'estudiante': sol.estudiantes,
+                'ajustes': ajustes_aprobados,
+                'solicitud_id': sol.id  # ID de la solicitud original
+            }
             
-            if estudiante_en_asignatura:
-                if asig.id not in mapa_casos_por_asignatura:
-                    mapa_casos_por_asignatura[asig.id] = []
+            total_estudiantes_con_caso.add(sol.estudiantes.id)
+            
+            # Asignar este detalle a TODAS las asignaturas del docente donde el estudiante está inscrito
+            # (no solo las asignaturas de la solicitud)
+            for asig in mis_asignaturas:
+                # Verificar si el estudiante está inscrito en esta asignatura
+                estudiante_en_asignatura = AsignaturasEnCurso.objects.filter(
+                    estudiantes=sol.estudiantes,
+                    asignaturas=asig
+                ).exists()
                 
-                # Evitar duplicados de estudiantes por asignatura
-                existe = False
-                for item in mapa_casos_por_asignatura[asig.id]:
-                    if item['estudiante'].id == sol.estudiantes.id:
-                        existe = True
-                        break
-                if not existe:
-                     mapa_casos_por_asignatura[asig.id].append(detalle_para_tabla)
+                if estudiante_en_asignatura:
+                    if asig.id not in mapa_casos_por_asignatura:
+                        mapa_casos_por_asignatura[asig.id] = []
+                    
+                    # Evitar duplicados de estudiantes por asignatura
+                    existe = False
+                    for item in mapa_casos_por_asignatura[asig.id]:
+                        if item['estudiante'].id == sol.estudiantes.id:
+                            existe = True
+                            break
+                    if not existe:
+                        mapa_casos_por_asignatura[asig.id].append(detalle_para_tabla)
 
     # 4. Construir el contexto final 'casos_por_asignatura' que espera la plantilla
     casos_por_asignatura = []
@@ -4677,15 +7705,31 @@ def mis_asignaturas_docente(request):
     
     perfil_docente = request.user.perfil
     
-    
+    # Obtener asignaturas del docente
     asignaturas_docente = Asignaturas.objects.filter(
         docente=perfil_docente
-    ).annotate(
-        total_estudiantes=Count('asignaturasencurso')
-    ).order_by('nombre') 
+    ).order_by('nombre')
+    
+    # Para cada asignatura, contar estudiantes con ajustes aprobados
+    asignaturas_con_contador = []
+    for asignatura in asignaturas_docente:
+        # Obtener estudiantes inscritos en esta asignatura
+        estudiantes_ids = AsignaturasEnCurso.objects.filter(
+            asignaturas=asignatura
+        ).values_list('estudiantes_id', flat=True)
+        
+        # Contar estudiantes con ajustes aprobados
+        estudiantes_con_ajustes_aprobados = AjusteAsignado.objects.filter(
+            solicitudes__estudiantes_id__in=estudiantes_ids,
+            estado_aprobacion='aprobado'
+        ).values('solicitudes__estudiantes_id').distinct().count()
+        
+        # Agregar el contador a la asignatura
+        asignatura.total_estudiantes = estudiantes_con_ajustes_aprobados
+        asignaturas_con_contador.append(asignatura)
 
     context = {
-        'asignaturas': asignaturas_docente
+        'asignaturas': asignaturas_con_contador
     }
     
     return render(request, 'SIAPE/mis_asignaturas_docente.html', context)
@@ -4721,41 +7765,41 @@ def mis_alumnos_docente(request):
         id__in=estudiantes_ids
     ).select_related('carreras').order_by('apellidos', 'nombres')
 
-    # 3. Obtener los IDs de estudiantes que tienen casos APROBADOS
-    #    Si un estudiante está en las clases del docente Y tiene una solicitud aprobada,
-    #    lo mostramos (sin importar si las asignaturas de la solicitud coinciden exactamente)
-    estudiantes_con_caso_aprobado_ids = set()
+    # 3. Obtener solo estudiantes que tienen AJUSTES APROBADOS
+    #    Filtrar estudiantes que cursan las asignaturas del docente Y tienen ajustes aprobados
+    estudiantes_con_ajustes_aprobados_ids = set()
     solicitudes_por_estudiante = {}
     
-    # Obtener todas las solicitudes aprobadas de estudiantes que están en las clases del docente
-    # Simplificado: si el estudiante está en las clases del docente y tiene solicitud aprobada, lo mostramos
-    solicitudes_aprobadas = Solicitudes.objects.filter(
-        estudiantes_id__in=estudiantes_ids,
-        estado='aprobado'
+    # Obtener ajustes aprobados de estudiantes que están en las clases del docente
+    ajustes_aprobados = AjusteAsignado.objects.filter(
+        solicitudes__estudiantes_id__in=estudiantes_ids,
+        estado_aprobacion='aprobado'
+    ).select_related(
+        'solicitudes',
+        'solicitudes__estudiantes'
     ).distinct()
     
-    # Para cada solicitud aprobada, agregar el estudiante a la lista
-    for solicitud in solicitudes_aprobadas:
-        estudiantes_con_caso_aprobado_ids.add(solicitud.estudiantes_id)
+    # Para cada ajuste aprobado, agregar el estudiante a la lista
+    for ajuste in ajustes_aprobados:
+        estudiante_id = ajuste.solicitudes.estudiantes_id
+        estudiantes_con_ajustes_aprobados_ids.add(estudiante_id)
         # Guardar la primera solicitud encontrada para cada estudiante
-        if solicitud.estudiantes_id not in solicitudes_por_estudiante:
-            solicitudes_por_estudiante[solicitud.estudiantes_id] = solicitud.id
+        if estudiante_id not in solicitudes_por_estudiante:
+            solicitudes_por_estudiante[estudiante_id] = ajuste.solicitudes_id
     
-    # 4. Preparar la lista final para la plantilla
+    # 4. Filtrar estudiantes: solo aquellos con ajustes aprobados
+    estudiantes_filtrados = mis_estudiantes.filter(
+        id__in=estudiantes_con_ajustes_aprobados_ids
+    )
+    
+    # 5. Preparar la lista final para la plantilla
     lista_alumnos_final = []
-    for est in mis_estudiantes:
-        tiene_caso_aprobado = est.id in estudiantes_con_caso_aprobado_ids
+    for est in estudiantes_filtrados:
         solicitud_id = solicitudes_por_estudiante.get(est.id)
-        
-        # Debug temporal - remover después
-        if tiene_caso_aprobado:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Estudiante {est.nombres} {est.apellidos} tiene caso aprobado. Solicitud ID: {solicitud_id}")
         
         lista_alumnos_final.append({
             'estudiante': est,
-            'tiene_caso_aprobado': tiene_caso_aprobado,
+            'tiene_caso_aprobado': True,  # Todos tienen ajustes aprobados
             'solicitud_id': solicitud_id
         })
 
@@ -4763,8 +7807,8 @@ def mis_alumnos_docente(request):
         'lista_alumnos': lista_alumnos_final,
         'total_alumnos': len(lista_alumnos_final),
         # Debug temporal
-        'debug_estudiantes_con_caso': len(estudiantes_con_caso_aprobado_ids),
-        'debug_total_solicitudes': solicitudes_aprobadas.count()
+        'debug_estudiantes_con_caso': len(estudiantes_con_ajustes_aprobados_ids),
+        'debug_total_solicitudes': ajustes_aprobados.count()
     }
 
     return render(request, 'SIAPE/mis_alumnos_docente.html', context)
@@ -4795,31 +7839,40 @@ def detalle_asignatura_docente(request, asignatura_id):
         asignaturas=asignatura
     ).select_related('estudiantes')
 
-    # 3. Obtener los IDs de estudiantes que tienen casos APROBADOS
-    # Simplificado: si el estudiante está en esta asignatura y tiene solicitud aprobada, lo mostramos
+    # 3. Obtener solo estudiantes que tienen AJUSTES APROBADOS
+    #    Filtrar estudiantes que cursan esta asignatura Y tienen ajustes aprobados
     estudiantes_ids_en_asignatura = list(estudiantes_en_curso.values_list('estudiantes_id', flat=True))
     
-    solicitudes_aprobadas = Solicitudes.objects.filter(
-        estudiantes_id__in=estudiantes_ids_en_asignatura,
-        estado='aprobado'
+    # Obtener ajustes aprobados de estudiantes que están en esta asignatura
+    ajustes_aprobados = AjusteAsignado.objects.filter(
+        solicitudes__estudiantes_id__in=estudiantes_ids_en_asignatura,
+        estado_aprobacion='aprobado'
+    ).select_related(
+        'solicitudes',
+        'solicitudes__estudiantes'
     ).distinct()
     
-    estudiantes_con_caso_aprobado_ids = set()
+    estudiantes_con_ajustes_aprobados_ids = set()
     solicitudes_por_estudiante = {}
-    for solicitud in solicitudes_aprobadas:
-        estudiantes_con_caso_aprobado_ids.add(solicitud.estudiantes_id)
-        if solicitud.estudiantes_id not in solicitudes_por_estudiante:
-            solicitudes_por_estudiante[solicitud.estudiantes_id] = solicitud.id
+    for ajuste in ajustes_aprobados:
+        estudiante_id = ajuste.solicitudes.estudiantes_id
+        estudiantes_con_ajustes_aprobados_ids.add(estudiante_id)
+        if estudiante_id not in solicitudes_por_estudiante:
+            solicitudes_por_estudiante[estudiante_id] = ajuste.solicitudes_id
 
     
-    # 4. Preparar la lista final de alumnos para la plantilla
+    # 4. Filtrar estudiantes: solo aquellos con ajustes aprobados
+    estudiantes_filtrados = estudiantes_en_curso.filter(
+        estudiantes_id__in=estudiantes_con_ajustes_aprobados_ids
+    )
+    
+    # 5. Preparar la lista final de alumnos para la plantilla
     lista_alumnos = []
-    for ec in estudiantes_en_curso:
-        tiene_caso_aprobado = ec.estudiantes.id in estudiantes_con_caso_aprobado_ids
+    for ec in estudiantes_filtrados:
         solicitud_id = solicitudes_por_estudiante.get(ec.estudiantes.id)
         lista_alumnos.append({
             'estudiante': ec.estudiantes,
-            'tiene_caso_aprobado': tiene_caso_aprobado,
+            'tiene_caso_aprobado': True,  # Todos tienen ajustes aprobados
             'solicitud_id': solicitud_id
         })
 
@@ -5210,4 +8263,100 @@ class PerfilUsuarioViewSet(viewsets.ModelViewSet):
             return queryset.filter(usuario=self.request.user)
         except AttributeError:
             return PerfilUsuario.objects.none()
+
+
+@login_required
+def opciones_usuario(request):
+    """
+    Vista para que el usuario pueda ver y editar sus datos personales
+    y cambiar su contraseña.
+    """
+    usuario = request.user
+    
+    if request.method == 'POST':
+        accion = request.POST.get('accion')
+        
+        if accion == 'actualizar_datos':
+            # Actualizar datos personales
+            first_name = request.POST.get('first_name', '').strip()
+            last_name = request.POST.get('last_name', '').strip()
+            email = request.POST.get('email', '').strip()
+            numero = request.POST.get('numero', '').strip()
+            
+            # Validaciones básicas
+            if not first_name or not last_name or not email:
+                messages.error(request, 'Nombre, apellido y correo electrónico son obligatorios.')
+                return redirect('opciones_usuario')
+            
+            # Validar que el email no esté en uso por otro usuario
+            if email != usuario.email and Usuario.objects.filter(email=email).exclude(id=usuario.id).exists():
+                messages.error(request, 'Este correo electrónico ya está en uso por otro usuario.')
+                return redirect('opciones_usuario')
+            
+            # Actualizar datos
+            usuario.first_name = first_name
+            usuario.last_name = last_name
+            usuario.email = email
+            if numero:
+                try:
+                    usuario.numero = int(numero)
+                except ValueError:
+                    messages.error(request, 'El número de teléfono debe ser un número válido.')
+                    return redirect('opciones_usuario')
+            else:
+                usuario.numero = None
+            
+            usuario.save()
+            messages.success(request, 'Datos actualizados correctamente.')
+            return redirect('opciones_usuario')
+        
+        elif accion == 'cambiar_password':
+            # Cambiar contraseña
+            password_actual = request.POST.get('password_actual', '')
+            password_nueva = request.POST.get('password_nueva', '')
+            password_confirmar = request.POST.get('password_confirmar', '')
+            
+            # Validar que se ingresó la contraseña actual
+            if not password_actual:
+                messages.error(request, 'Debe ingresar su contraseña actual.')
+                return redirect('opciones_usuario')
+            
+            # Verificar que la contraseña actual sea correcta
+            if not usuario.check_password(password_actual):
+                messages.error(request, 'La contraseña actual es incorrecta.')
+                return redirect('opciones_usuario')
+            
+            # Validar que se ingresó la nueva contraseña
+            if not password_nueva:
+                messages.error(request, 'Debe ingresar una nueva contraseña.')
+                return redirect('opciones_usuario')
+            
+            # Validar que las contraseñas nuevas coincidan
+            if password_nueva != password_confirmar:
+                messages.error(request, 'Las contraseñas nuevas no coinciden.')
+                return redirect('opciones_usuario')
+            
+            # Validar la nueva contraseña
+            es_valida, mensaje_error = validar_contraseña(password_nueva)
+            if not es_valida:
+                messages.error(request, mensaje_error)
+                return redirect('opciones_usuario')
+            
+            # Cambiar la contraseña
+            usuario.set_password(password_nueva)
+            usuario.save()
+            
+            # Actualizar la sesión para que el usuario no se desloguee
+            update_session_auth_hash(request, usuario)
+            
+            messages.success(request, 'Contraseña cambiada correctamente.')
+            return redirect('opciones_usuario')
+    
+    # GET: Mostrar formulario con datos actuales
+    context = {
+        'usuario': usuario,
+        'rol': usuario.perfil.rol.nombre_rol if hasattr(usuario, 'perfil') and usuario.perfil.rol else 'Sin rol asignado',
+    }
+    
+    return render(request, 'SIAPE/opciones_usuario.html', context)
 

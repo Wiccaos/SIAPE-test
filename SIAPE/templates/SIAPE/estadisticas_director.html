@@ -8,6 +8,13 @@
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Asegurar que el texto tachado se muestre en las leyendas de Chart.js cuando está oculto */
+        canvas ~ ul li[style*="opacity"] span,
+        canvas ~ ul li[style*="opacity"] {
+            text-decoration: line-through !important;
+        }
+    </style>
 {% endblock %}
 
 {% block content %}
@@ -30,38 +37,249 @@
             <i class="fas fa-graduation-cap"></i>
             Mis Carreras
         </a>
+        <a href="{% url 'gestion_asignaturas_director' %}" class="nav-item">
+            <i class="fas fa-book"></i>
+            Asignaturas
+        </a>
         <a href="{% url 'gestion_carga_masiva_director' %}" class="nav-item">
             <i class="fas fa-file-upload"></i>
             Carga Masiva
         </a>
     </nav>
 
-    <div class="chart-grid">
+    <h1 class="page-title"><i class="fas fa-chart-line"></i> Estadísticas de Mis Carreras</h1>
+    <p class="text-muted" style="margin-bottom: 30px;">Vista completa de estadísticas y métricas de las carreras que gestionas</p>
 
-        <div class="chart-container-half">
-            <h3><i class="fas fa-pie-chart"></i> Estado General de Ajustes</h3>
-            <p class="text-muted">Estado de todos los ajustes para estudiantes de tus carreras.</p>
-            <div class="chart-canvas-wrapper">
-                <canvas id="pieChartAjustes"></canvas>
+    <!-- KPIs Principales -->
+    <section class="kpi-container kpi-container-asesor">
+        <div class="kpi-card">
+            <div class="kpi-icon icon-solicitudes">
+                <i class="fas fa-file-medical"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ total_casos|default:0 }}</span>
+                <span class="kpi-label">Total Casos</span>
             </div>
         </div>
 
-        <div class="chart-container-half">
-            <h3><i class="fas fa-tags"></i> Tipos de Apoyo Aprobados</h3>
-            <p class="text-muted">Categorías más comunes de ajustes aprobados en tus carreras.</p>
-            <div class="chart-canvas-wrapper" style="max-width: 100%; height: 100%;">
-                <canvas id="barChartTipos"></canvas>
+        <div class="kpi-card">
+            <div class="kpi-icon icon-resueltos">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ casos_aprobados|default:0 }}</span>
+                <span class="kpi-label">Aprobados</span>
             </div>
         </div>
 
-        <div class="chart-container-full">
-            <h3><i class="fas fa-book-reader"></i> Secciones con Más Apoyos Aprobados (Top 5)</h3>
-            <p class="text-muted">Identifica las asignaturas/secciones donde se concentran los apoyos.</p>
-            <div style="position: relative; width: 100%; height: 400px;">
-                <canvas id="barChartSecciones"></canvas>
+        <div class="kpi-card">
+            <div class="kpi-icon icon-proceso">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ casos_pendientes|default:0 }}</span>
+                <span class="kpi-label">Pendientes</span>
             </div>
         </div>
 
+        <div class="kpi-card">
+            <div class="kpi-icon icon-proceso">
+                <i class="fas fa-tools"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ total_ajustes|default:0 }}</span>
+                <span class="kpi-label">Total Ajustes</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-resueltos">
+                <i class="fas fa-check"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ ajustes_aprobados|default:0 }}</span>
+                <span class="kpi-label">Ajustes Aprobados</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-icon-danger">
+                <i class="fas fa-times"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ ajustes_rechazados|default:0 }}</span>
+                <span class="kpi-label">Ajustes Rechazados</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-proceso">
+                <i class="fas fa-percentage"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ tasa_aprobacion|default:0 }}%</span>
+                <span class="kpi-label">Tasa Aprobación</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-solicitudes">
+                <i class="fas fa-calendar-week"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ casos_nuevos_semana|default:0 }}</span>
+                <span class="kpi-label">Nuevos (Semana)</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Selector de Rango de Tiempo y Generación de Reportes -->
+    <section class="filters-section" style="margin-bottom: 30px; margin-top: 20px;">
+        <form method="GET" action="{% url 'estadisticas_director' %}" style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; margin-bottom: 15px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <label for="rango" style="font-weight: 600; color: var(--text-secondary);">Rango de Tiempo:</label>
+                <select name="rango" id="rango" onchange="this.form.submit()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; background: var(--bg-input); color: var(--text-primary); min-width: 180px;">
+                    <option value="mes" {% if rango_seleccionado == 'mes' %}selected{% endif %}>Último Mes</option>
+                    <option value="semestre" {% if rango_seleccionado == 'semestre' %}selected{% endif %}>Último Semestre</option>
+                    <option value="año" {% if rango_seleccionado == 'año' %}selected{% endif %}>Último Año</option>
+                    <option value="historico" {% if rango_seleccionado == 'historico' %}selected{% endif %}>Histórico Completo</option>
+                </select>
+            </div>
+            <span style="color: var(--text-secondary); font-size: 0.9em;">
+                <i class="fas fa-info-circle"></i> Mostrando: <strong>{{ rango_nombre }}</strong>
+            </span>
+        </form>
+        
+        <!-- Botones de Generación de Reportes -->
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <span style="font-weight: 600; color: var(--text-secondary); margin-right: 5px;">Generar Reporte:</span>
+            <a href="{% url 'generar_reporte_pdf_director' %}?rango={{ rango_seleccionado }}" 
+               class="btn btn-primary" 
+               style="padding: 8px 16px; background: #D32F2F; color: white; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;"
+               target="_blank">
+                <i class="fas fa-file-pdf"></i> PDF
+            </a>
+            <a href="{% url 'generar_reporte_excel_director' %}?rango={{ rango_seleccionado }}" 
+               class="btn btn-secondary" 
+               style="padding: 8px 16px; background: #007bff; color: white; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;"
+               download>
+                <i class="fas fa-file-excel"></i> Excel
+            </a>
+        </div>
+    </section>
+
+    <!-- Gráficos de Tendencias -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+        <!-- Tendencia de Casos -->
+        <section class="table-container">
+            <div class="table-header">
+                <h3>
+                    <i class="fas fa-chart-line"></i> 
+                    {% if rango_seleccionado == 'mes' %}
+                        Casos por Día ({{ rango_nombre }})
+                    {% elif rango_seleccionado == 'semestre' or rango_seleccionado == 'año' %}
+                        Casos por Mes ({{ rango_nombre }})
+                    {% else %}
+                        Casos por Año ({{ rango_nombre }})
+                    {% endif %}
+                </h3>
+            </div>
+            <div style="padding: 20px;">
+                <canvas id="graficoTendencia"></canvas>
+            </div>
+        </section>
+
+        <!-- Estado de Ajustes -->
+        <section class="table-container">
+            <div class="table-header">
+                <h3><i class="fas fa-chart-pie"></i> Estado de Ajustes</h3>
+            </div>
+            <div style="padding: 20px; min-height: 400px; display: flex; justify-content: center; align-items: center;">
+                <canvas id="graficoAjustes" style="max-width: 250px; max-height: 250px;"></canvas>
+            </div>
+        </section>
+    </div>
+
+    <!-- Gráficos de Distribución -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+        <!-- Tipos de Apoyo por Categoría -->
+        <section class="table-container">
+            <div class="table-header">
+                <h3><i class="fas fa-tags"></i> Ajustes Aprobados por Categoría</h3>
+            </div>
+            <div style="padding: 20px;">
+                <canvas id="graficoTipos"></canvas>
+            </div>
+        </section>
+
+        <!-- Secciones con Más Ajustes -->
+        <section class="table-container">
+            <div class="table-header">
+                <h3><i class="fas fa-book-reader"></i> Secciones con Más Ajustes (Top 5)</h3>
+            </div>
+            <div style="padding: 20px;">
+                <canvas id="graficoSecciones"></canvas>
+            </div>
+        </section>
+    </div>
+
+    <!-- Tablas Detalladas -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+        <!-- Tabla de Estados -->
+        <section class="table-container">
+            <div class="table-header">
+                <h3><i class="fas fa-list"></i> Casos por Estado</h3>
+            </div>
+            <table class="custom-table table-estados">
+                <thead>
+                    <tr>
+                        <th>Estado</th>
+                        <th style="text-align: center;">Cantidad</th>
+                        <th style="text-align: center;">Porcentaje</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for estado in estados_stats %}
+                    <tr>
+                        <td>{{ estado.nombre }}</td>
+                        <td style="text-align: center;"><strong>{{ estado.cantidad }}</strong></td>
+                        <td style="text-align: center;">{{ estado.porcentaje }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Tabla de Carreras -->
+        <section class="table-container">
+            <div class="table-header">
+                <h3><i class="fas fa-graduation-cap"></i> Estadísticas por Carrera</h3>
+            </div>
+            <table class="custom-table table-carreras">
+                <thead>
+                    <tr>
+                        <th>Carrera</th>
+                        <th style="text-align: center;">Total</th>
+                        <th style="text-align: center;">Aprobados</th>
+                        <th style="text-align: center;">Tasa</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for carrera in carreras_stats %}
+                    <tr>
+                        <td>{{ carrera.nombre }}</td>
+                        <td style="text-align: center;"><strong>{{ carrera.total }}</strong></td>
+                        <td style="text-align: center;">{{ carrera.aprobados }}</td>
+                        <td style="text-align: center;">{{ carrera.tasa_aprobacion }}%</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" style="text-align: center; color: #999;">No hay datos disponibles</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
     </div>
 
 </div>
@@ -69,47 +287,72 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         
-        // --- Cargar datos de Django (convertidos a JSON en la vista) ---
-        const pieData = {{ pie_chart_data_json|safe }};
-        const barDataTipos = {{ bar_chart_tipos_json|safe }};
-        const barDataSecciones = {{ bar_chart_secciones_json|safe }};
+        // --- 1. Gráfico de Tendencia (Línea) ---
+        const ctxTendencia = document.getElementById('graficoTendencia').getContext('2d');
+        const tendenciaData = JSON.parse('{{ chart_tendencia_json|escapejs }}');
+        new Chart(ctxTendencia, {
+            type: 'line',
+            data: tendenciaData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
 
-        // --- 1. Renderizar Gráfico Circular (Estado de Ajustes) ---
-        const ctxPie = document.getElementById('pieChartAjustes').getContext('2d');
-        if (pieData.labels.length > 0) {
-            new Chart(ctxPie, {
-                type: 'pie',
-                data: pieData,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { 
-                            position: 'top',
-                            align: 'center'
-                        },
+        // --- 2. Gráfico de Estado de Ajustes (Doughnut) ---
+        const ctxAjustes = document.getElementById('graficoAjustes').getContext('2d');
+        const ajustesData = JSON.parse('{{ pie_chart_data_json|escapejs }}');
+        new Chart(ctxAjustes, {
+            type: 'doughnut',
+            data: ajustesData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                aspectRatio: 1,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        generateLabels: function(chart) {
+                            const original = Chart.defaults.plugins.legend.labels.generateLabels;
+                            const labels = original.call(this, chart);
+                            labels.forEach((label, i) => {
+                                const meta = chart.getDatasetMeta(0);
+                                const data = meta.data[i];
+                                const value = chart.data.datasets[0].data[i];
+                                const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                label.text = `${label.text}: ${value} (${percentage}%)`;
+                                if (data.hidden) {
+                                    label.hidden = true;
+                                }
+                            });
+                            return labels;
+                        }
                     },
-                    layout: {
-                        padding: {
-                            top: 10,
-                            bottom: 10,
-                            left: 10,
-                            right: 10
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.label + ': ' + context.parsed;
+                            }
                         }
                     }
                 }
-            });
-        } else {
-            document.getElementById('pieChartAjustes').parentElement.innerHTML = 
-                '<div class="empty-state"><i class="fas fa-chart-pie"></i><p>No hay datos de ajustes para mostrar.</p></div>';
-        }
+            }
+        });
 
-        // --- 2. Renderizar Gráfico de Barras (Tipos de Ajuste) ---
-        const ctxBarTipos = document.getElementById('barChartTipos').getContext('2d');
-        if (barDataTipos.labels.length > 0) {
-            new Chart(ctxBarTipos, {
+        // --- 3. Gráfico de Tipos de Ajuste (Barras) ---
+        const ctxTipos = document.getElementById('graficoTipos').getContext('2d');
+        const tiposData = JSON.parse('{{ bar_chart_tipos_json|escapejs }}');
+        if (tiposData.labels.length > 0) {
+            new Chart(ctxTipos, {
                 type: 'bar',
-                data: barDataTipos,
+                data: tiposData,
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
@@ -120,20 +363,21 @@
                 }
             });
         } else {
-            document.getElementById('barChartTipos').parentElement.innerHTML = 
+            document.getElementById('graficoTipos').parentElement.innerHTML = 
                 '<div class="empty-state"><i class="fas fa-tags"></i><p>No hay ajustes aprobados para mostrar.</p></div>';
         }
 
-        // --- 3. Renderizar Gráfico de Barras (Secciones) ---
-        const ctxBarSecciones = document.getElementById('barChartSecciones').getContext('2d');
-        if (barDataSecciones.labels.length > 0) {
-            new Chart(ctxBarSecciones, {
+        // --- 4. Gráfico de Secciones (Barras Horizontales) ---
+        const ctxSecciones = document.getElementById('graficoSecciones').getContext('2d');
+        const seccionesData = JSON.parse('{{ bar_chart_secciones_json|escapejs }}');
+        if (seccionesData.labels.length > 0) {
+            new Chart(ctxSecciones, {
                 type: 'bar',
-                data: barDataSecciones,
+                data: seccionesData,
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    indexAxis: 'y', // Hace el gráfico horizontal para mejor lectura
+                    indexAxis: 'y',
                     plugins: { legend: { display: false } },
                     scales: {
                         x: { beginAtZero: true, ticks: { stepSize: 1 } }
@@ -141,11 +385,10 @@
                 }
             });
         } else {
-            document.getElementById('barChartSecciones').parentElement.innerHTML = 
+            document.getElementById('graficoSecciones').parentElement.innerHTML = 
                 '<div class="empty-state"><i class="fas fa-book-reader"></i><p>No hay datos de secciones con ajustes aprobados.</p></div>';
         }
 
     });
 </script>
-
 {% endblock %}

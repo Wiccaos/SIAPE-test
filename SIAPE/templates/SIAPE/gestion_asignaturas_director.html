@@ -1,0 +1,240 @@
+{% extends "plantilla.html" %}
+{% load static %}
+
+{% block title %}
+    Gestión de Asignaturas | SIAPE
+{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="main-content"> 
+    
+    <nav class="dashboard-nav">
+        <a href="{% url 'dashboard_director' %}" class="nav-item">
+            <i class="fas fa-user-tie"></i>
+            Panel Principal
+        </a>
+        <a href="{% url 'casos_generales' %}" class="nav-item">
+            <i class="fas fa-folder-open"></i>
+            Casos
+        </a>
+        <a href="{% url 'estadisticas_director' %}" class="nav-item">
+            <i class="fas fa-chart-bar"></i>
+            Estadísticas
+        </a>
+        <a href="{% url 'carreras_director' %}" class="nav-item">
+            <i class="fas fa-graduation-cap"></i>
+            Mis Carreras
+        </a>
+        <a href="{% url 'gestion_asignaturas_director' %}" class="nav-item active">
+            <i class="fas fa-book"></i>
+            Asignaturas
+        </a>
+        <a href="{% url 'gestion_carga_masiva_director' %}" class="nav-item">
+            <i class="fas fa-file-upload"></i>
+            Carga Masiva
+        </a>
+    </nav>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <h1 class="page-title"><i class="fas fa-book"></i> Gestión de Asignaturas</h1>
+    
+    <!-- Estadísticas rápidas -->
+    <div class="stats-row">
+        <div class="stat-mini total">
+            <i class="fas fa-book-open"></i>
+            <div class="stat-mini-info">
+                <span class="value">{{ total_asignaturas }}</span>
+                <span class="label">Total Asignaturas</span>
+            </div>
+        </div>
+        <div class="stat-mini activas">
+            <i class="fas fa-check-circle"></i>
+            <div class="stat-mini-info">
+                <span class="value">{{ total_activas }}</span>
+                <span class="label">Activas</span>
+            </div>
+        </div>
+        <div class="stat-mini inactivas">
+            <i class="fas fa-times-circle"></i>
+            <div class="stat-mini-info">
+                <span class="value">{{ total_inactivas }}</span>
+                <span class="label">Inactivas</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="filters-section">
+        <form method="GET" class="filters-form">
+            <div class="filter-group">
+                <label>Estado</label>
+                <select name="estado">
+                    <option value="todas" {% if filtro_estado == 'todas' %}selected{% endif %}>Todas</option>
+                    <option value="activas" {% if filtro_estado == 'activas' %}selected{% endif %}>Solo Activas</option>
+                    <option value="inactivas" {% if filtro_estado == 'inactivas' %}selected{% endif %}>Solo Inactivas</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Carrera</label>
+                <select name="carrera">
+                    <option value="">Todas las carreras</option>
+                    {% for carrera in carreras %}
+                        <option value="{{ carrera.id }}" {% if filtro_carrera == carrera.id|stringformat:"s" %}selected{% endif %}>{{ carrera.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Semestre</label>
+                <select name="semestre">
+                    <option value="">Todos</option>
+                    {% for key, label in semestres %}
+                        <option value="{{ key }}" {% if filtro_semestre == key %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="filter-btn">
+                <i class="fas fa-filter"></i> Filtrar
+            </button>
+            <a href="{% url 'gestion_asignaturas_director' %}" class="clear-filters">
+                <i class="fas fa-times"></i> Limpiar
+            </a>
+        </form>
+    </div>
+
+    <!-- Información sobre desactivación automática -->
+    <div class="bulk-actions info-box">
+        <span>
+            <i class="fas fa-info-circle"></i> 
+            <strong>Desactivación automática:</strong> Las asignaturas se desactivan automáticamente al terminar el semestre.
+            <br><small>Otoño (Mar-Jul) se desactiva en Agosto | Primavera (Ago-Dic) se desactiva en Enero</small>
+        </span>
+    </div>
+    
+    <!-- Acciones masivas (solo reactivación) -->
+    <form method="POST" action="{% url 'bulk_toggle_asignaturas' %}" id="bulkForm">
+        {% csrf_token %}
+        <div class="bulk-actions">
+            <span><i class="fas fa-tasks"></i> Acciones masivas:</span>
+            <button type="submit" name="accion" value="activar" class="bulk-btn activar" onclick="return confirm('¿Reactivar las asignaturas seleccionadas?')">
+                <i class="fas fa-redo"></i> Reactivar seleccionadas
+            </button>
+        </div>
+
+        <!-- Tabla de asignaturas -->
+        <section class="table-container">
+            <div class="tabla-asignaturas-wrapper">
+                <table class="custom-table tabla-asignaturas">
+                    <thead>
+                        <tr>
+                            <th class="col-checkbox">
+                                <input type="checkbox" id="selectAll" class="asignatura-checkbox" title="Seleccionar todas">
+                            </th>
+                            <th class="col-nombre">Nombre Asignatura</th>
+                            <th class="col-seccion">Sección</th>
+                            <th class="col-carrera">Carrera</th>
+                            <th class="col-docente">Docente</th>
+                            <th class="col-semestre">Semestre</th>
+                            <th class="col-estado">Estado</th>
+                            <th class="col-accion">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for asignatura in asignaturas %}
+                        <tr>
+                            <td class="col-checkbox">
+                                <input type="checkbox" name="asignaturas_ids" value="{{ asignatura.id }}" class="asignatura-checkbox asignatura-check">
+                            </td>
+                            <td class="col-nombre" title="{{ asignatura.nombre }}">
+                                <strong>{{ asignatura.nombre }}</strong>
+                            </td>
+                            <td class="col-seccion">
+                                <code>{{ asignatura.seccion }}</code>
+                            </td>
+                            <td class="col-carrera" title="{{ asignatura.carreras.nombre }}">
+                                {{ asignatura.carreras.nombre }}
+                            </td>
+                            <td class="col-docente" title="{% if asignatura.docente %}{{ asignatura.docente.usuario.first_name }} {{ asignatura.docente.usuario.last_name }}{% endif %}">
+                                {% if asignatura.docente %}
+                                    {{ asignatura.docente.usuario.first_name }} {{ asignatura.docente.usuario.last_name }}
+                                {% else %}
+                                    <span class="text-muted-light">Sin asignar</span>
+                                {% endif %}
+                            </td>
+                            <td class="col-semestre">
+                                {% if asignatura.semestre %}
+                                    <span class="badge-semestre">
+                                        {{ asignatura.get_semestre_display }}{% if asignatura.anio %} {{ asignatura.anio }}{% endif %}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted-light">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="col-estado">
+                                {% if asignatura.is_active %}
+                                    <span class="badge-estado badge-activa"><i class="fas fa-check"></i> Activa</span>
+                                {% else %}
+                                    <span class="badge-estado badge-inactiva"><i class="fas fa-times"></i> Inactiva</span>
+                                {% endif %}
+                            </td>
+                            <td class="col-accion">
+                                {% if not asignatura.is_active %}
+                                    <form method="POST" action="{% url 'toggle_asignatura_estado' asignatura.id %}">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn-toggle activar" onclick="return confirm('¿Reactivar esta asignatura?')">
+                                            <i class="fas fa-redo"></i> Reactivar
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <span class="text-success-sm">
+                                        <i class="fas fa-check-circle"></i> Vigente
+                                    </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8">
+                                <div class="empty-state">
+                                    <i class="fas fa-book"></i>
+                                    <p>No hay asignaturas que mostrar con los filtros seleccionados.</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </form>
+
+</div>
+
+<script>
+    // Seleccionar/deseleccionar todas
+    document.getElementById('selectAll').addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('.asignatura-check');
+        checkboxes.forEach(cb => cb.checked = this.checked);
+    });
+    
+    // Actualizar "seleccionar todas" cuando se cambian checkboxes individuales
+    document.querySelectorAll('.asignatura-check').forEach(cb => {
+        cb.addEventListener('change', function() {
+            const allChecked = document.querySelectorAll('.asignatura-check:checked').length === 
+                              document.querySelectorAll('.asignatura-check').length;
+            document.getElementById('selectAll').checked = allChecked;
+        });
+    });
+</script>
+{% endblock %}
+

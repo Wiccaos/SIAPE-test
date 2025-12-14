@@ -33,12 +33,21 @@
             <a href="{% url 'casos_generales' %}" class="nav-item active"> 
                 <i class="fas fa-folder-open"></i> Casos
             </a>
-        {% elif user.perfil.rol.nombre_rol == "Asesora Pedagógica" %}
+            <a href="{% url 'gestion_categorias_ajustes' %}" class="nav-item">
+                <i class="fas fa-tags"></i> Categorías
+            </a>
+            <a href="{% url 'estadisticas_ajustes_coordinador_tecnico' %}" class="nav-item">
+                <i class="fas fa-chart-bar"></i> Estadísticas
+            </a>
+        {% elif user.perfil.rol.nombre_rol == "Asesor Pedagógico" %}
             <a href="{% url 'dashboard_asesor' %}" class="nav-item">
                 <i class="fas fa-home"></i> Panel Principal
             </a>
             <a href="{% url 'casos_generales' %}" class="nav-item active"> 
                 <i class="fas fa-folder-open"></i> Casos
+            </a>
+            <a href="{% url 'estadisticas_asesor_pedagogico' %}" class="nav-item">
+                <i class="fas fa-chart-bar"></i> Estadísticas
             </a>
         {% elif user.perfil.rol.nombre_rol == "Director de Carrera" %}
             <a href="{% url 'dashboard_director' %}" class="nav-item">
@@ -52,6 +61,9 @@
             </a>
             <a href="{% url 'carreras_director' %}" class="nav-item">
                 <i class="fas fa-graduation-cap"></i> Mis Carreras
+            </a>
+            <a href="{% url 'gestion_asignaturas_director' %}" class="nav-item">
+                <i class="fas fa-book"></i> Asignaturas
             </a>
             <a href="{% url 'gestion_carga_masiva_director' %}" class="nav-item">
                 <i class="fas fa-file-upload"></i> Carga Masiva
@@ -95,7 +107,7 @@
                         Mostrando casos en estado "Pendiente de Entrevista" y "Pendiente de Formulación de Caso".
                     {% elif rol_usuario == "Coordinador Técnico Pedagógico" %}
                         Mostrando casos en estado "Pendiente de Formulación de Ajustes".
-                    {% elif rol_usuario == "Asesora Pedagógica" %}
+                    {% elif rol_usuario == "Asesor Pedagógico" %}
                         Mostrando casos en estado "Pendiente de Preaprobación".
                     {% elif rol_usuario == "Director de Carrera" %}
                         Mostrando casos en estado "Pendiente de Aprobación".

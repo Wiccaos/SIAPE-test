@@ -1,0 +1,183 @@
+{% extends "plantilla.html" %}
+{% load static %}
+
+{% block title %}
+    Gestión de Categorías de Ajustes | SIAPE
+{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="main-content"> 
+    
+    <nav class="dashboard-nav">
+        <a href="{% url 'dashboard_coordinador_tecnico_pedagogico' %}" class="nav-item">
+            <i class="fas fa-home"></i>
+            Panel Principal
+        </a>
+        <a href="{% url 'casos_generales' %}" class="nav-item">
+            <i class="fas fa-folder-open"></i>
+            Casos
+        </a>
+        <a href="{% url 'gestion_categorias_ajustes' %}" class="nav-item active">
+            <i class="fas fa-tags"></i>
+            Categorías
+        </a>
+        <a href="{% url 'estadisticas_ajustes_coordinador_tecnico' %}" class="nav-item">
+            <i class="fas fa-chart-bar"></i>
+            Estadísticas
+        </a>
+    </nav>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <h1 class="page-title"><i class="fas fa-tags"></i> Gestión de Categorías de Ajustes</h1>
+    
+    <p class="text-muted" style="margin-bottom: 20px;">
+        Administra las categorías disponibles para clasificar los ajustes razonables. 
+        Las categorías en uso no pueden ser eliminadas.
+    </p>
+
+    <!-- Formulario para crear nueva categoría -->
+    <section class="table-container" style="margin-bottom: 20px;">
+        <div class="table-header">
+            <h3><i class="fas fa-plus-circle"></i> Crear Nueva Categoría</h3>
+        </div>
+        <form method="POST" style="padding: 20px;">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="crear">
+            <div style="display: flex; gap: 10px; align-items: flex-end;">
+                <div style="flex: 1;">
+                    <label for="nombre" style="display: block; margin-bottom: 5px; font-weight: 600;">Nombre de la Categoría:</label>
+                    <input type="text" name="nombre" id="nombre" required 
+                           placeholder="Ej: Tiempo adicional, Material adaptado, etc."
+                           style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                </div>
+                <button type="submit" class="btn-accion btn-accion-green">
+                    <i class="fas fa-plus"></i> Crear Categoría
+                </button>
+            </div>
+        </form>
+    </section>
+
+    <!-- Tabla de categorías existentes -->
+    <section class="table-container">
+        <div class="table-header">
+            <h3><i class="fas fa-list"></i> Categorías Existentes</h3>
+        </div>
+        
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th style="width: 5%;">#</th>
+                    <th>Nombre de la Categoría</th>
+                    <th style="width: 15%; text-align: center;">Ajustes Asociados</th>
+                    <th style="width: 25%; text-align: center;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for categoria in categorias %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td><strong>{{ categoria.nombre_categoria }}</strong></td>
+                    <td style="text-align: center;">
+                        <span class="badge-estado {% if categoria.total_ajustes > 0 %}badge-activa{% else %}badge-inactiva{% endif %}">
+                            {{ categoria.total_ajustes }}
+                        </span>
+                    </td>
+                    <td style="text-align: center;">
+                        <div style="display: flex; gap: 5px; justify-content: center;">
+                            <!-- Botón Editar -->
+                            <button type="button" class="btn-toggle activar" 
+                                    onclick="abrirModalEditar({{ categoria.id }}, '{{ categoria.nombre_categoria|escapejs }}')">
+                                <i class="fas fa-edit"></i> Editar
+                            </button>
+                            <!-- Botón Eliminar -->
+                            {% if categoria.total_ajustes == 0 %}
+                            <form method="POST" style="display: inline;" 
+                                  onsubmit="return confirm('¿Está seguro de eliminar la categoría \"{{ categoria.nombre_categoria }}\"?');">
+                                {% csrf_token %}
+                                <input type="hidden" name="accion" value="eliminar">
+                                <input type="hidden" name="categoria_id" value="{{ categoria.id }}">
+                                <button type="submit" class="btn-toggle desactivar">
+                                    <i class="fas fa-trash"></i> Eliminar
+                                </button>
+                            </form>
+                            {% else %}
+                            <button type="button" class="btn-toggle desactivar" disabled 
+                                    title="No se puede eliminar: tiene {{ categoria.total_ajustes }} ajuste(s) asociado(s)">
+                                <i class="fas fa-trash"></i> Eliminar
+                            </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4">
+                        <div class="empty-state">
+                            <i class="fas fa-tags"></i>
+                            <p>No hay categorías creadas aún.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+</div>
+
+<!-- Modal para Editar Categoría -->
+<div id="modalEditar" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h4><i class="fas fa-edit"></i> Editar Categoría</h4>
+            <button class="close" onclick="cerrarModalEditar()">&times;</button>
+        </div>
+        <form method="POST" id="formEditar">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="editar">
+            <input type="hidden" name="categoria_id" id="categoria_id_editar">
+            <div class="form-group">
+                <label for="nuevo_nombre">Nuevo Nombre:</label>
+                <input type="text" name="nuevo_nombre" id="nuevo_nombre" required 
+                       style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarModalEditar()">Cancelar</button>
+                <button type="submit" class="btn-accion btn-accion-green">Guardar Cambios</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function abrirModalEditar(categoriaId, nombreActual) {
+    document.getElementById('categoria_id_editar').value = categoriaId;
+    document.getElementById('nuevo_nombre').value = nombreActual;
+    document.getElementById('modalEditar').style.display = 'block';
+}
+
+function cerrarModalEditar() {
+    document.getElementById('modalEditar').style.display = 'none';
+}
+
+// Cerrar modal al hacer clic fuera
+window.onclick = function(event) {
+    const modal = document.getElementById('modalEditar');
+    if (event.target == modal) {
+        cerrarModalEditar();
+    }
+}
+</script>
+{% endblock %}
+

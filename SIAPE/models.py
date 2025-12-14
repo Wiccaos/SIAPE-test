@@ -264,6 +264,11 @@ class Evidencias(models.Model):
         return self.archivo.name
 
 
+SEMESTRE_CHOICES = (
+    ('otono', 'Otoño (Marzo-Julio)'),
+    ('primavera', 'Primavera (Agosto-Diciembre)'),
+)
+
 class Asignaturas(models.Model):
     nombre = models.CharField(max_length=150)
     seccion = models.CharField(max_length=150)
@@ -273,6 +278,23 @@ class Asignaturas(models.Model):
             on_delete=models.CASCADE,
             limit_choices_to={'rol__nombre_rol': 'Docente'}
         )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="Asignatura Activa",
+        help_text="Desactivar al finalizar el semestre"
+    )
+    semestre = models.CharField(
+        max_length=20,
+        choices=SEMESTRE_CHOICES,
+        blank=True,
+        null=True,
+        verbose_name="Semestre"
+    )
+    anio = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        verbose_name="Año"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -281,6 +303,13 @@ class Asignaturas(models.Model):
 
     def __str__(self):
         return f"{self.nombre} {self.seccion}"
+    
+    @property
+    def periodo_completo(self):
+        """Retorna el periodo completo (ej: 'Otoño 2025')"""
+        if self.semestre and self.anio:
+            return f"{self.get_semestre_display()} {self.anio}"
+        return "Sin periodo asignado"
 
 # estado para las Asignaturas
 ESTADO_CURSO_CHOICES = (

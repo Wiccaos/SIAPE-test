@@ -29,6 +29,10 @@
             <i class="fas fa-graduation-cap"></i>
             Mis Carreras
         </a>
+        <a href="{% url 'gestion_asignaturas_director' %}" class="nav-item">
+            <i class="fas fa-book"></i>
+            Asignaturas
+        </a>
         <a href="{% url 'gestion_carga_masiva_director' %}" class="nav-item active">
             <i class="fas fa-file-upload"></i>
             Carga Masiva
@@ -155,9 +159,7 @@
             
             <div class="columns-info">
                 <strong>Columnas requeridas:</strong><br>
-                <code>Estudiante_RUT</code><br>
-                <strong>Identificar asignatura con:</strong><br>
-                <code>Asignatura_ID</code> o (<code>Asignatura_Nombre</code> + <code>Asignatura_Seccion</code>)
+                <code>Estudiante_RUT</code>, <code>Asignatura_Nombre</code>, <code>Asignatura_Seccion</code>
             </div>
             
             <form method="post" action="{% url 'cargar_inscripciones_excel' %}" enctype="multipart/form-data" class="upload-form">

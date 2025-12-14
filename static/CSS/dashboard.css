@@ -478,6 +478,53 @@ body.dark-mode .detalle-card li {
     margin-bottom: 30px;
 }
 
+/* Estilo unificado para todos los contenedores de KPIs */
+.kpi-container,
+.stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px 15px;
+    margin-bottom: 20px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.kpi-container-asesor {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px 15px;
+    margin-bottom: 20px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+@media (max-width: 1200px) {
+    .kpi-container,
+    .stats-grid,
+    .kpi-container-asesor {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px 15px;
+    }
+}
+
+@media (max-width: 768px) {
+    .kpi-container,
+    .stats-grid,
+    .kpi-container-asesor {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px 15px;
+    }
+}
+
+@media (max-width: 480px) {
+    .kpi-container,
+    .stats-grid,
+    .kpi-container-asesor {
+        grid-template-columns: 1fr;
+        gap: 12px 15px;
+    }
+}
+
 .kpi-card {
     background-color: #ffffff;
     border-radius: 8px;
@@ -486,6 +533,59 @@ body.dark-mode .detalle-card li {
     display: flex;
     align-items: center;
     gap: 20px;
+    min-height: 100px;
+}
+
+/* Estilo unificado para todas las tarjetas KPI */
+.kpi-container .kpi-card,
+.stats-grid .stat-card,
+.kpi-container-asesor .kpi-card {
+    flex-direction: row;
+    text-align: left;
+    align-items: center;
+    padding: 10px 12px;
+    gap: 12px;
+    min-height: 75px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.kpi-container .kpi-icon,
+.stats-grid .stat-icon,
+.kpi-container-asesor .kpi-icon {
+    margin: 0;
+    font-size: 1.1rem;
+    width: 26px;
+    height: 26px;
+    padding: 4px;
+    flex-shrink: 0;
+}
+
+.kpi-container .kpi-info,
+.stats-grid .stat-info,
+.kpi-container-asesor .kpi-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.kpi-container .kpi-value,
+.stats-grid .stat-value,
+.kpi-container-asesor .kpi-value {
+    font-size: 1.2rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.kpi-container .kpi-label,
+.stats-grid .stat-label,
+.kpi-container-asesor .kpi-label {
+    font-size: 0.65em;
+    line-height: 1.1;
+    word-break: break-word;
 }
 
 .kpi-icon {
@@ -768,6 +868,43 @@ body.dark-mode .detalle-card li {
 }
 .custom-table tr:not(:last-child) td {
     border-bottom: 1px solid #ececec;
+}
+
+/* Tabla de Casos por Estado - Más espacio para Estado */
+.table-estados th:nth-child(1),
+.table-estados td:nth-child(1) {
+    width: 60% !important; /* Estado - más espacio */
+}
+
+.table-estados th:nth-child(2),
+.table-estados td:nth-child(2) {
+    width: 20% !important; /* Cantidad - menos espacio */
+}
+
+.table-estados th:nth-child(3),
+.table-estados td:nth-child(3) {
+    width: 20% !important; /* Porcentaje - menos espacio */
+}
+
+/* Tabla de Estadísticas por Carrera - Más espacio para Carrera */
+.table-carreras th:nth-child(1),
+.table-carreras td:nth-child(1) {
+    width: 50% !important; /* Carrera - más espacio */
+}
+
+.table-carreras th:nth-child(2),
+.table-carreras td:nth-child(2) {
+    width: 17% !important; /* Total - menos espacio */
+}
+
+.table-carreras th:nth-child(3),
+.table-carreras td:nth-child(3) {
+    width: 17% !important; /* Aprobados - menos espacio */
+}
+
+.table-carreras th:nth-child(4),
+.table-carreras td:nth-child(4) {
+    width: 16% !important; /* Tasa - menos espacio */
 }
 
 /* Link rojo "Ver mÃ¡s" */
@@ -2464,6 +2601,270 @@ body.dark-mode .btn-accion-orange:hover {
     margin: 0;
 }
 
+/* Estilos para formulario de subida de archivos en detalle de caso */
+.detalle-card-content form {
+    margin-top: 0;
+}
+
+.detalle-card-content .form-group {
+    margin-bottom: 15px;
+}
+
+.detalle-card-content input[type="file"] {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #fff;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.detalle-card-content input[type="file"]:hover {
+    border-color: #cc0000;
+}
+
+.detalle-card-content input[type="file"]:focus {
+    outline: none;
+    border-color: #cc0000;
+    box-shadow: 0 0 0 2px rgba(204, 0, 0, 0.1);
+}
+
+.detalle-card-content small {
+    display: block;
+    margin-top: 5px;
+    color: #666;
+    font-size: 0.85rem;
+}
+
+.detalle-card-content h4 {
+    margin-bottom: 10px;
+    font-size: 1rem;
+    color: #333;
+    font-weight: 600;
+}
+
+.detalle-card-content h4 i {
+    margin-right: 8px;
+    color: #cc0000;
+}
+
+/* Modo oscuro para formulario de subida */
+body.dark-mode .detalle-card-content input[type="file"] {
+    background-color: #2a2a2a;
+    border-color: #444;
+    color: #e0e0e0;
+}
+
+body.dark-mode .detalle-card-content input[type="file"]:hover {
+    border-color: #cc0000;
+}
+
+body.dark-mode .detalle-card-content input[type="file"]:focus {
+    border-color: #cc0000;
+    box-shadow: 0 0 0 2px rgba(204, 0, 0, 0.3);
+}
+
+body.dark-mode .detalle-card-content small {
+    color: #b0b0b0;
+}
+
+body.dark-mode .detalle-card-content h4 {
+    color: #ffffff;
+}
+
+body.dark-mode .detalle-card-content h4 i {
+    color: #cc0000;
+}
+
+/* Sección de subida de archivos */
+.upload-file-section {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+}
+
+body.dark-mode .upload-file-section {
+    border-top-color: #444;
+}
+
+.upload-file-title {
+    margin-bottom: 15px;
+    font-size: 1rem;
+    color: #333;
+    font-weight: 600;
+}
+
+.upload-file-title i {
+    margin-right: 8px;
+    color: #cc0000;
+}
+
+body.dark-mode .upload-file-title {
+    color: #ffffff;
+}
+
+.upload-file-form {
+    margin-top: 10px;
+}
+
+/* Wrapper personalizado para el input de archivo */
+.file-upload-wrapper {
+    position: relative;
+    margin-bottom: 12px;
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+}
+
+.file-input-hidden {
+    position: absolute;
+    width: 0.1px;
+    height: 0.1px;
+    opacity: 0;
+    overflow: hidden;
+    z-index: -1;
+}
+
+.file-upload-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background-color: #f5f5f5;
+    border: 2px dashed #ccc;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.9rem;
+    color: #555;
+    font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.file-upload-label:hover {
+    background-color: #e8e8e8;
+    border-color: #cc0000;
+    color: #cc0000;
+}
+
+.file-upload-label i {
+    color: #cc0000;
+    font-size: 1rem;
+}
+
+.file-upload-text {
+    user-select: none;
+}
+
+.file-name-display {
+    padding: 10px 12px;
+    background-color: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    color: #666;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-height: 40px;
+}
+
+.file-name-display i {
+    color: #cc0000;
+    flex-shrink: 0;
+}
+
+.file-name-display span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-input-hint {
+    display: block;
+    margin-top: 10px;
+    margin-bottom: 15px;
+    color: #666;
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+.file-input-hint i {
+    color: #cc0000;
+    margin-right: 5px;
+}
+
+.btn-upload-submit {
+    width: 100%;
+    padding: 12px 20px;
+    background-color: #cc0000;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-upload-submit:hover {
+    background-color: #a00000;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(204, 0, 0, 0.2);
+}
+
+.btn-upload-submit:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(204, 0, 0, 0.2);
+}
+
+.btn-upload-submit i {
+    font-size: 1rem;
+}
+
+/* Modo oscuro */
+body.dark-mode .file-upload-label {
+    background-color: #2a2a2a;
+    border-color: #444;
+    color: #e0e0e0;
+}
+
+body.dark-mode .file-upload-label:hover {
+    background-color: #3a3a3a;
+    border-color: #cc0000;
+    color: #ffffff;
+}
+
+body.dark-mode .file-name-display {
+    background-color: #2a2a2a;
+    border-color: #444;
+    color: #d0d0d0;
+}
+
+body.dark-mode .file-name-display span {
+    color: #d0d0d0;
+}
+
+body.dark-mode .file-input-hint {
+    color: #b0b0b0;
+}
+
+body.dark-mode .btn-upload-submit {
+    background-color: #cc0000;
+    color: #ffffff;
+}
+
+body.dark-mode .btn-upload-submit:hover {
+    background-color: #a00000;
+}
+
 /* Tarjetas anidadas (para entrevistas, ajustes) */
 .detalle-sub-card {
     background-color: #f9f9f9;
@@ -3989,5 +4390,766 @@ body.dark-mode .search-filter-input::placeholder {
 body.dark-mode .search-filter-select option {
     background-color: #1e1e1e !important;
     color: #ffffff !important;
+}
+
+/* =============================================================
+   ESTILOS PARA DASHBOARD ADMIN - ESTADÍSTICAS DEL SISTEMA
+   ============================================================= */
+
+/* Grid de estadísticas */
+/* Estilos unificados ya aplicados arriba - estos estilos antiguos se mantienen solo para compatibilidad de colores de íconos */
+.stat-icon.users { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+.stat-icon.students { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; }
+.stat-icon.active { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; }
+.stat-icon.cases { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; }
+.stat-icon.approved { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; }
+.stat-icon.pending { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; }
+
+.stat-trend {
+    font-size: 0.75rem;
+    margin-top: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.stat-trend.up {
+    background: rgba(46, 204, 113, 0.15);
+    color: #27ae60;
+}
+
+.stat-trend.down {
+    background: rgba(231, 76, 60, 0.15);
+    color: #e74c3c;
+}
+
+.stat-trend.neutral {
+    background: rgba(149, 165, 166, 0.15);
+    color: #7f8c8d;
+}
+
+/* Grid de gráficos */
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.chart-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border: 1px solid #e0e0e0;
+}
+
+.chart-card.full-width {
+    grid-column: 1 / -1;
+}
+
+.chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #eee;
+}
+
+.chart-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.chart-title i {
+    color: #cc0000;
+}
+
+.chart-canvas-container {
+    position: relative;
+    height: 280px;
+}
+
+.chart-canvas-container.small {
+    height: 220px;
+}
+
+/* Tabla de actividad reciente */
+.activity-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.activity-table th,
+.activity-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+.activity-table th {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #888;
+    font-weight: 600;
+}
+
+.activity-table td {
+    font-size: 0.875rem;
+    color: #333;
+}
+
+.activity-table tbody tr:hover {
+    background: #f9f9f9;
+}
+
+.activity-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.user-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.user-details {
+    min-width: 0;
+}
+
+.user-name {
+    font-weight: 500;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.user-role {
+    font-size: 0.75rem;
+    color: #888;
+}
+
+.time-ago {
+    font-size: 0.8rem;
+    color: #888;
+}
+
+/* Tarjetas de resumen semanal */
+.weekly-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.summary-card {
+    background: #ffffff;
+    border-radius: 10px;
+    padding: 1.25rem;
+    text-align: center;
+    border: 1px solid #e0e0e0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.summary-card .value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #cc0000;
+}
+
+.summary-card .label {
+    font-size: 0.85rem;
+    color: #666;
+    margin-top: 0.25rem;
+}
+
+.summary-card .comparison {
+    font-size: 0.75rem;
+    margin-top: 0.5rem;
+    color: #888;
+}
+
+/* Empty state en tablas de admin */
+.empty-activity {
+    text-align: center;
+    padding: 2rem;
+    color: #888;
+}
+
+.empty-activity i {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.5;
+}
+
+/* =============================================================
+   MODO OSCURO - DASHBOARD ADMIN ESTADÍSTICAS
+   ============================================================= */
+
+body.dark-mode .stat-card {
+    background-color: #1e1e1e !important;
+    border-color: #3a3a3a !important;
+}
+
+body.dark-mode .stat-value {
+    color: #ffffff !important;
+}
+
+body.dark-mode .stat-label {
+    color: #b0b0b0 !important;
+}
+
+body.dark-mode .chart-card {
+    background-color: #1e1e1e !important;
+    border-color: #3a3a3a !important;
+}
+
+body.dark-mode .chart-header {
+    border-bottom-color: #3a3a3a !important;
+}
+
+body.dark-mode .chart-title {
+    color: #ffffff !important;
+}
+
+body.dark-mode .activity-table th {
+    color: #b0b0b0 !important;
+}
+
+body.dark-mode .activity-table td {
+    color: #ffffff !important;
+    border-bottom-color: #3a3a3a !important;
+}
+
+body.dark-mode .activity-table tbody tr:hover {
+    background-color: #2a2a2a !important;
+}
+
+body.dark-mode .user-name {
+    color: #ffffff !important;
+}
+
+body.dark-mode .user-role {
+    color: #b0b0b0 !important;
+}
+
+body.dark-mode .time-ago {
+    color: #b0b0b0 !important;
+}
+
+body.dark-mode .summary-card {
+    background-color: #1e1e1e !important;
+    border-color: #3a3a3a !important;
+}
+
+body.dark-mode .summary-card .value {
+    color: #ff6b6b !important;
+}
+
+body.dark-mode .summary-card .label {
+    color: #d0d0d0 !important;
+}
+
+body.dark-mode .summary-card .comparison {
+    color: #b0b0b0 !important;
+}
+
+body.dark-mode .empty-activity {
+    color: #888 !important;
+}
+
+/* ============================================
+   GESTIÓN DE ASIGNATURAS - DIRECTOR
+   ============================================ */
+
+/* Sección de Filtros */
+.filters-section {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e0e0e0;
+}
+
+.filters-form {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.filter-group label {
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.filter-group select {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    min-width: 150px;
+}
+
+.filter-btn {
+    padding: 8px 16px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.filter-btn:hover {
+    background: var(--primary-hover);
+}
+
+.clear-filters {
+    padding: 8px 16px;
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.clear-filters:hover {
+    background: var(--bg-hover);
+}
+
+/* Estadísticas Mini */
+.stats-row {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.stat-mini {
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 15px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e0e0e0;
+}
+
+.stat-mini i {
+    font-size: 1.5em;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+}
+
+.stat-mini.total i {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.stat-mini.activas i {
+    background: #e8f5e9;
+    color: #388e3c;
+}
+
+.stat-mini.inactivas i {
+    background: #ffebee;
+    color: #d32f2f;
+}
+
+.stat-mini-info span {
+    display: block;
+}
+
+.stat-mini-info .value {
+    font-size: 1.5em;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.stat-mini-info .label {
+    font-size: 0.85em;
+    color: var(--text-secondary);
+}
+
+/* Acciones Masivas */
+.bulk-actions {
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e0e0e0;
+    flex-wrap: wrap;
+}
+
+.bulk-actions span {
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.bulk-actions.info-box {
+    background: #e3f2fd;
+    border-left: 4px solid #1976d2;
+}
+
+.bulk-actions.info-box span {
+    color: #1565c0;
+}
+
+.bulk-btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9em;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.bulk-btn.activar {
+    background: #28a745;
+    color: white;
+}
+
+.bulk-btn.desactivar {
+    background: #dc3545;
+    color: white;
+}
+
+.bulk-btn:hover {
+    opacity: 0.9;
+}
+
+/* Checkboxes de asignaturas */
+.asignatura-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.asignatura-checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.select-all-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Badges de estado */
+.badge-estado {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    font-weight: 600;
+}
+
+.badge-activa {
+    background: #d4edda;
+    color: #155724;
+}
+
+.badge-inactiva {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.badge-semestre {
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.75em;
+    background: #e9ecef;
+    color: #495057;
+}
+
+/* Botones de toggle estado */
+.btn-toggle {
+    padding: 5px 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.btn-toggle.activar {
+    background: #28a745;
+    color: white;
+}
+
+.btn-toggle.desactivar {
+    background: #ffc107;
+    color: #212529;
+}
+
+.btn-toggle:hover {
+    opacity: 0.85;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .stats-row {
+        flex-direction: column;
+    }
+    .filters-form {
+        flex-direction: column;
+    }
+    .filter-group select {
+        width: 100%;
+    }
+    .bulk-actions {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+/* Dark Mode - Gestión Asignaturas */
+body.dark-mode .filters-section {
+    background: #1e1e1e;
+    border-color: #3a3a3a;
+}
+
+body.dark-mode .filter-group select {
+    background: #2d2d2d;
+    border-color: #444;
+    color: #e0e0e0;
+}
+
+body.dark-mode .stat-mini {
+    background: #1e1e1e;
+    border-color: #3a3a3a;
+}
+
+body.dark-mode .stat-mini.total i {
+    background: #1a3a5c;
+    color: #64b5f6;
+}
+
+body.dark-mode .stat-mini.activas i {
+    background: #1b3d25;
+    color: #81c784;
+}
+
+body.dark-mode .stat-mini.inactivas i {
+    background: #3d1b1b;
+    color: #ef5350;
+}
+
+body.dark-mode .bulk-actions {
+    background: #1e1e1e;
+    border-color: #3a3a3a;
+}
+
+body.dark-mode .bulk-actions.info-box {
+    background: #1a3a5c;
+    border-color: #64b5f6;
+}
+
+body.dark-mode .bulk-actions.info-box span {
+    color: #90caf9;
+}
+
+body.dark-mode .badge-activa {
+    background: #1b3d25;
+    color: #81c784;
+}
+
+body.dark-mode .badge-inactiva {
+    background: #3d1b1b;
+    color: #ef5350;
+}
+
+body.dark-mode .badge-semestre {
+    background: #2d2d2d;
+    color: #b0b0b0;
+}
+
+body.dark-mode .clear-filters {
+    background: transparent;
+    border-color: #444;
+    color: #b0b0b0;
+}
+
+body.dark-mode .clear-filters:hover {
+    background: #2d2d2d;
+}
+
+/* Utilidades para tablas de asignaturas */
+.text-center {
+    text-align: center;
+}
+
+.text-muted-light {
+    color: #999;
+}
+
+.text-success-sm {
+    color: #28a745;
+    font-size: 0.85em;
+}
+
+.col-checkbox {
+    width: 30px !important;
+    min-width: 30px !important;
+    max-width: 30px !important;
+    padding: 8px 5px !important;
+    text-align: center;
+}
+
+.page-title {
+    margin-bottom: 20px;
+}
+
+/* Tabla de Asignaturas - Columnas específicas */
+.tabla-asignaturas {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.tabla-asignaturas th,
+.tabla-asignaturas td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 12px 10px;
+}
+
+.tabla-asignaturas .col-checkbox {
+    width: 30px !important;
+    min-width: 30px !important;
+    max-width: 30px !important;
+    padding: 8px 5px !important;
+}
+
+.tabla-asignaturas .col-nombre {
+    width: 24%;
+    min-width: 150px;
+}
+
+.tabla-asignaturas .col-seccion {
+    width: 10%;
+    min-width: 70px;
+}
+
+.tabla-asignaturas .col-carrera {
+    width: 18%;
+    min-width: 120px;
+}
+
+.tabla-asignaturas .col-docente {
+    width: 18%;
+    min-width: 130px;
+}
+
+.tabla-asignaturas .col-semestre {
+    width: 12%;
+    min-width: 100px;
+    text-align: center;
+}
+
+.tabla-asignaturas .col-estado {
+    width: 9%;
+    min-width: 85px;
+    text-align: center;
+}
+
+.tabla-asignaturas .col-accion {
+    width: 9%;
+    min-width: 90px;
+    text-align: center;
+}
+
+/* Mostrar contenido completo en hover */
+.tabla-asignaturas td[title]:hover {
+    overflow: visible;
+    white-space: normal;
+    word-wrap: break-word;
+}
+
+/* Código de sección más compacto */
+.tabla-asignaturas code {
+    background: #f1f3f4;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: #5f6368;
+}
+
+body.dark-mode .tabla-asignaturas code {
+    background: #2d2d2d;
+    color: #b0b0b0;
+}
+
+/* Responsive: scroll horizontal en móviles */
+@media (max-width: 992px) {
+    .tabla-asignaturas-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .tabla-asignaturas {
+        min-width: 800px;
+    }
+}
+
+body.dark-mode .text-muted-light {
+    color: #666;
+}
+
+body.dark-mode .text-success-sm {
+    color: #81c784;
 }
 
