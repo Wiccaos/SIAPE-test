@@ -6010,10 +6010,14 @@ def generar_reporte_pdf_director(request):
             plt.close()
             img_buffer.seek(0)
             
-            img = Image(img_buffer, width=7*inch, height=5.25*inch)
+            # Leer el contenido del buffer antes de crear la imagen
+            img_data = img_buffer.getvalue()
+            img_buffer.close()
+            
+            # Crear la imagen desde los bytes en memoria
+            img = Image(BytesIO(img_data), width=7*inch, height=5.25*inch)
             elements.append(img)
             elements.append(Spacer(1, 0.2*inch))
-            img_buffer.close()
     except Exception as e:
         pass
     
@@ -6086,10 +6090,14 @@ def generar_reporte_pdf_director(request):
             plt.close()
             img_buffer.seek(0)
             
-            img = Image(img_buffer, width=6*inch, height=3.75*inch)
+            # Leer el contenido del buffer antes de crear la imagen
+            img_data = img_buffer.getvalue()
+            img_buffer.close()
+            
+            # Crear la imagen desde los bytes en memoria
+            img = Image(BytesIO(img_data), width=6*inch, height=3.75*inch)
             elements.append(img)
             elements.append(Spacer(1, 0.2*inch))
-            img_buffer.close()
     except Exception as e:
         pass
     
@@ -6229,10 +6237,14 @@ def generar_reporte_pdf_director(request):
             plt.close()
             img_buffer.seek(0)
             
-            img = Image(img_buffer, width=6*inch, height=3.75*inch)
+            # Leer el contenido del buffer antes de crear la imagen
+            img_data = img_buffer.getvalue()
+            img_buffer.close()
+            
+            # Crear la imagen desde los bytes en memoria
+            img = Image(BytesIO(img_data), width=6*inch, height=3.75*inch)
             elements.append(img)
             elements.append(Spacer(1, 0.2*inch))
-            img_buffer.close()
     except Exception as e:
         pass
     
@@ -6352,10 +6364,14 @@ def generar_reporte_pdf_director(request):
             plt.close()
             img_buffer.seek(0)
             
-            img = Image(img_buffer, width=7*inch, height=4.2*inch)
+            # Leer el contenido del buffer antes de crear la imagen
+            img_data = img_buffer.getvalue()
+            img_buffer.close()
+            
+            # Crear la imagen desde los bytes en memoria
+            img = Image(BytesIO(img_data), width=7*inch, height=4.2*inch)
             elements.append(img)
             elements.append(Spacer(1, 0.2*inch))
-            img_buffer.close()
     except Exception as e:
         pass
     
