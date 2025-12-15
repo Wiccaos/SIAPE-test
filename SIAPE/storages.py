@@ -17,8 +17,8 @@ class MediaStorage(S3Boto3Storage):
     # AWS_STORAGE_BUCKET_NAME=siape-docs
     location = 'media'
     file_overwrite = False
-    # No establecer default_acl para cuentas de estudiante que pueden no tener permisos de ACL
-    default_acl = None
+    # Archivos públicos para acceso permanente sin tokens que expiren
+    default_acl = 'public-read'
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
