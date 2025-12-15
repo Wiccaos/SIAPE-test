@@ -7,11 +7,12 @@ from django.contrib.auth import logout, login
 from django.contrib.auth import update_session_auth_hash
 from django.utils import timezone
 from django.urls import reverse
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from datetime import timedelta, datetime, time, date
 from collections import Counter
 from django.db.models import Count, Q
 from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 import json
 import calendar  # Importar para el calendario mensual
@@ -31,7 +32,7 @@ import os
 
 # Django REST Framework
 from rest_framework import viewsets, mixins, status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.views import APIView
@@ -47,7 +48,7 @@ from .serializer import (
 from .validators import validar_rut_chileno, validar_contraseña, traducir_feriado_chileno
 from .models import(
     Usuario, PerfilUsuario, Roles, Areas, CategoriasAjustes, Carreras, Estudiantes, Solicitudes, Evidencias,
-    Asignaturas, AsignaturasEnCurso, Entrevistas, AjusteRazonable, AjusteAsignado, HorarioBloqueado, SEMESTRE_CHOICES
+    Asignaturas, AsignaturasEnCurso, Entrevistas, AjusteRazonable, AjusteAsignado, HorarioBloqueado, DecisionDocenteAjuste, SEMESTRE_CHOICES
 )  
 
 # Permisos personalizados
@@ -7972,6 +7973,7 @@ def estadisticas_ajustes_coordinador_tecnico(request):
 
 
 @api_view(['GET'])
+@authentication_classes([SessionAuthentication])
 @permission_classes([IsAuthenticated])
 def obtener_datos_caso_docente(request, solicitud_id):
     """
@@ -8005,18 +8007,23 @@ def obtener_datos_caso_docente(request, solicitud_id):
     ajustes_asignados = AjusteAsignado.objects.filter(
         solicitudes=solicitud,
         estado_aprobacion='aprobado'
-    ).select_related('ajuste_razonable__categorias_ajustes', 'docente_comentador__usuario')
+    ).select_related('ajuste_razonable__categorias_ajustes').prefetch_related('decisiones_docente__docente__usuario')
     
     ajustes_data = []
     for ajuste in ajustes_asignados:
+        # Obtener la decisión del docente actual para este ajuste
+        decision_docente = ajuste.decisiones_docente.filter(docente=perfil_docente).first()
+        
         ajustes_data.append({
             'id': ajuste.id,
             'categoria': ajuste.ajuste_razonable.categorias_ajustes.nombre_categoria,
             'descripcion': ajuste.ajuste_razonable.descripcion,
             'estado_aprobacion': ajuste.estado_aprobacion,
-            'comentarios_docente': ajuste.comentarios_docente or '',
-            'fecha_comentario_docente': ajuste.fecha_comentario_docente.strftime('%d/%m/%Y %H:%M') if ajuste.fecha_comentario_docente else None,
-            'docente_comentador': ajuste.docente_comentador.usuario.get_full_name() if ajuste.docente_comentador else None
+            'decision_docente': decision_docente.decision if decision_docente else None,
+            'decision_docente_display': decision_docente.get_decision_display() if decision_docente else None,
+            'comentario_docente': decision_docente.comentario or '' if decision_docente else '',
+            'fecha_decision_docente': decision_docente.fecha_decision.strftime('%d/%m/%Y %H:%M') if decision_docente and decision_docente.fecha_decision else None,
+            'docente': decision_docente.docente.usuario.get_full_name() if decision_docente and decision_docente.docente.usuario else None
         })
     
     # Preparar respuesta
@@ -8034,58 +8041,132 @@ def obtener_datos_caso_docente(request, solicitud_id):
     
     return Response(data, status=status.HTTP_200_OK)
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def agregar_comentario_ajuste_docente(request, ajuste_asignado_id):
+@csrf_exempt
+@login_required
+@require_POST
+def decision_docente_ajuste(request, ajuste_asignado_id):
     """
-    Endpoint API para que el docente agregue o actualice un comentario sobre un ajuste.
+    Endpoint API para que el docente apruebe o rechace un ajuste.
+    Si rechaza, debe proporcionar un comentario obligatorio.
     """
+    # Log para debugging
+    logging.info(f'decision_docente_ajuste llamado: ajuste_id={ajuste_asignado_id}, user={request.user.id if request.user.is_authenticated else "No autenticado"}, method={request.method}')
+    
+    # Verificar autenticación
+    if not request.user.is_authenticated:
+        logging.warning(f'Usuario no autenticado intentó acceder a decision_docente_ajuste')
+        return JsonResponse({'error': 'No autenticado'}, status=401)
+    
+    # Usar EXACTAMENTE la misma validación que obtener_datos_caso_docente
     try:
         if request.user.perfil.rol.nombre_rol != ROL_DOCENTE:
-            return Response({'error': 'No autorizado'}, status=status.HTTP_403_FORBIDDEN)
+            logging.warning(f'Usuario {request.user.id} intentó tomar decisión pero no es docente')
+            return JsonResponse({'error': 'No autorizado'}, status=403)
     except AttributeError:
-        return Response({'error': 'No autorizado'}, status=status.HTTP_403_FORBIDDEN)
+        logging.warning(f'Usuario {request.user.id} no tiene perfil o rol válido')
+        return JsonResponse({'error': 'No autorizado'}, status=403)
     
     perfil_docente = request.user.perfil
     
     # Obtener el ajuste asignado
     try:
-        ajuste = AjusteAsignado.objects.get(
+        ajuste = AjusteAsignado.objects.select_related(
+            'solicitudes__estudiantes'
+        ).get(
             id=ajuste_asignado_id,
             estado_aprobacion='aprobado'
         )
     except AjusteAsignado.DoesNotExist:
-        return Response({'error': 'Ajuste no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+        return JsonResponse({
+            'error': 'Ajuste no encontrado o no está aprobado',
+            'ajuste_id': ajuste_asignado_id
+        }, status=404)
     
-    # Verificar que el docente tiene acceso a este ajuste (el estudiante debe estar en sus clases)
+    # Verificar que el docente tiene acceso a este ajuste
+    # Usar EXACTAMENTE la misma lógica que obtener_datos_caso_docente (líneas 7987-8002)
     mis_asignaturas = Asignaturas.objects.filter(docente=perfil_docente)
+    
+    # Verificar que el estudiante está en las clases del docente
     estudiante_en_clases = AsignaturasEnCurso.objects.filter(
         estudiantes=ajuste.solicitudes.estudiantes,
         asignaturas__in=mis_asignaturas
     ).exists()
     
     if not estudiante_en_clases:
-        return Response({'error': 'No autorizado'}, status=status.HTTP_403_FORBIDDEN)
+        logging.warning(
+            f'Docente {perfil_docente.id} intentó tomar decisión sobre ajuste {ajuste_asignado_id} '
+            f'pero estudiante {ajuste.solicitudes.estudiantes.id} no está en sus asignaturas'
+        )
+        return JsonResponse({'error': 'No autorizado'}, status=403)
     
-    # Obtener el comentario del request
-    comentario = request.data.get('comentario', '').strip()
+    # Obtener la decisión y comentario del request (JSON)
+    try:
+        data = json.loads(request.body)
+        decision = data.get('decision', '').strip().lower()
+        comentario = data.get('comentario', '').strip()
+    except (json.JSONDecodeError, AttributeError):
+        # Fallback a POST si no es JSON
+        decision = request.POST.get('decision', '').strip().lower()
+        comentario = request.POST.get('comentario', '').strip()
     
-    if not comentario:
-        return Response({'error': 'El comentario no puede estar vacío'}, status=status.HTTP_400_BAD_REQUEST)
+    # Validar la decisión
+    if decision not in ['aprobado', 'rechazado']:
+        return JsonResponse({
+            'error': 'Decisión inválida. Debe ser "aprobado" o "rechazado".'
+        }, status=400)
     
-    # Guardar el comentario
-    ajuste.comentarios_docente = comentario
-    ajuste.docente_comentador = perfil_docente
-    ajuste.fecha_comentario_docente = timezone.now()
-    ajuste.save()
+    # Si rechaza, el comentario es obligatorio
+    if decision == 'rechazado' and not comentario:
+        return JsonResponse({
+            'error': 'El comentario es obligatorio cuando se rechaza un ajuste.'
+        }, status=400)
     
-    return Response({
+    # Guardar la decisión en la nueva tabla
+    try:
+        # Verificar si ya existe una decisión de este docente para este ajuste
+        decision_existente = DecisionDocenteAjuste.objects.filter(
+            ajuste_asignado=ajuste,
+            docente=perfil_docente
+        ).first()
+        
+        if decision_existente:
+            # Actualizar la decisión existente
+            decision_existente.decision = decision
+            decision_existente.comentario = comentario
+            decision_existente.fecha_decision = timezone.now()
+            decision_existente.save()
+            decision_obj = decision_existente
+        else:
+            # Crear nueva decisión
+            decision_obj = DecisionDocenteAjuste.objects.create(
+                ajuste_asignado=ajuste,
+                docente=perfil_docente,
+                decision=decision,
+                comentario=comentario
+            )
+        
+        # Recargar el objeto desde la base de datos
+        decision_obj.refresh_from_db()
+        
+    except Exception as e:
+        # Log del error para debugging
+        logging.error(f'Error al guardar decisión del docente: {str(e)}')
+        return JsonResponse({
+            'error': f'Error al guardar la decisión: {str(e)}'
+        }, status=500)
+    
+    # Formatear la fecha para la respuesta
+    fecha_decision_str = decision_obj.fecha_decision.strftime('%d/%m/%Y %H:%M') if decision_obj.fecha_decision else None
+    
+    return JsonResponse({
         'success': True,
-        'message': 'Comentario guardado exitosamente',
-        'comentario': ajuste.comentarios_docente,
-        'fecha_comentario': ajuste.fecha_comentario_docente.strftime('%d/%m/%Y %H:%M'),
-        'docente_comentador': perfil_docente.usuario.get_full_name()
-    }, status=status.HTTP_200_OK)
+        'message': f'Ajuste {decision_obj.get_decision_display().lower()} exitosamente',
+        'decision': decision_obj.decision,
+        'decision_display': decision_obj.get_decision_display(),
+        'comentario': decision_obj.comentario,
+        'fecha_decision': fecha_decision_str,
+        'docente': perfil_docente.usuario.get_full_name() if perfil_docente.usuario else 'Docente'
+    }, status=200)
 
 @login_required
 def dashboard_docente(request):

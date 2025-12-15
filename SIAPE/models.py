@@ -478,3 +478,55 @@ class AjusteAsignado(models.Model):
 
     def __str__(self):
         return f"Ajuste asignado a {self.solicitudes}"
+
+
+class DecisionDocenteAjuste(models.Model):
+    """
+    Modelo para guardar las decisiones de aprobación/rechazo de ajustes por parte del docente.
+    Separado de AjusteAsignado para mantener independencia y evitar conflictos.
+    """
+    ESTADO_DECISION_CHOICES = (
+        ('aprobado', 'Aprobado'),
+        ('rechazado', 'Rechazado'),
+    )
+    
+    ajuste_asignado = models.ForeignKey(
+        AjusteAsignado,
+        on_delete=models.CASCADE,
+        related_name='decisiones_docente',
+        verbose_name="Ajuste Asignado"
+    )
+    docente = models.ForeignKey(
+        'PerfilUsuario',
+        on_delete=models.CASCADE,
+        limit_choices_to={'rol__nombre_rol': 'Docente'},
+        related_name='decisiones_ajustes',
+        verbose_name="Docente"
+    )
+    decision = models.CharField(
+        max_length=20,
+        choices=ESTADO_DECISION_CHOICES,
+        verbose_name="Decisión"
+    )
+    comentario = models.TextField(
+        blank=True,
+        default='',
+        verbose_name="Comentario"
+    )
+    fecha_decision = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Fecha de Decisión"
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'decision_docente_ajuste'
+        verbose_name = "Decisión de Docente sobre Ajuste"
+        verbose_name_plural = "Decisiones de Docentes sobre Ajustes"
+        # Un docente solo puede tener una decisión por ajuste asignado
+        unique_together = ['ajuste_asignado', 'docente']
+    
+    def __str__(self):
+        return f"{self.docente} - {self.get_decision_display()} - {self.ajuste_asignado}"

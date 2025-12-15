@@ -49,7 +49,7 @@ urlpatterns = [
     path('api/horarios-disponibles/', views.get_horarios_disponibles, name='api-horarios-disponibles'),
     path('api/calendario-disponible/', views.get_calendario_disponible, name='api-calendario-disponible'),
     path('api/docente/caso/<int:solicitud_id>/', views.obtener_datos_caso_docente, name='api-datos-caso-docente'),
-    path('api/docente/ajuste/<int:ajuste_asignado_id>/comentario/', views.agregar_comentario_ajuste_docente, name='api-comentario-ajuste-docente'),
+    path('api/docente/ajuste/<int:ajuste_asignado_id>/decision/', views.decision_docente_ajuste, name='api-decision-ajuste-docente'),
     path('api/buscar-estudiante/', views.buscar_estudiante_por_rut, name='api-buscar-estudiante'),
 
     # URLs del Administrador

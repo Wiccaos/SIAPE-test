@@ -138,14 +138,26 @@ function abrirModalCasoDocente(solicitudId) {
         let ajustesHTML = '';
         if (data.tiene_ajustes) {
             ajustesHTML = data.ajustes.map(ajuste => {
-                const tieneComentario = ajuste.comentarios_docente && ajuste.comentarios_docente.trim() !== '';
-                const comentarioHTML = tieneComentario ? `
-                    <div class="modal-comentario-docente">
-                        <div class="modal-comentario-header">
-                            <strong><i class="fas fa-comment"></i> Mi Comentario:</strong>
-                            ${ajuste.fecha_comentario_docente ? `<span class="modal-comentario-fecha">${ajuste.fecha_comentario_docente}</span>` : ''}
+                const tieneDecision = ajuste.decision_docente !== null && ajuste.decision_docente !== undefined;
+                const esAprobado = ajuste.decision_docente === 'aprobado';
+                const esRechazado = ajuste.decision_docente === 'rechazado';
+                
+                // Mostrar estado de la decisión si existe
+                const estadoHTML = tieneDecision ? `
+                    <div class="modal-decision-docente">
+                        <div class="modal-decision-header">
+                            <strong><i class="fas fa-${esAprobado ? 'check-circle' : 'times-circle'}"></i> Decisión:</strong>
+                            <span class="modal-decision-estado ${esAprobado ? 'decision-aprobado' : 'decision-rechazado'}">
+                                ${ajuste.decision_docente_display || ajuste.decision_docente}
+                            </span>
+                            ${ajuste.fecha_decision_docente ? `<span class="modal-decision-fecha">${ajuste.fecha_decision_docente}</span>` : ''}
                         </div>
-                        <div class="modal-comentario-texto">${ajuste.comentarios_docente}</div>
+                        ${esRechazado && ajuste.comentario_docente ? `
+                            <div class="modal-decision-comentario">
+                                <strong>Motivo del rechazo:</strong>
+                                <div class="modal-comentario-texto">${ajuste.comentario_docente}</div>
+                            </div>
+                        ` : ''}
                     </div>
                 ` : '';
                 
@@ -157,11 +169,18 @@ function abrirModalCasoDocente(solicitudId) {
                         <div class="modal-ajuste-descripcion">
                             ${ajuste.descripcion}
                         </div>
-                        ${comentarioHTML}
-                        <div class="modal-comentario-acciones">
-                            <button type="button" class="btn-comentario" onclick="abrirFormularioComentario(${ajuste.id}, ${tieneComentario ? 'true' : 'false'})">
-                                <i class="fas fa-${tieneComentario ? 'edit' : 'comment'}"></i> ${tieneComentario ? 'Editar Comentario' : 'Agregar Comentario'}
-                            </button>
+                        ${estadoHTML}
+                        <div class="modal-decision-acciones">
+                            ${!tieneDecision || esRechazado ? `
+                                <button type="button" class="btn-accion btn-accion-success" onclick="aprobarAjuste(${ajuste.id})">
+                                    <i class="fas fa-check"></i> Aprobar Ajuste
+                                </button>
+                            ` : ''}
+                            ${!tieneDecision || esAprobado ? `
+                                <button type="button" class="btn-accion btn-accion-danger" onclick="rechazarAjuste(${ajuste.id})">
+                                    <i class="fas fa-times"></i> Rechazar Ajuste
+                                </button>
+                            ` : ''}
                         </div>
                     </div>
                 `;
@@ -199,6 +218,9 @@ function abrirModalCasoDocente(solicitudId) {
                 ${ajustesHTML}
             </div>
         `;
+        
+        // Guardar el ID de la solicitud para poder recargar después de una decisión
+        modalBody.setAttribute('data-solicitud-id', solicitudId);
     })
     .catch(error => {
         modalBody.innerHTML = `
@@ -238,37 +260,49 @@ function getCookie(name) {
             }
         }
     }
+    // Si no se encuentra en cookies, intentar obtener del meta tag
+    if (!cookieValue) {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (csrfToken) {
+            cookieValue = csrfToken.value;
+        }
+    }
     return cookieValue;
 }
 
-// Función para abrir el formulario de comentario
-function abrirFormularioComentario(ajusteId, tieneComentario) {
+// Función para aprobar un ajuste
+function aprobarAjuste(ajusteId) {
+    if (!confirm('¿Está seguro de que desea aprobar este ajuste?')) {
+        return;
+    }
+    
+    enviarDecisionAjuste(ajusteId, 'aprobado', '');
+}
+
+// Función para rechazar un ajuste (muestra formulario para comentario obligatorio)
+function rechazarAjuste(ajusteId) {
     const ajusteItem = document.querySelector(`[data-ajuste-id="${ajusteId}"]`);
     if (!ajusteItem) return;
     
     // Buscar si ya existe un formulario
-    let formularioExistente = ajusteItem.querySelector('.modal-formulario-comentario');
+    let formularioExistente = ajusteItem.querySelector('.modal-formulario-rechazo');
     if (formularioExistente) {
         formularioExistente.style.display = 'block';
         return;
     }
     
-    // Obtener el comentario actual si existe
-    const comentarioActual = ajusteItem.querySelector('.modal-comentario-texto');
-    const textoActual = comentarioActual ? comentarioActual.textContent.trim() : '';
-    
-    // Crear formulario
+    // Crear formulario para comentario obligatorio
     const formulario = document.createElement('div');
-    formulario.className = 'modal-formulario-comentario';
+    formulario.className = 'modal-formulario-rechazo';
     formulario.innerHTML = `
-        <div class="modal-formulario-comentario-content">
-            <label for="comentario-${ajusteId}"><strong>${tieneComentario ? 'Editar' : 'Agregar'} Comentario:</strong></label>
-            <textarea id="comentario-${ajusteId}" class="modal-textarea-comentario" rows="4" placeholder="Ej: Aprobado, realizaré el ajuste. / Necesito equipo especial para...">${textoActual}</textarea>
-            <div class="modal-formulario-comentario-botones">
-                <button type="button" class="btn-comentario btn-comentario-guardar" onclick="guardarComentario(${ajusteId})">
-                    <i class="fas fa-save"></i> Guardar
+        <div class="modal-formulario-rechazo-content">
+            <label for="comentario-rechazo-${ajusteId}"><strong>Motivo del rechazo (obligatorio):</strong></label>
+            <textarea id="comentario-rechazo-${ajusteId}" class="modal-textarea-comentario" rows="4" placeholder="Explique por qué rechaza este ajuste..." required></textarea>
+            <div class="modal-formulario-rechazo-botones">
+                <button type="button" class="btn-accion btn-accion-danger" onclick="confirmarRechazo(${ajusteId})">
+                    <i class="fas fa-times"></i> Confirmar Rechazo
                 </button>
-                <button type="button" class="btn-comentario btn-comentario-cancelar" onclick="cerrarFormularioComentario(${ajusteId})">
+                <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarFormularioRechazo(${ajusteId})">
                     <i class="fas fa-times"></i> Cancelar
                 </button>
             </div>
@@ -276,38 +310,51 @@ function abrirFormularioComentario(ajusteId, tieneComentario) {
     `;
     
     // Insertar después de las acciones
-    const accionesDiv = ajusteItem.querySelector('.modal-comentario-acciones');
+    const accionesDiv = ajusteItem.querySelector('.modal-decision-acciones');
     accionesDiv.insertAdjacentElement('afterend', formulario);
 }
 
-// Función para cerrar el formulario de comentario
-function cerrarFormularioComentario(ajusteId) {
+// Función para cerrar el formulario de rechazo
+function cerrarFormularioRechazo(ajusteId) {
     const ajusteItem = document.querySelector(`[data-ajuste-id="${ajusteId}"]`);
     if (!ajusteItem) return;
     
-    const formulario = ajusteItem.querySelector('.modal-formulario-comentario');
+    const formulario = ajusteItem.querySelector('.modal-formulario-rechazo');
     if (formulario) {
         formulario.style.display = 'none';
     }
 }
 
-// Función para guardar el comentario
-function guardarComentario(ajusteId) {
-    const textarea = document.getElementById(`comentario-${ajusteId}`);
+// Función para confirmar el rechazo
+function confirmarRechazo(ajusteId) {
+    const textarea = document.getElementById(`comentario-rechazo-${ajusteId}`);
     if (!textarea) return;
     
     const comentario = textarea.value.trim();
     if (!comentario) {
-        alert('Por favor, ingrese un comentario.');
+        alert('Por favor, ingrese el motivo del rechazo. Este campo es obligatorio.');
+        textarea.focus();
         return;
     }
     
-    // Deshabilitar botones mientras se guarda
-    const botones = document.querySelectorAll(`[onclick*="guardarComentario(${ajusteId})"], [onclick*="cerrarFormularioComentario(${ajusteId})"]`);
-    botones.forEach(btn => btn.disabled = true);
+    if (!confirm('¿Está seguro de que desea rechazar este ajuste?')) {
+        return;
+    }
     
-    // Enviar comentario al servidor
-    fetch(`/api/docente/ajuste/${ajusteId}/comentario/`, {
+    enviarDecisionAjuste(ajusteId, 'rechazado', comentario);
+}
+
+// Función para enviar la decisión al servidor
+function enviarDecisionAjuste(ajusteId, decision, comentario) {
+    // Deshabilitar botones mientras se procesa
+    const ajusteItem = document.querySelector(`[data-ajuste-id="${ajusteId}"]`);
+    if (ajusteItem) {
+        const botones = ajusteItem.querySelectorAll('button');
+        botones.forEach(btn => btn.disabled = true);
+    }
+    
+    // Enviar decisión al servidor
+    fetch(`/api/docente/ajuste/${ajusteId}/decision/`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -315,55 +362,51 @@ function guardarComentario(ajusteId) {
         },
         credentials: 'same-origin',
         body: JSON.stringify({
+            decision: decision,
             comentario: comentario
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(err => {
+                // Mostrar mensaje de error más detallado
+                const errorMsg = err.error || 'Error desconocido';
+                const debugInfo = err.debug ? `\n\nInformación de depuración: ${JSON.stringify(err.debug, null, 2)}` : '';
+                throw new Error(errorMsg + debugInfo);
+            }).catch(() => {
+                // Si no se puede parsear el JSON, lanzar error genérico
+                throw new Error(`Error ${response.status}: ${response.statusText}`);
+            });
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
-            // Actualizar la interfaz con el nuevo comentario
-            const ajusteItem = document.querySelector(`[data-ajuste-id="${ajusteId}"]`);
-            if (ajusteItem) {
-                // Remover formulario
-                const formulario = ajusteItem.querySelector('.modal-formulario-comentario');
-                if (formulario) formulario.remove();
-                
-                // Actualizar o crear sección de comentario
-                let comentarioDiv = ajusteItem.querySelector('.modal-comentario-docente');
-                if (!comentarioDiv) {
-                    comentarioDiv = document.createElement('div');
-                    comentarioDiv.className = 'modal-comentario-docente';
-                    const accionesDiv = ajusteItem.querySelector('.modal-comentario-acciones');
-                    accionesDiv.insertAdjacentElement('beforebegin', comentarioDiv);
-                }
-                
-                comentarioDiv.innerHTML = `
-                    <div class="modal-comentario-header">
-                        <strong><i class="fas fa-comment"></i> Mi Comentario:</strong>
-                        <span class="modal-comentario-fecha">${data.fecha_comentario}</span>
-                    </div>
-                    <div class="modal-comentario-texto">${data.comentario}</div>
-                `;
-                
-                // Actualizar botón
-                const btnComentario = ajusteItem.querySelector('.btn-comentario');
-                if (btnComentario) {
-                    btnComentario.innerHTML = '<i class="fas fa-edit"></i> Editar Comentario';
-                }
+            // Recargar el modal para mostrar la nueva decisión
+            const modal = document.getElementById('modalCasoDocente');
+            const modalBody = document.getElementById('modalCasoDocenteBody');
+            const solicitudId = modalBody.getAttribute('data-solicitud-id');
+            
+            if (solicitudId) {
+                // Recargar los datos del caso
+                abrirModalCasoDocente(parseInt(solicitudId));
             }
             
-            alert('Comentario guardado exitosamente.');
+            alert(data.message || `Ajuste ${data.decision_display.toLowerCase()} exitosamente.`);
         } else {
-            alert('Error al guardar el comentario: ' + (data.error || 'Error desconocido'));
+            alert('Error al procesar la decisión: ' + (data.error || 'Error desconocido'));
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error al guardar el comentario. Por favor, intente nuevamente.');
+        alert('Error al procesar la decisión: ' + error.message);
     })
     .finally(() => {
         // Rehabilitar botones
-        botones.forEach(btn => btn.disabled = false);
+        if (ajusteItem) {
+            const botones = ajusteItem.querySelectorAll('button');
+            botones.forEach(btn => btn.disabled = false);
+        }
     });
 }
 </script>

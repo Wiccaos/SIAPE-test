@@ -233,37 +233,65 @@ function abrirModalCasoDocente(solicitudId) {
         return response.json();
     })
     .then(data => {
-        // Debug: ver qué datos recibimos
-        console.log('Datos recibidos:', data);
-        console.log('Tiene ajustes:', data.tiene_ajustes);
-        console.log('Ajustes:', data.ajustes);
-        
         // Generar iniciales del estudiante para la foto
         const nombres = data.estudiante.nombres.split(' ');
         const apellidos = data.estudiante.apellidos.split(' ');
         const iniciales = (nombres[0] ? nombres[0][0] : '') + (apellidos[0] ? apellidos[0][0] : '');
         
         let ajustesHTML = '';
-        if (data.tiene_ajustes && data.ajustes && data.ajustes.length > 0) {
+        if (data.tiene_ajustes) {
             ajustesHTML = data.ajustes.map(ajuste => {
-                // Escapar HTML para seguridad
-                const categoria = ajuste.categoria || 'Sin categoría';
-                const descripcion = ajuste.descripcion || 'Sin descripción';
+                const tieneDecision = ajuste.decision_docente !== null && ajuste.decision_docente !== undefined;
+                const esAprobado = ajuste.decision_docente === 'aprobado';
+                const esRechazado = ajuste.decision_docente === 'rechazado';
+                
+                // Mostrar estado de la decisión si existe
+                const estadoHTML = tieneDecision ? `
+                    <div class="modal-decision-docente">
+                        <div class="modal-decision-header">
+                            <strong><i class="fas fa-${esAprobado ? 'check-circle' : 'times-circle'}"></i> Decisión:</strong>
+                            <span class="modal-decision-estado ${esAprobado ? 'decision-aprobado' : 'decision-rechazado'}">
+                                ${ajuste.decision_docente_display || ajuste.decision_docente}
+                            </span>
+                            ${ajuste.fecha_decision_docente ? `<span class="modal-decision-fecha">${ajuste.fecha_decision_docente}</span>` : ''}
+                        </div>
+                        ${esRechazado && ajuste.comentario_docente ? `
+                            <div class="modal-decision-comentario">
+                                <strong>Motivo del rechazo:</strong>
+                                <div class="modal-comentario-texto">${ajuste.comentario_docente}</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                ` : '';
+                
                 return `
-                <div class="modal-ajuste-item">
-                    <div class="modal-ajuste-categoria">
-                        <i class="fas fa-tag"></i> ${categoria}
+                    <div class="modal-ajuste-item" data-ajuste-id="${ajuste.id}">
+                        <div class="modal-ajuste-categoria">
+                            <i class="fas fa-tag"></i> ${ajuste.categoria}
+                        </div>
+                        <div class="modal-ajuste-descripcion">
+                            ${ajuste.descripcion}
+                        </div>
+                        ${estadoHTML}
+                        <div class="modal-decision-acciones">
+                            ${!tieneDecision || esRechazado ? `
+                                <button type="button" class="btn-accion btn-accion-success" onclick="aprobarAjuste(${ajuste.id})">
+                                    <i class="fas fa-check"></i> Aprobar Ajuste
+                                </button>
+                            ` : ''}
+                            ${!tieneDecision || esAprobado ? `
+                                <button type="button" class="btn-accion btn-accion-danger" onclick="rechazarAjuste(${ajuste.id})">
+                                    <i class="fas fa-times"></i> Rechazar Ajuste
+                                </button>
+                            ` : ''}
+                        </div>
                     </div>
-                    <div class="modal-ajuste-descripcion">
-                        ${descripcion}
-                    </div>
-                </div>
-            `;
+                `;
             }).join('');
         } else {
             ajustesHTML = `
-                <div class="modal-ajuste-item" style="border-left-color: #ffc107;">
-                    <div class="modal-ajuste-descripcion" style="color: #666; font-style: italic;">
+                <div class="modal-ajuste-item modal-ajuste-item-warning">
+                    <div class="modal-ajuste-descripcion modal-ajuste-descripcion-warning">
                         <i class="fas fa-info-circle"></i> Este caso está aprobado pero aún no tiene ajustes asignados.
                     </div>
                 </div>
@@ -283,8 +311,8 @@ function abrirModalCasoDocente(solicitudId) {
             
             <div class="modal-seccion">
                 <h4><i class="fas fa-file-alt"></i> Descripción del Caso</h4>
-                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 6px; white-space: pre-wrap; line-height: 1.6;">
-                    ${data.descripcion_caso}
+                <div class="modal-descripcion-caso">
+                    ${data.descripcion_caso.trim()}
                 </div>
             </div>
             
@@ -293,6 +321,9 @@ function abrirModalCasoDocente(solicitudId) {
                 ${ajustesHTML}
             </div>
         `;
+        
+        // Guardar el ID de la solicitud para poder recargar después de una decisión
+        modalBody.setAttribute('data-solicitud-id', solicitudId);
     })
     .catch(error => {
         modalBody.innerHTML = `
@@ -332,7 +363,154 @@ function getCookie(name) {
             }
         }
     }
+    // Si no se encuentra en cookies, intentar obtener del meta tag
+    if (!cookieValue) {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (csrfToken) {
+            cookieValue = csrfToken.value;
+        }
+    }
     return cookieValue;
+}
+
+// Función para aprobar un ajuste
+function aprobarAjuste(ajusteId) {
+    if (!confirm('¿Está seguro de que desea aprobar este ajuste?')) {
+        return;
+    }
+    
+    enviarDecisionAjuste(ajusteId, 'aprobado', '');
+}
+
+// Función para rechazar un ajuste (muestra formulario para comentario obligatorio)
+function rechazarAjuste(ajusteId) {
+    const ajusteItem = document.querySelector(`[data-ajuste-id="${ajusteId}"]`);
+    if (!ajusteItem) return;
+    
+    // Buscar si ya existe un formulario
+    let formularioExistente = ajusteItem.querySelector('.modal-formulario-rechazo');
+    if (formularioExistente) {
+        formularioExistente.style.display = 'block';
+        return;
+    }
+    
+    // Crear formulario para comentario obligatorio
+    const formulario = document.createElement('div');
+    formulario.className = 'modal-formulario-rechazo';
+    formulario.innerHTML = `
+        <div class="modal-formulario-rechazo-content">
+            <label for="comentario-rechazo-${ajusteId}"><strong>Motivo del rechazo (obligatorio):</strong></label>
+            <textarea id="comentario-rechazo-${ajusteId}" class="modal-textarea-comentario" rows="4" placeholder="Explique por qué rechaza este ajuste..." required></textarea>
+            <div class="modal-formulario-rechazo-botones">
+                <button type="button" class="btn-accion btn-accion-danger" onclick="confirmarRechazo(${ajusteId})">
+                    <i class="fas fa-times"></i> Confirmar Rechazo
+                </button>
+                <button type="button" class="btn-accion btn-accion-gray" onclick="cerrarFormularioRechazo(${ajusteId})">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+            </div>
+        </div>
+    `;
+    
+    // Insertar después de las acciones
+    const accionesDiv = ajusteItem.querySelector('.modal-decision-acciones');
+    accionesDiv.insertAdjacentElement('afterend', formulario);
+}
+
+// Función para cerrar el formulario de rechazo
+function cerrarFormularioRechazo(ajusteId) {
+    const ajusteItem = document.querySelector(`[data-ajuste-id="${ajusteId}"]`);
+    if (!ajusteItem) return;
+    
+    const formulario = ajusteItem.querySelector('.modal-formulario-rechazo');
+    if (formulario) {
+        formulario.style.display = 'none';
+    }
+}
+
+// Función para confirmar el rechazo
+function confirmarRechazo(ajusteId) {
+    const textarea = document.getElementById(`comentario-rechazo-${ajusteId}`);
+    if (!textarea) return;
+    
+    const comentario = textarea.value.trim();
+    if (!comentario) {
+        alert('Por favor, ingrese el motivo del rechazo. Este campo es obligatorio.');
+        textarea.focus();
+        return;
+    }
+    
+    if (!confirm('¿Está seguro de que desea rechazar este ajuste?')) {
+        return;
+    }
+    
+    enviarDecisionAjuste(ajusteId, 'rechazado', comentario);
+}
+
+// Función para enviar la decisión al servidor
+function enviarDecisionAjuste(ajusteId, decision, comentario) {
+    // Deshabilitar botones mientras se procesa
+    const ajusteItem = document.querySelector(`[data-ajuste-id="${ajusteId}"]`);
+    if (ajusteItem) {
+        const botones = ajusteItem.querySelectorAll('button');
+        botones.forEach(btn => btn.disabled = true);
+    }
+    
+    // Enviar decisión al servidor
+    fetch(`/api/docente/ajuste/${ajusteId}/decision/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            decision: decision,
+            comentario: comentario
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(err => {
+                // Mostrar mensaje de error más detallado
+                const errorMsg = err.error || 'Error desconocido';
+                const debugInfo = err.debug ? `\n\nInformación de depuración: ${JSON.stringify(err.debug, null, 2)}` : '';
+                throw new Error(errorMsg + debugInfo);
+            }).catch(() => {
+                // Si no se puede parsear el JSON, lanzar error genérico
+                throw new Error(`Error ${response.status}: ${response.statusText}`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            // Recargar el modal para mostrar la nueva decisión
+            const modal = document.getElementById('modalCasoDocente');
+            const modalBody = document.getElementById('modalCasoDocenteBody');
+            const solicitudId = modalBody.getAttribute('data-solicitud-id');
+            
+            if (solicitudId) {
+                // Recargar los datos del caso
+                abrirModalCasoDocente(parseInt(solicitudId));
+            }
+            
+            alert(data.message || `Ajuste ${data.decision_display.toLowerCase()} exitosamente.`);
+        } else {
+            alert('Error al procesar la decisión: ' + (data.error || 'Error desconocido'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error al procesar la decisión: ' + error.message);
+    })
+    .finally(() => {
+        // Rehabilitar botones
+        if (ajusteItem) {
+            const botones = ajusteItem.querySelectorAll('button');
+            botones.forEach(btn => btn.disabled = false);
+        }
+    });
 }
 </script>
 
