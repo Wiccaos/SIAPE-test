@@ -28,7 +28,6 @@ import matplotlib
 matplotlib.use('Agg')  # Usar backend sin GUI
 import matplotlib.pyplot as plt
 import os
-import tempfile
 
 # Django REST Framework
 from rest_framework import viewsets, mixins, status
@@ -6005,14 +6004,16 @@ def generar_reporte_pdf_director(request):
                      loc='center left', bbox_to_anchor=(1, 0, 0.5, 1), fontsize=8)
             
             plt.tight_layout()
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-            plt.savefig(temp_file.name, dpi=200, bbox_inches='tight', facecolor='white')
+            # Usar BytesIO en lugar de archivo temporal para evitar problemas de permisos
+            img_buffer = BytesIO()
+            plt.savefig(img_buffer, format='png', dpi=200, bbox_inches='tight', facecolor='white')
             plt.close()
+            img_buffer.seek(0)
             
-            img = Image(temp_file.name, width=7*inch, height=5.25*inch)
+            img = Image(img_buffer, width=7*inch, height=5.25*inch)
             elements.append(img)
             elements.append(Spacer(1, 0.2*inch))
-            os.unlink(temp_file.name)
+            img_buffer.close()
     except Exception as e:
         pass
     
@@ -6079,14 +6080,16 @@ def generar_reporte_pdf_director(request):
                        ha='left', va='center', fontsize=9, fontweight='bold', pad=5)
             
             plt.tight_layout()
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-            plt.savefig(temp_file.name, dpi=150, bbox_inches='tight')
+            # Usar BytesIO en lugar de archivo temporal para evitar problemas de permisos
+            img_buffer = BytesIO()
+            plt.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight')
             plt.close()
+            img_buffer.seek(0)
             
-            img = Image(temp_file.name, width=6*inch, height=3.75*inch)
+            img = Image(img_buffer, width=6*inch, height=3.75*inch)
             elements.append(img)
             elements.append(Spacer(1, 0.2*inch))
-            os.unlink(temp_file.name)
+            img_buffer.close()
     except Exception as e:
         pass
     
@@ -6220,14 +6223,16 @@ def generar_reporte_pdf_director(request):
                        ha='center', va='bottom', fontsize=9, fontweight='bold')
             
             plt.tight_layout()
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-            plt.savefig(temp_file.name, dpi=150, bbox_inches='tight')
+            # Usar BytesIO en lugar de archivo temporal para evitar problemas de permisos
+            img_buffer = BytesIO()
+            plt.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight')
             plt.close()
+            img_buffer.seek(0)
             
-            img = Image(temp_file.name, width=6*inch, height=3.75*inch)
+            img = Image(img_buffer, width=6*inch, height=3.75*inch)
             elements.append(img)
             elements.append(Spacer(1, 0.2*inch))
-            os.unlink(temp_file.name)
+            img_buffer.close()
     except Exception as e:
         pass
     
@@ -6341,14 +6346,16 @@ def generar_reporte_pdf_director(request):
             ax.legend(fontsize=9)
             ax.grid(axis='y', alpha=0.3, linestyle='--')
             plt.tight_layout()
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-            plt.savefig(temp_file.name, dpi=150, bbox_inches='tight')
+            # Usar BytesIO en lugar de archivo temporal para evitar problemas de permisos
+            img_buffer = BytesIO()
+            plt.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight')
             plt.close()
+            img_buffer.seek(0)
             
-            img = Image(temp_file.name, width=7*inch, height=4.2*inch)
+            img = Image(img_buffer, width=7*inch, height=4.2*inch)
             elements.append(img)
             elements.append(Spacer(1, 0.2*inch))
-            os.unlink(temp_file.name)
+            img_buffer.close()
     except Exception as e:
         pass
     
