@@ -48,7 +48,7 @@ from .serializer import (
 from .validators import validar_rut_chileno, validar_contraseña, traducir_feriado_chileno
 from .models import(
     Usuario, PerfilUsuario, Roles, Areas, CategoriasAjustes, Carreras, Estudiantes, Solicitudes, Evidencias,
-    Asignaturas, AsignaturasEnCurso, Entrevistas, AjusteRazonable, AjusteAsignado, HorarioBloqueado
+    Asignaturas, AsignaturasEnCurso, Entrevistas, AjusteRazonable, AjusteAsignado, HorarioBloqueado, SEMESTRE_CHOICES
 )  
 
 # Permisos personalizados
@@ -6135,7 +6135,7 @@ def generar_reporte_pdf_director(request):
         elements.append(Paragraph('Asignaturas por Semestre', heading_style))
         semestre_data = [['Semestre', 'Año', 'Total']]
         for item in asignaturas_por_semestre:
-            semestre_nombre = dict(Asignaturas.SEMESTRE_CHOICES).get(item['semestre'], item['semestre']) if item['semestre'] else "Sin semestre"
+            semestre_nombre = dict(SEMESTRE_CHOICES).get(item['semestre'], item['semestre']) if item['semestre'] else "Sin semestre"
             semestre_data.append([semestre_nombre, str(item['anio']) if item['anio'] else "N/A", str(item['total'])])
         
         semestre_table = Table(semestre_data, colWidths=[2*inch, 1.5*inch, 1.5*inch])
