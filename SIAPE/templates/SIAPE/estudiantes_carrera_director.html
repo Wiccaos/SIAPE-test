@@ -51,6 +51,7 @@
                     <th>RUT</th>
                     <th>Email</th>
                     <th>Teléfono</th>
+                    <th style="text-align: center;">Acción</th>
                 </tr>
             </thead>
             <tbody>
@@ -60,10 +61,15 @@
                     <td>{{ estudiante.rut }}</td>
                     <td>{{ estudiante.email }}</td>
                     <td>{{ estudiante.numero|default:'N/A' }}</td>
+                    <td style="text-align: center;">
+                        <a href="{% url 'perfil_estudiante_director' estudiante.id %}" class="btn-accion btn-agendar btn-accion-small">
+                            <i class="fas fa-user-circle"></i> Ver más
+                        </a>
+                    </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="4">
+                    <td colspan="5">
                         <div class="empty-state">
                             <i class="fas fa-user-graduate"></i>
                             <p>No hay estudiantes registrados en esta carrera.</p>

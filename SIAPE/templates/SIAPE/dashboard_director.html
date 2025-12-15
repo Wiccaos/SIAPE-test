@@ -115,7 +115,7 @@
 
     <section class="table-container">
         <div class="table-header">
-            <h2><i class="fas fa-history"></i> Historial de Casos Aprobados</h2>
+            <h2><i class="fas fa-history"></i> Historial de Casos</h2>
         </div>
         
         <table class="custom-table">
@@ -135,7 +135,11 @@
                     <td>{{ solicitud.estudiantes.carreras.nombre }}</td>
                     <td>{{ solicitud.updated_at|date:"d/m/Y" }}</td>
                     <td>
-                        <span class="status status-aprobado">Aprobado</span>
+                        {% if solicitud.estado == 'aprobado' %}
+                            <span class="status status-aprobado">Aprobado</span>
+                        {% elif solicitud.estado == 'rechazado' %}
+                            <span class="status status-rechazado">Rechazado</span>
+                        {% endif %}
                     </td>
                     <td>
                         <a href="{% url 'detalle_caso' solicitud.id %}" class="btn-accion btn-agendar btn-accion-small">
@@ -155,6 +159,36 @@
                 {% endfor %}
             </tbody>
         </table>
+        
+        <!-- Información de paginación -->
+        {% if solicitudes_historial.has_other_pages %}
+        <div class="table-footer">
+            <span>Mostrando {{ solicitudes_historial.start_index }} - {{ solicitudes_historial.end_index }} de {{ solicitudes_historial.paginator.count }} caso{{ solicitudes_historial.paginator.count|pluralize:"s" }}</span>
+        </div>
+        
+        <!-- Controles de paginación -->
+        <div class="pagination-container" style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 10px;">
+            {% if solicitudes_historial.has_previous %}
+                <a href="?page_historial=1" class="btn-accion btn-accion-gray btn-accion-small">
+                    <i class="fas fa-angle-double-left"></i>
+                </a>
+                <a href="?page_historial={{ solicitudes_historial.previous_page_number }}" class="btn-accion btn-accion-gray btn-accion-small">
+                    <i class="fas fa-angle-left"></i> Anterior
+                </a>
+            {% endif %}
+            <span class="pagination-info">
+                Página {{ solicitudes_historial.number }} de {{ solicitudes_historial.paginator.num_pages }}
+            </span>
+            {% if solicitudes_historial.has_next %}
+                <a href="?page_historial={{ solicitudes_historial.next_page_number }}" class="btn-accion btn-accion-gray btn-accion-small">
+                    Siguiente <i class="fas fa-angle-right"></i>
+                </a>
+                <a href="?page_historial={{ solicitudes_historial.paginator.num_pages }}" class="btn-accion btn-accion-gray btn-accion-small">
+                    <i class="fas fa-angle-double-right"></i>
+                </a>
+            {% endif %}
+        </div>
+        {% endif %}
     </section>
 
 </div>

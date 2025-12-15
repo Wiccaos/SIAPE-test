@@ -140,6 +140,7 @@ urlpatterns = [
     path('dashboard/director/ajustes/<int:ajuste_asignado_id>/rechazar/', views.rechazar_ajuste_director, name='rechazar_ajuste_director'),
     path('dashboard/director/carreras/', views.carreras_director, name='carreras_director'),
     path('dashboard/director/carreras/<int:carrera_id>/estudiantes/', views.estudiantes_por_carrera_director, name='estudiantes_carrera_director'),
+    path('dashboard/director/estudiantes/<int:estudiante_id>/perfil/', views.perfil_estudiante_director, name='perfil_estudiante_director'),
     
     # URLs de Gestión de Asignaturas (Director)
     path('dashboard/director/asignaturas/', views.gestion_asignaturas_director, name='gestion_asignaturas_director'),

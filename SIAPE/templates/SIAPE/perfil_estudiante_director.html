@@ -1,0 +1,227 @@
+{% extends "plantilla.html" %}
+{% load static %}
+
+{% block title %}
+    Perfil de {{ estudiante.nombres }} {{ estudiante.apellidos }} | SIAPE
+{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="main-content"> 
+    
+    <nav class="dashboard-nav">
+        <a href="{% url 'dashboard_director' %}" class="nav-item">
+            <i class="fas fa-user-tie"></i>
+            Panel Principal
+        </a>
+        <a href="{% url 'casos_generales' %}" class="nav-item">
+            <i class="fas fa-folder-open"></i>
+            Casos
+        </a>
+        <a href="{% url 'estadisticas_director' %}" class="nav-item">
+            <i class="fas fa-chart-bar"></i>
+            Estadísticas
+        </a>
+        <a href="{% url 'carreras_director' %}" class="nav-item active">
+            <i class="fas fa-graduation-cap"></i>
+            Mis Carreras
+        </a>
+        <a href="{% url 'gestion_asignaturas_director' %}" class="nav-item">
+            <i class="fas fa-book"></i>
+            Asignaturas
+        </a>
+        <a href="{% url 'gestion_carga_masiva_director' %}" class="nav-item">
+            <i class="fas fa-file-upload"></i>
+            Carga Masiva
+        </a>
+    </nav>
+
+    <!-- Información del Estudiante -->
+    <section class="table-container" style="margin-bottom: 30px;">
+        <div class="table-header">
+            <h2><i class="fas fa-user-circle"></i> Información del Estudiante</h2>
+        </div>
+        
+        <div style="padding: 20px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 25px;">
+                <div>
+                    <label style="font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 2px solid #cc0000;">Nombre Completo</label>
+                    <p style="margin: 0; font-size: 1.1em; padding-top: 5px;">{{ estudiante.nombres }} {{ estudiante.apellidos }}</p>
+                </div>
+                <div>
+                    <label style="font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 2px solid #cc0000;">RUT</label>
+                    <p style="margin: 0; font-size: 1.1em; padding-top: 5px;">{{ estudiante.rut }}</p>
+                </div>
+                <div>
+                    <label style="font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 2px solid #cc0000;">Email</label>
+                    <p style="margin: 0; font-size: 1.1em; padding-top: 5px;">{{ estudiante.email }}</p>
+                </div>
+                <div>
+                    <label style="font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 2px solid #cc0000;">Teléfono</label>
+                    <p style="margin: 0; font-size: 1.1em; padding-top: 5px;">{{ estudiante.numero|default:'No registrado' }}</p>
+                </div>
+                <div>
+                    <label style="font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 2px solid #cc0000;">Carrera</label>
+                    <p style="margin: 0; font-size: 1.1em; padding-top: 5px;">{{ estudiante.carreras.nombre }}</p>
+                </div>
+                <div>
+                    <label style="font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 2px solid #cc0000;">Semestre Actual</label>
+                    <p style="margin: 0; font-size: 1.1em; padding-top: 5px;">{{ estudiante.semestre_actual|default:'No registrado' }}</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- KPIs de Solicitudes -->
+    <section class="kpi-container" style="margin-bottom: 30px;">
+        <div class="kpi-card">
+            <div class="kpi-icon icon-solicitudes">
+                <i class="fas fa-file-medical"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ total_solicitudes|default:0 }}</span>
+                <span class="kpi-label">Total Solicitudes</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-resueltos">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ solicitudes_aprobadas|default:0 }}</span>
+                <span class="kpi-label">Aprobadas</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-icon-danger">
+                <i class="fas fa-times"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ solicitudes_rechazadas|default:0 }}</span>
+                <span class="kpi-label">Rechazadas</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon icon-proceso">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-value">{{ solicitudes_pendientes|default:0 }}</span>
+                <span class="kpi-label">Pendientes</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Asignaturas en Curso -->
+    {% if asignaturas_en_curso %}
+    <section class="table-container" style="margin-bottom: 30px;">
+        <div class="table-header">
+            <h2><i class="fas fa-book"></i> Asignaturas en Curso</h2>
+        </div>
+        
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Asignatura</th>
+                    <th>Código</th>
+                    <th>Sección</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for asignatura_curso in asignaturas_en_curso %}
+                <tr>
+                    <td>{{ asignatura_curso.asignaturas.nombre }}</td>
+                    <td>{{ asignatura_curso.asignaturas.codigo|default:'N/A' }}</td>
+                    <td>{{ asignatura_curso.asignaturas.seccion|default:'N/A' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+
+    <!-- Historial de Solicitudes -->
+    <section class="table-container">
+        <div class="table-header">
+            <h2><i class="fas fa-history"></i> Historial de Solicitudes</h2>
+        </div>
+        
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Fecha Solicitud</th>
+                    <th>Asunto</th>
+                    <th>Estado</th>
+                    <th>Ajustes Asignados</th>
+                    <th>Fecha Resolución</th>
+                    <th style="text-align: center;">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for solicitud in solicitudes %}
+                <tr>
+                    <td>{{ solicitud.created_at|date:"d/m/Y" }}</td>
+                    <td>{{ solicitud.asunto|truncatewords:10 }}</td>
+                    <td>
+                        {% if solicitud.estado == 'aprobado' %}
+                            <span class="status status-aprobado">Aprobado</span>
+                        {% elif solicitud.estado == 'rechazado' %}
+                            <span class="status status-rechazado">Rechazado</span>
+                        {% elif solicitud.estado == 'pendiente_aprobacion' %}
+                            <span class="status status-pendiente">Pendiente</span>
+                        {% else %}
+                            <span class="status status-proceso">En Proceso</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% for ajuste_asignado in solicitud.ajusteasignado_set.all %}
+                            <span class="badge" style="background: {% if ajuste_asignado.estado_aprobacion == 'aprobado' %}#4CAF50{% elif ajuste_asignado.estado_aprobacion == 'rechazado' %}#f44336{% else %}#ff9800{% endif %}; color: white; padding: 3px 8px; border-radius: 3px; font-size: 0.85em; margin-right: 5px; display: inline-block; margin-bottom: 3px;">
+                                {{ ajuste_asignado.ajuste_razonable.categorias_ajustes.nombre_categoria|default:'Sin categoría' }}
+                            </span>
+                        {% empty %}
+                            <span style="color: #999;">Sin ajustes</span>
+                        {% endfor %}
+                    </td>
+                    <td>
+                        {% if solicitud.estado in 'aprobado,rechazado' %}
+                            {{ solicitud.updated_at|date:"d/m/Y" }}
+                        {% else %}
+                            <span style="color: #999;">-</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: center;">
+                        <a href="{% url 'detalle_caso' solicitud.id %}" class="btn-accion btn-agendar btn-accion-small">
+                            <i class="fas fa-eye"></i> Ver Detalles
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6">
+                        <div class="empty-state">
+                            <i class="fas fa-inbox"></i>
+                            <p>El estudiante no tiene solicitudes registradas.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <!-- Botón Volver -->
+    <div class="grid-column-full mt-15" style="margin-top: 25px;">
+        <a href="{% url 'estudiantes_carrera_director' estudiante.carreras.id %}" class="btn-volver">
+            <i class="fas fa-chevron-left"></i> Volver a Estudiantes
+        </a>
+    </div>
+
+</div>
+{% endblock %}
+

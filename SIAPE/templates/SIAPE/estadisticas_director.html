@@ -7,14 +7,8 @@
 
 {% block extra_head %}
     <link rel="stylesheet" href="{% static 'CSS/dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'CSS/estadisticas_director.css' %}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        /* Asegurar que el texto tachado se muestre en las leyendas de Chart.js cuando está oculto */
-        canvas ~ ul li[style*="opacity"] span,
-        canvas ~ ul li[style*="opacity"] {
-            text-decoration: line-through !important;
-        }
-    </style>
 {% endblock %}
 
 {% block content %}
@@ -134,42 +128,46 @@
     </section>
 
     <!-- Selector de Rango de Tiempo y Generación de Reportes -->
-    <section class="filters-section" style="margin-bottom: 30px; margin-top: 20px;">
-        <form method="GET" action="{% url 'estadisticas_director' %}" style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; margin-bottom: 15px;">
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <label for="rango" style="font-weight: 600; color: var(--text-secondary);">Rango de Tiempo:</label>
-                <select name="rango" id="rango" onchange="this.form.submit()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; background: var(--bg-input); color: var(--text-primary); min-width: 180px;">
+    <section class="filters-section">
+        <form method="GET" action="{% url 'estadisticas_director' %}">
+            <div>
+                <label for="rango">Rango de Tiempo:</label>
+                <select name="rango" id="rango" onchange="this.form.submit()">
                     <option value="mes" {% if rango_seleccionado == 'mes' %}selected{% endif %}>Último Mes</option>
                     <option value="semestre" {% if rango_seleccionado == 'semestre' %}selected{% endif %}>Último Semestre</option>
                     <option value="año" {% if rango_seleccionado == 'año' %}selected{% endif %}>Último Año</option>
                     <option value="historico" {% if rango_seleccionado == 'historico' %}selected{% endif %}>Histórico Completo</option>
                 </select>
             </div>
-            <span style="color: var(--text-secondary); font-size: 0.9em;">
+            <span class="info-text">
                 <i class="fas fa-info-circle"></i> Mostrando: <strong>{{ rango_nombre }}</strong>
             </span>
         </form>
         
         <!-- Botones de Generación de Reportes -->
-        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-            <span style="font-weight: 600; color: var(--text-secondary); margin-right: 5px;">Generar Reporte:</span>
+        <div class="report-buttons">
+            <span>Generar Reporte:</span>
             <a href="{% url 'generar_reporte_pdf_director' %}?rango={{ rango_seleccionado }}" 
-               class="btn btn-primary" 
-               style="padding: 8px 16px; background: #D32F2F; color: white; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;"
+               class="btn btn-primary"
                target="_blank">
                 <i class="fas fa-file-pdf"></i> PDF
             </a>
             <a href="{% url 'generar_reporte_excel_director' %}?rango={{ rango_seleccionado }}" 
-               class="btn btn-secondary" 
-               style="padding: 8px 16px; background: #007bff; color: white; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;"
+               class="btn btn-secondary"
                download>
                 <i class="fas fa-file-excel"></i> Excel
             </a>
         </div>
     </section>
 
+    <!-- Datos JSON para los gráficos (ocultos) -->
+    <script type="application/json" id="tendencia-data">{{ chart_tendencia_json|safe }}</script>
+    <script type="application/json" id="ajustes-data">{{ pie_chart_data_json|safe }}</script>
+    <script type="application/json" id="tipos-data">{{ bar_chart_tipos_json|safe }}</script>
+    <script type="application/json" id="secciones-data">{{ bar_chart_secciones_json|safe }}</script>
+
     <!-- Gráficos de Tendencias -->
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+    <div class="charts-grid">
         <!-- Tendencia de Casos -->
         <section class="table-container">
             <div class="table-header">
@@ -184,7 +182,7 @@
                     {% endif %}
                 </h3>
             </div>
-            <div style="padding: 20px;">
+            <div class="chart-container-tendencia">
                 <canvas id="graficoTendencia"></canvas>
             </div>
         </section>
@@ -194,20 +192,20 @@
             <div class="table-header">
                 <h3><i class="fas fa-chart-pie"></i> Estado de Ajustes</h3>
             </div>
-            <div style="padding: 20px; min-height: 400px; display: flex; justify-content: center; align-items: center;">
-                <canvas id="graficoAjustes" style="max-width: 250px; max-height: 250px;"></canvas>
+            <div class="chart-container-ajustes">
+                <canvas id="graficoAjustes"></canvas>
             </div>
         </section>
     </div>
 
     <!-- Gráficos de Distribución -->
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+    <div class="charts-grid">
         <!-- Ajustes Aprobados y Rechazados por Categoría -->
         <section class="table-container">
             <div class="table-header">
                 <h3><i class="fas fa-tags"></i> Ajustes Aprobados y Rechazados por Categoría</h3>
             </div>
-            <div style="padding: 20px;">
+            <div class="chart-container">
                 <canvas id="graficoTipos"></canvas>
             </div>
         </section>
@@ -217,14 +215,14 @@
             <div class="table-header">
                 <h3><i class="fas fa-book-reader"></i> Secciones con Más Ajustes</h3>
             </div>
-            <div style="padding: 20px;">
+            <div class="chart-container">
                 <canvas id="graficoSecciones"></canvas>
             </div>
         </section>
     </div>
 
     <!-- Tablas Detalladas -->
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+    <div class="tables-grid">
         <!-- Tabla de Estados -->
         <section class="table-container">
             <div class="table-header">
@@ -234,16 +232,16 @@
                 <thead>
                     <tr>
                         <th>Estado</th>
-                        <th style="text-align: center;">Cantidad</th>
-                        <th style="text-align: center;">Porcentaje</th>
+                        <th>Cantidad</th>
+                        <th>Porcentaje</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for estado in estados_stats %}
                     <tr>
                         <td>{{ estado.nombre }}</td>
-                        <td style="text-align: center;"><strong>{{ estado.cantidad }}</strong></td>
-                        <td style="text-align: center;">{{ estado.porcentaje }}%</td>
+                        <td><strong>{{ estado.cantidad }}</strong></td>
+                        <td>{{ estado.porcentaje }}%</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -259,18 +257,18 @@
                 <thead>
                     <tr>
                         <th>Carrera</th>
-                        <th style="text-align: center;">Total</th>
-                        <th style="text-align: center;">Aprobados</th>
-                        <th style="text-align: center;">Tasa</th>
+                        <th>Total</th>
+                        <th>Aprobados</th>
+                        <th>Tasa</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for carrera in carreras_stats %}
                     <tr>
                         <td>{{ carrera.nombre }}</td>
-                        <td style="text-align: center;"><strong>{{ carrera.total }}</strong></td>
-                        <td style="text-align: center;">{{ carrera.aprobados }}</td>
-                        <td style="text-align: center;">{{ carrera.tasa_aprobacion }}%</td>
+                        <td><strong>{{ carrera.total }}</strong></td>
+                        <td>{{ carrera.aprobados }}</td>
+                        <td>{{ carrera.tasa_aprobacion }}%</td>
                     </tr>
                     {% empty %}
                     <tr>
@@ -284,123 +282,5 @@
 
 </div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        
-        // --- 1. Gráfico de Tendencia (Línea) ---
-        const ctxTendencia = document.getElementById('graficoTendencia').getContext('2d');
-        const tendenciaData = JSON.parse('{{ chart_tendencia_json|escapejs }}');
-        new Chart(ctxTendencia, {
-            type: 'line',
-            data: tendenciaData,
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false }
-                },
-                scales: {
-                    y: { beginAtZero: true }
-                }
-            }
-        });
-
-        // --- 2. Gráfico de Estado de Ajustes (Doughnut) ---
-        const ctxAjustes = document.getElementById('graficoAjustes').getContext('2d');
-        const ajustesData = JSON.parse('{{ pie_chart_data_json|escapejs }}');
-        new Chart(ctxAjustes, {
-            type: 'doughnut',
-            data: ajustesData,
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                aspectRatio: 1,
-                plugins: {
-                    legend: {
-                        position: 'right',
-                        generateLabels: function(chart) {
-                            const original = Chart.defaults.plugins.legend.labels.generateLabels;
-                            const labels = original.call(this, chart);
-                            labels.forEach((label, i) => {
-                                const meta = chart.getDatasetMeta(0);
-                                const data = meta.data[i];
-                                const value = chart.data.datasets[0].data[i];
-                                const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
-                                const percentage = ((value / total) * 100).toFixed(1);
-                                label.text = `${label.text}: ${value} (${percentage}%)`;
-                                if (data.hidden) {
-                                    label.hidden = true;
-                                }
-                            });
-                            return labels;
-                        }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return context.label + ': ' + context.parsed;
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-        // --- 3. Gráfico de Ajustes por Categoría (Barras Agrupadas) ---
-        const ctxTipos = document.getElementById('graficoTipos').getContext('2d');
-        const tiposData = JSON.parse('{{ bar_chart_tipos_json|escapejs }}');
-        if (tiposData.labels.length > 0) {
-            new Chart(ctxTipos, {
-                type: 'bar',
-                data: tiposData,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { 
-                        legend: { 
-                            display: true,
-                            position: 'top'
-                        } 
-                    },
-                    scales: {
-                        y: { 
-                            beginAtZero: true, 
-                            ticks: { stepSize: 1 },
-                            stacked: false
-                        },
-                        x: {
-                            stacked: false
-                        }
-                    }
-                }
-            });
-        } else {
-            document.getElementById('graficoTipos').parentElement.innerHTML = 
-                '<div class="empty-state"><i class="fas fa-tags"></i><p>No hay ajustes para mostrar.</p></div>';
-        }
-
-        // --- 4. Gráfico de Secciones (Barras Horizontales) ---
-        const ctxSecciones = document.getElementById('graficoSecciones').getContext('2d');
-        const seccionesData = JSON.parse('{{ bar_chart_secciones_json|escapejs }}');
-        if (seccionesData.labels.length > 0) {
-            new Chart(ctxSecciones, {
-                type: 'bar',
-                data: seccionesData,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    indexAxis: 'y',
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { beginAtZero: true, ticks: { stepSize: 1 } }
-                    }
-                }
-            });
-        } else {
-            document.getElementById('graficoSecciones').parentElement.innerHTML = 
-                '<div class="empty-state"><i class="fas fa-book-reader"></i><p>No hay datos de secciones con ajustes aprobados.</p></div>';
-        }
-
-    });
-</script>
+<script src="{% static 'JS/estadisticas_director.js' %}"></script>
 {% endblock %}

@@ -21,9 +21,14 @@ import csv
 from io import BytesIO
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter, A4
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
+import matplotlib
+matplotlib.use('Agg')  # Usar backend sin GUI
+import matplotlib.pyplot as plt
+import os
+import tempfile
 
 # Django REST Framework
 from rest_framework import viewsets, mixins, status
@@ -5007,6 +5012,13 @@ def dashboard_director(request):
     
     # Si no tiene carreras asignadas, mostrar mensaje y retornar lista vacía
     if not carreras_del_director.exists():
+        # Determinar semestre actual para mostrar en los KPIs
+        mes_actual = timezone.localtime(timezone.now()).month
+        if mes_actual >= 3 and mes_actual <= 8:
+            semestre_actual = 1
+        else:
+            semestre_actual = 2
+        
         messages.warning(request, 'No tienes carreras asignadas. Contacta a un administrador para que te asigne carreras.')
         context = {
             'nombre_usuario': request.user.first_name,
@@ -5016,12 +5028,22 @@ def dashboard_director(request):
                 'total_pendientes': 0,
                 'total_aprobados': 0,
                 'total_rechazados': 0,
+                'semestre_actual': semestre_actual,
             },
         }
         return render(request, 'SIAPE/dashboard_director.html', context)
     
     # Obtener IDs de las carreras para hacer el filtro más eficiente
     carreras_ids = carreras_del_director.values_list('id', flat=True)
+    
+    # 1.5. Determinar el semestre actual basado en la fecha
+    # Semestre 1: Marzo - Agosto (meses 3-8)
+    # Semestre 2: Septiembre - Febrero (meses 9-12, 1-2)
+    mes_actual = timezone.localtime(timezone.now()).month
+    if mes_actual >= 3 and mes_actual <= 8:
+        semestre_actual = 1
+    else:
+        semestre_actual = 2
     
     # 2. Base de solicitudes de sus carreras - usando IDs para mejor rendimiento
     solicitudes_base = Solicitudes.objects.filter(
@@ -5030,6 +5052,11 @@ def dashboard_director(request):
         'estudiantes', 
         'estudiantes__carreras'
     ).distinct()
+    
+    # 2.5. Filtrar solicitudes por semestre actual del estudiante
+    solicitudes_base_semestre = solicitudes_base.filter(
+        estudiantes__semestre_actual=semestre_actual
+    )
 
     # 3. Filtrar solicitudes PENDIENTES (estado 'pendiente_aprobacion')
     # Estos son los casos que el Asesor Pedagógico le envió.
@@ -5038,16 +5065,27 @@ def dashboard_director(request):
     ).order_by('updated_at') # Más antiguas (recién llegadas) primero
 
     # 4. Filtrar el HISTORIAL (casos 'aprobados' o 'rechazados')
-    solicitudes_historial = solicitudes_base.filter(
+    solicitudes_historial_base = solicitudes_base.filter(
         estado__in=['aprobado', 'rechazado']
     ).order_by('-updated_at') # Más recientes primero
 
-    # 5. KPIs (Específicos del Director)
+    # 5. KPIs (Específicos del Director) - filtrar por semestre actual
     kpis = {
-        'total_pendientes': solicitudes_pendientes.count(),
-        'total_aprobados': solicitudes_historial.filter(estado='aprobado').count(),
-        'total_rechazados': solicitudes_historial.filter(estado='rechazado').count(),
+        'total_pendientes': solicitudes_base_semestre.filter(estado='pendiente_aprobacion').count(),
+        'total_aprobados': solicitudes_base_semestre.filter(estado='aprobado').count(),
+        'total_rechazados': solicitudes_base_semestre.filter(estado='rechazado').count(),
+        'semestre_actual': semestre_actual,
     }
+
+    # 6. Paginación del historial (10 por página)
+    page_historial = request.GET.get('page_historial', 1)
+    paginator_historial = Paginator(solicitudes_historial_base, 10)
+    try:
+        solicitudes_historial = paginator_historial.page(page_historial)
+    except PageNotAnInteger:
+        solicitudes_historial = paginator_historial.page(1)
+    except EmptyPage:
+        solicitudes_historial = paginator_historial.page(paginator_historial.num_pages)
 
     context = {
         'nombre_usuario': request.user.first_name,
@@ -5117,6 +5155,67 @@ def estudiantes_por_carrera_director(request, carrera_id):
     }
     # 3. Renderizar un nuevo template que crearemos a continuación
     return render(request, 'SIAPE/estudiantes_carrera_director.html', context)
+
+@login_required
+def perfil_estudiante_director(request, estudiante_id):
+    """
+    Muestra el perfil completo de un estudiante con sus solicitudes
+    para el Director de Carrera.
+    """
+    try:
+        perfil_director = request.user.perfil
+        if perfil_director.rol.nombre_rol != ROL_DIRECTOR:
+            messages.error(request, 'No tienes permisos para esta acción.')
+            return redirect('home')
+    except AttributeError:
+        return redirect('home')
+
+    # 1. Obtener el estudiante
+    estudiante = get_object_or_404(Estudiantes, id=estudiante_id)
+    
+    # 2. Verificar que el director tenga acceso a la carrera del estudiante
+    carreras_del_director = Carreras.objects.filter(director=perfil_director)
+    if estudiante.carreras not in carreras_del_director:
+        messages.error(request, 'No tienes permisos para ver este estudiante.')
+        return redirect('carreras_director')
+    
+    # 3. Obtener todas las solicitudes del estudiante ordenadas por fecha (más recientes primero)
+    solicitudes = Solicitudes.objects.filter(
+        estudiantes=estudiante
+    ).select_related(
+        'estudiantes',
+        'estudiantes__carreras',
+        'coordinadora_asignada',
+        'coordinador_tecnico_pedagogico_asignado',
+        'asesor_pedagogico_asignado'
+    ).prefetch_related(
+        'ajusteasignado_set',
+        'ajusteasignado_set__ajuste_razonable',
+        'ajusteasignado_set__ajuste_razonable__categorias_ajustes'
+    ).order_by('-created_at')
+    
+    # 4. Estadísticas del estudiante
+    total_solicitudes = solicitudes.count()
+    solicitudes_aprobadas = solicitudes.filter(estado='aprobado').count()
+    solicitudes_rechazadas = solicitudes.filter(estado='rechazado').count()
+    solicitudes_pendientes = solicitudes.exclude(estado__in=['aprobado', 'rechazado']).count()
+    
+    # 5. Obtener asignaturas en curso del estudiante
+    asignaturas_en_curso = estudiante.asignaturasencurso_set.filter(estado=True).select_related('asignaturas')
+    
+    context = {
+        'estudiante': estudiante,
+        'solicitudes': solicitudes,
+        'total_solicitudes': total_solicitudes,
+        'solicitudes_aprobadas': solicitudes_aprobadas,
+        'solicitudes_rechazadas': solicitudes_rechazadas,
+        'solicitudes_pendientes': solicitudes_pendientes,
+        'asignaturas_en_curso': asignaturas_en_curso,
+        'nombre_usuario': request.user.first_name,
+        'carrera': estudiante.carreras,
+    }
+    
+    return render(request, 'SIAPE/perfil_estudiante_director.html', context)
 
 @login_required
 def estadisticas_director(request):
@@ -5771,8 +5870,32 @@ def generar_reporte_pdf_director(request):
     elements.append(Paragraph(f'Generado por: {request.user.get_full_name()}', styles['Normal']))
     elements.append(Spacer(1, 0.4*inch))
     
+    # Introducción
+    intro_text = f"""
+    Este reporte presenta un análisis completo de las estadísticas de las carreras bajo su dirección 
+    para el período: <b>{rango_nombre}</b>. El documento incluye indicadores clave de rendimiento (KPIs), 
+    análisis de casos y ajustes razonables, estadísticas por carrera, asignaturas, estudiantes y docentes.
+    """
+    intro_style = ParagraphStyle(
+        'IntroStyle',
+        parent=styles['Normal'],
+        fontSize=10,
+        leading=14,
+        spaceAfter=15,
+        alignment=4,  # Justificado
+    )
+    elements.append(Paragraph(intro_text, intro_style))
+    elements.append(Spacer(1, 0.2*inch))
+    
     # KPIs Principales
     elements.append(Paragraph('Indicadores Principales', heading_style))
+    kpi_text = """
+    Los siguientes indicadores proporcionan una visión general del estado de las solicitudes de ajustes 
+    razonables en sus carreras. Estos datos reflejan el total de casos gestionados, su estado de aprobación 
+    y la distribución de ajustes asignados.
+    """
+    elements.append(Paragraph(kpi_text, intro_style))
+    elements.append(Spacer(1, 0.1*inch))
     kpi_data = [
         ['Indicador', 'Valor'],
         ['Total Casos', str(total_casos)],
@@ -5830,10 +5953,78 @@ def generar_reporte_pdf_director(request):
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
     ]))
     elements.append(estado_table)
-    elements.append(Spacer(1, 0.3*inch))
+    elements.append(Spacer(1, 0.2*inch))
+    
+    # Gráfico de Casos por Estado (Gráfico de pastel mejorado)
+    try:
+        estado_counts = {}
+        estado_labels_short = {}
+        for estado_valor, estado_nombre in Solicitudes.ESTADO_CHOICES:
+            cantidad = solicitudes_base.filter(estado=estado_valor).count()
+            if cantidad > 0:
+                estado_counts[estado_nombre] = cantidad
+                # Acortar etiquetas largas para mejor visualización
+                if len(estado_nombre) > 30:
+                    estado_labels_short[estado_nombre] = estado_nombre[:27] + '...'
+                else:
+                    estado_labels_short[estado_nombre] = estado_nombre
+        
+        if estado_counts:
+            fig, ax = plt.subplots(figsize=(8, 6))
+            colors_pie = ['#4CAF50', '#FF9800', '#f44336', '#2196F3', '#9E9E9E', '#FFC107', '#00BCD4']
+            
+            # Ordenar por cantidad descendente para mejor visualización
+            sorted_estados = sorted(estado_counts.items(), key=lambda x: x[1], reverse=True)
+            valores = [v for _, v in sorted_estados]
+            etiquetas = [estado_labels_short[k] for k, _ in sorted_estados]
+            
+            wedges, texts, autotexts = ax.pie(
+                valores,
+                labels=etiquetas,
+                autopct=lambda pct: f'{pct:.1f}%\n({int(pct/100*sum(valores))})' if pct > 3 else '',
+                colors=colors_pie[:len(valores)],
+                startangle=90,
+                textprops={'fontsize': 8, 'fontweight': 'bold'},
+                pctdistance=0.85,
+                labeldistance=1.1
+            )
+            
+            # Mejorar la legibilidad de los textos
+            for autotext in autotexts:
+                autotext.set_color('white')
+                autotext.set_fontweight('bold')
+                autotext.set_fontsize(9)
+            
+            for text in texts:
+                text.set_fontsize(8)
+            
+            ax.set_title('Distribución de Casos por Estado', fontsize=12, fontweight='bold', pad=20)
+            
+            # Agregar leyenda fuera del gráfico
+            ax.legend(wedges, [f'{k}: {v}' for k, v in sorted_estados], 
+                     loc='center left', bbox_to_anchor=(1, 0, 0.5, 1), fontsize=8)
+            
+            plt.tight_layout()
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+            plt.savefig(temp_file.name, dpi=200, bbox_inches='tight', facecolor='white')
+            plt.close()
+            
+            img = Image(temp_file.name, width=7*inch, height=5.25*inch)
+            elements.append(img)
+            elements.append(Spacer(1, 0.2*inch))
+            os.unlink(temp_file.name)
+    except Exception as e:
+        pass
     
     # Estadísticas por Carrera
     elements.append(Paragraph('Estadísticas por Carrera', heading_style))
+    carrera_text = """
+    El análisis por carrera permite identificar qué programas académicos presentan mayor demanda de ajustes 
+    razonables y su tasa de aprobación. Esta información es valiosa para la planificación académica y la 
+    asignación de recursos.
+    """
+    elements.append(Paragraph(carrera_text, intro_style))
+    elements.append(Spacer(1, 0.1*inch))
     carrera_data = [['Carrera', 'Total Casos', 'Aprobados', 'Tasa Aprobación']]
     for carrera in carreras_del_director:
         casos_carrera = solicitudes_base.filter(estudiantes__carreras=carrera)
@@ -5857,10 +6048,57 @@ def generar_reporte_pdf_director(request):
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
     ]))
     elements.append(carrera_table)
-    elements.append(Spacer(1, 0.3*inch))
+    elements.append(Spacer(1, 0.2*inch))
+    
+    # Gráfico de Tasa de Aprobación por Carrera
+    try:
+        carrera_names = []
+        tasa_aprobaciones = []
+        for carrera in carreras_del_director:
+            casos_carrera = solicitudes_base.filter(estudiantes__carreras=carrera)
+            total_carrera = casos_carrera.count()
+            if total_carrera > 0:
+                aprobados_carrera = casos_carrera.filter(estado='aprobado').count()
+                tasa_carrera = round((aprobados_carrera / total_carrera * 100), 1)
+                carrera_names.append(carrera.nombre[:20])
+                tasa_aprobaciones.append(tasa_carrera)
+        
+        if carrera_names:
+            fig, ax = plt.subplots(figsize=(8, 5))
+            bars = ax.barh(carrera_names, tasa_aprobaciones, color='#D32F2F', edgecolor='black', linewidth=1)
+            ax.set_xlabel('Tasa de Aprobación (%)', fontsize=10, fontweight='bold')
+            ax.set_title('Tasa de Aprobación por Carrera', fontsize=11, fontweight='bold', pad=15)
+            ax.set_xlim(0, 100)
+            ax.grid(axis='x', alpha=0.3, linestyle='--')
+            
+            # Agregar valores en las barras
+            for i, bar in enumerate(bars):
+                width = bar.get_width()
+                ax.text(width, bar.get_y() + bar.get_height()/2.,
+                       f'{width}%',
+                       ha='left', va='center', fontsize=9, fontweight='bold', pad=5)
+            
+            plt.tight_layout()
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+            plt.savefig(temp_file.name, dpi=150, bbox_inches='tight')
+            plt.close()
+            
+            img = Image(temp_file.name, width=6*inch, height=3.75*inch)
+            elements.append(img)
+            elements.append(Spacer(1, 0.2*inch))
+            os.unlink(temp_file.name)
+    except Exception as e:
+        pass
     
     # Estadísticas de Asignaturas
     elements.append(Paragraph('Estadísticas de Asignaturas', heading_style))
+    asignaturas_text = """
+    Esta sección detalla las asignaturas ofrecidas en sus carreras, incluyendo información sobre docentes 
+    asignados, estado de las asignaturas y distribución por semestre. Los datos ayudan a comprender la 
+    estructura académica y la carga docente.
+    """
+    elements.append(Paragraph(asignaturas_text, intro_style))
+    elements.append(Spacer(1, 0.1*inch))
     asignaturas_data = [['Asignatura', 'Sección', 'Carrera', 'Docente', 'Estado', 'Semestre']]
     for asignatura in asignaturas_base.select_related('carreras', 'docente__usuario')[:50]:  # Top 50
         docente_nombre = f"{asignatura.docente.usuario.first_name} {asignatura.docente.usuario.last_name}" if asignatura.docente else "Sin docente"
@@ -5948,7 +6186,50 @@ def generar_reporte_pdf_director(request):
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
     ]))
     elements.append(estudiantes_table)
-    elements.append(Spacer(1, 0.3*inch))
+    elements.append(Spacer(1, 0.2*inch))
+    
+    # Gráfico de Estudiantes con Ajustes por Carrera
+    try:
+        carrera_est_names = []
+        porcentajes_ajustes = []
+        for carrera in carreras_del_director:
+            estudiantes_carrera = estudiantes_base.filter(carreras=carrera)
+            total_est_carrera = estudiantes_carrera.count()
+            if total_est_carrera > 0:
+                con_ajustes_carrera = estudiantes_carrera.filter(
+                    solicitudes__in=solicitudes_base
+                ).distinct().count()
+                porcentaje_ajustes = round((con_ajustes_carrera / total_est_carrera * 100), 1)
+                carrera_est_names.append(carrera.nombre[:20])
+                porcentajes_ajustes.append(porcentaje_ajustes)
+        
+        if carrera_est_names:
+            fig, ax = plt.subplots(figsize=(8, 5))
+            bars = ax.bar(carrera_est_names, porcentajes_ajustes, color='#2196F3', edgecolor='black', linewidth=1)
+            ax.set_ylabel('Porcentaje de Estudiantes (%)', fontsize=10, fontweight='bold')
+            ax.set_title('Porcentaje de Estudiantes con Ajustes por Carrera', fontsize=11, fontweight='bold', pad=15)
+            ax.set_ylim(0, max(porcentajes_ajustes) * 1.2 if porcentajes_ajustes else 100)
+            ax.grid(axis='y', alpha=0.3, linestyle='--')
+            plt.xticks(rotation=45, ha='right')
+            
+            # Agregar valores en las barras
+            for bar in bars:
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width()/2., height,
+                       f'{height}%',
+                       ha='center', va='bottom', fontsize=9, fontweight='bold')
+            
+            plt.tight_layout()
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+            plt.savefig(temp_file.name, dpi=150, bbox_inches='tight')
+            plt.close()
+            
+            img = Image(temp_file.name, width=6*inch, height=3.75*inch)
+            elements.append(img)
+            elements.append(Spacer(1, 0.2*inch))
+            os.unlink(temp_file.name)
+    except Exception as e:
+        pass
     
     # Estudiantes por Semestre
     if estudiantes_por_semestre:
@@ -5976,6 +6257,13 @@ def generar_reporte_pdf_director(request):
     
     # Estadísticas de Docentes
     elements.append(Paragraph('Estadísticas de Docentes', heading_style))
+    docentes_text = """
+    El análisis de docentes muestra la participación del cuerpo académico en el proceso de ajustes razonables. 
+    Se incluye información sobre asignaturas asignadas, ajustes aprobados y rechazados, así como comentarios 
+    realizados por los docentes durante el proceso de evaluación.
+    """
+    elements.append(Paragraph(docentes_text, intro_style))
+    elements.append(Spacer(1, 0.1*inch))
     docentes_data = [['Docente', 'Total Asignaturas', 'Ajustes Aprobados', 'Ajustes Rechazados', 'Comentarios']]
     
     # Combinar datos de docentes
@@ -6031,7 +6319,38 @@ def generar_reporte_pdf_director(request):
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
     ]))
     elements.append(docentes_table)
-    elements.append(Spacer(1, 0.3*inch))
+    elements.append(Spacer(1, 0.2*inch))
+    
+    # Gráfico de Ajustes por Docente (Top 10)
+    try:
+        docentes_top = sorted(docentes_dict.items(), key=lambda x: x[1]['aprobados'] + x[1]['rechazados'], reverse=True)[:10]
+        if docentes_top:
+            docentes_nombres = [d[0][:15] for d in docentes_top]
+            aprobados_data = [d[1]['aprobados'] for d in docentes_top]
+            rechazados_data = [d[1]['rechazados'] for d in docentes_top]
+            
+            fig, ax = plt.subplots(figsize=(10, 6))
+            x = range(len(docentes_nombres))
+            width = 0.35
+            bars1 = ax.bar([i - width/2 for i in x], aprobados_data, width, label='Aprobados', color='#4CAF50', edgecolor='black')
+            bars2 = ax.bar([i + width/2 for i in x], rechazados_data, width, label='Rechazados', color='#f44336', edgecolor='black')
+            ax.set_ylabel('Cantidad de Ajustes', fontsize=10, fontweight='bold')
+            ax.set_title('Top 10 Docentes: Ajustes Aprobados vs Rechazados', fontsize=11, fontweight='bold', pad=15)
+            ax.set_xticks(x)
+            ax.set_xticklabels(docentes_nombres, rotation=45, ha='right')
+            ax.legend(fontsize=9)
+            ax.grid(axis='y', alpha=0.3, linestyle='--')
+            plt.tight_layout()
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+            plt.savefig(temp_file.name, dpi=150, bbox_inches='tight')
+            plt.close()
+            
+            img = Image(temp_file.name, width=7*inch, height=4.2*inch)
+            elements.append(img)
+            elements.append(Spacer(1, 0.2*inch))
+            os.unlink(temp_file.name)
+    except Exception as e:
+        pass
     
     # Inscripciones por Asignatura (Top 20)
     if inscripciones_por_asignatura:
@@ -6059,6 +6378,39 @@ def generar_reporte_pdf_director(request):
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [color_blanco, color_gris_claro]),
         ]))
         elements.append(inscripciones_table)
+        elements.append(Spacer(1, 0.2*inch))
+    
+    # Conclusión
+    elements.append(PageBreak())
+    elements.append(Paragraph('Conclusiones y Recomendaciones', heading_style))
+    conclusion_text = f"""
+    <b>Resumen Ejecutivo:</b><br/><br/>
+    
+    Durante el período analizado ({rango_nombre}), se registraron <b>{total_casos}</b> casos de solicitudes de ajustes 
+    razonables en las carreras bajo su dirección. De estos, <b>{casos_aprobados}</b> fueron aprobados, lo que representa 
+    una tasa de aprobación del <b>{tasa_aprobacion}%</b>.<br/><br/>
+    
+    Se asignaron un total de <b>{total_ajustes}</b> ajustes razonables, de los cuales <b>{ajustes_aprobados}</b> fueron 
+    aprobados y <b>{ajustes_rechazados}</b> fueron rechazados. Actualmente hay <b>{ajustes_pendientes}</b> ajustes en 
+    estado pendiente de evaluación.<br/><br/>
+    
+    <b>Recomendaciones:</b><br/>
+    • Continuar monitoreando la tasa de aprobación para identificar tendencias.<br/>
+    • Revisar los casos pendientes para agilizar el proceso de evaluación.<br/>
+    • Analizar las carreras con mayor demanda de ajustes para identificar necesidades específicas.<br/>
+    • Mantener comunicación fluida con docentes para la implementación efectiva de los ajustes aprobados.<br/><br/>
+    
+    Este reporte fue generado el {timezone.now().strftime("%d de %B de %Y a las %H:%M")} horas.
+    """
+    conclusion_style = ParagraphStyle(
+        'ConclusionStyle',
+        parent=styles['Normal'],
+        fontSize=10,
+        leading=14,
+        spaceAfter=15,
+        alignment=4,  # Justificado
+    )
+    elements.append(Paragraph(conclusion_text, conclusion_style))
     
     # Construir el PDF
     doc.build(elements)
