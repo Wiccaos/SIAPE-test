@@ -9,6 +9,7 @@ from django.utils import timezone
 from django.urls import reverse
 from django.http import HttpResponse
 from datetime import timedelta, datetime, time, date
+from collections import Counter
 from django.db.models import Count, Q
 from django.views.decorators.http import require_POST
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
@@ -5199,13 +5200,14 @@ def estadisticas_director(request):
     ).distinct()
     
     # Base de ajustes de sus carreras
+    # No usar distinct() ya que cada AjusteAsignado es único y no debería haber duplicados
     ajustes_base = AjusteAsignado.objects.filter(
         solicitudes__estudiantes__carreras__id__in=carreras_ids
     ).select_related(
         'solicitudes',
         'solicitudes__estudiantes',
         'solicitudes__estudiantes__carreras'
-    ).distinct()
+    )
     
     # Aplicar filtro de tiempo (si está definido)
     if fecha_inicio_dt:
@@ -5258,65 +5260,186 @@ def estadisticas_director(request):
         }]
     }
 
-    # 7. --- Gráfico 2: Tipos de Apoyo por Categoría ---
-    tipos_ajustes = ajustes_base.filter(estado_aprobacion='aprobado').values(
-        'ajuste_razonable__categorias_ajustes__nombre_categoria'
-    ).annotate(total=Count('id')).order_by('-total')[:10]  # Top 10
-
-    bar_labels_tipos = [d['ajuste_razonable__categorias_ajustes__nombre_categoria'] or 'Sin categoría' for d in tipos_ajustes]
-    bar_data_tipos = [d['total'] for d in tipos_ajustes]
-
+    # 7. --- Gráfico 2: Ajustes Aprobados y Rechazados por Categoría ---
+    # Obtener todos los ajustes (aprobados y rechazados) con sus categorías
+    ajustes_por_categoria_qs = ajustes_base.filter(
+        estado_aprobacion__in=['aprobado', 'rechazado']
+    ).select_related(
+        'ajuste_razonable',
+        'ajuste_razonable__categorias_ajustes'
+    )
+    
+    # Convertir a lista para procesar
+    ajustes_por_categoria_lista = list(ajustes_por_categoria_qs)
+    
+    # Procesar: agrupar por categoría y estado
+    categorias_estados = {}  # {categoria: {'aprobado': count, 'rechazado': count}}
+    
+    for ajuste in ajustes_por_categoria_lista:
+        if ajuste.ajuste_razonable and ajuste.ajuste_razonable.categorias_ajustes:
+            categoria_nombre = ajuste.ajuste_razonable.categorias_ajustes.nombre_categoria
+        else:
+            categoria_nombre = 'Sin categoría'
+        
+        estado = ajuste.estado_aprobacion
+        
+        if categoria_nombre not in categorias_estados:
+            categorias_estados[categoria_nombre] = {'aprobado': 0, 'rechazado': 0}
+        
+        if estado == 'aprobado':
+            categorias_estados[categoria_nombre]['aprobado'] += 1
+        elif estado == 'rechazado':
+            categorias_estados[categoria_nombre]['rechazado'] += 1
+    
+    # Ordenar por total de ajustes (aprobados + rechazados) descendente
+    categorias_ordenadas = sorted(
+        categorias_estados.items(),
+        key=lambda x: x[1]['aprobado'] + x[1]['rechazado'],
+        reverse=True
+    )
+    
+    # Limitar a las primeras 15 categorías si hay muchas
+    if len(categorias_ordenadas) > 15:
+        categorias_ordenadas = categorias_ordenadas[:15]
+    
+    # Preparar datos para el gráfico de barras agrupadas
+    bar_labels_categorias = [item[0] for item in categorias_ordenadas]
+    bar_data_aprobados = [item[1]['aprobado'] for item in categorias_ordenadas]
+    bar_data_rechazados = [item[1]['rechazado'] for item in categorias_ordenadas]
+    
     bar_chart_tipos = {
-        'labels': bar_labels_tipos,
-        'datasets': [{
-            'label': 'Ajustes Aprobados por Categoría',
-            'data': bar_data_tipos,
-            'backgroundColor': 'rgba(211, 47, 47, 0.7)',  # Rojo INACAP
-        }]
+        'labels': bar_labels_categorias,
+        'datasets': [
+            {
+                'label': 'Aprobados',
+                'data': bar_data_aprobados,
+                'backgroundColor': 'rgba(40, 167, 69, 0.7)',  # Verde
+            },
+            {
+                'label': 'Rechazados',
+                'data': bar_data_rechazados,
+                'backgroundColor': 'rgba(220, 53, 69, 0.7)',  # Rojo
+            }
+        ]
     }
 
-    # 8. --- Gráfico 3: Secciones con Más Ajustes (Top 5) ---
-    secciones_data = ajustes_base.filter(estado_aprobacion='aprobado').values(
-        'solicitudes__asignaturas_solicitadas__nombre',
-        'solicitudes__asignaturas_solicitadas__seccion'
-    ).annotate(total=Count('id')).order_by('-total')[:5]
+    # 8. --- Gráfico 3: Secciones con Más Ajustes Aprobados ---
+    # Obtener solo ajustes aprobados para las secciones
+    # Usar asignaturas_en_curso a través del estudiante en lugar del ManyToMany
+    ajustes_aprobados_secciones_qs = ajustes_base.filter(
+        estado_aprobacion='aprobado'
+    ).select_related(
+        'solicitudes',
+        'solicitudes__estudiantes',
+        'solicitudes__estudiantes__carreras'
+    )
 
-    bar_labels_secciones = []
-    bar_data_secciones = []
-    for d in secciones_data:
-        nombre = d['solicitudes__asignaturas_solicitadas__nombre'] or 'Sin asignatura'
-        seccion = d['solicitudes__asignaturas_solicitadas__seccion'] or ''
-        bar_labels_secciones.append(f"{nombre} ({seccion})" if seccion else nombre)
-        bar_data_secciones.append(d['total'])
+    # Convertir a lista para procesar
+    ajustes_aprobados_secciones_lista = list(ajustes_aprobados_secciones_qs)
+
+    # Pre-cargar todas las asignaturas_en_curso relacionadas para optimizar
+    from SIAPE.models import AsignaturasEnCurso
+
+    estudiantes_ids = [ajuste.solicitudes.estudiantes_id for ajuste in ajustes_aprobados_secciones_lista]
+    asignaturas_en_curso_dict = {}
+
+    if estudiantes_ids:
+        asignaturas_en_curso_lista = AsignaturasEnCurso.objects.filter(
+            estudiantes_id__in=estudiantes_ids,
+            estado=True  # Solo asignaturas activas
+        ).select_related('asignaturas')
+        
+        # Organizar por estudiante_id para acceso rápido
+        for aec in asignaturas_en_curso_lista:
+            estudiante_id = aec.estudiantes_id
+            if estudiante_id not in asignaturas_en_curso_dict:
+                asignaturas_en_curso_dict[estudiante_id] = []
+            asignaturas_en_curso_dict[estudiante_id].append(aec.asignaturas)
+
+    # Contar ajustes por sección (asignatura + sección)
+    secciones_counter = Counter()
+
+    for ajuste in ajustes_aprobados_secciones_lista:
+        solicitud = ajuste.solicitudes
+        estudiante_id = solicitud.estudiantes_id
+        
+        # Obtener asignaturas a través de asignaturas_en_curso del estudiante
+        asignaturas = asignaturas_en_curso_dict.get(estudiante_id, [])
+        
+        if asignaturas:
+            for asignatura in asignaturas:
+                # Crear clave única: "Nombre Asignatura (Sección)"
+                if asignatura.seccion:
+                    clave = f"{asignatura.nombre} ({asignatura.seccion})"
+                else:
+                    clave = f"{asignatura.nombre} (Sin sección)"
+                secciones_counter[clave] += 1
+        else:
+            # Si no hay asignaturas, contar como "Sin asignatura"
+            secciones_counter["Sin asignatura"] += 1
+
+    # Obtener las secciones más frecuentes (top 15)
+    top_secciones = secciones_counter.most_common(15)
+
+    # Ordenar por cantidad descendente (most_common ya lo hace, pero asegurémonos)
+    top_secciones.sort(key=lambda x: x[1], reverse=True)
+
+    bar_labels_secciones = [item[0] for item in top_secciones]
+    bar_data_secciones = [item[1] for item in top_secciones]
 
     bar_chart_secciones = {
         'labels': bar_labels_secciones,
         'datasets': [{
-            'label': 'Ajustes Aprobados por Sección (Top 5)',
+            'label': 'Ajustes Aprobados',
             'data': bar_data_secciones,
-            'backgroundColor': 'rgba(211, 47, 47, 0.7)',  # Rojo INACAP
+            'backgroundColor': 'rgba(40, 167, 69, 0.7)',  # Verde para aprobados
         }]
     }
 
     # 9. --- Gráfico 4: Tendencia de Casos por Tiempo ---
+    # IMPORTANTE: Usar solicitudes_base que ya tiene el filtro de tiempo aplicado
     casos_por_tiempo = []
     if rango_seleccionado == 'mes':
-        # Por día
+        # Por día - solo mostrar días dentro del rango seleccionado
+        if fecha_inicio_dt:
+            fecha_inicio_calc = fecha_inicio_dt.date()
+        else:
+            # Si es histórico, usar la fecha del primer caso
+            primer_caso = solicitudes_base.order_by('created_at').first()
+            if primer_caso:
+                fecha_inicio_calc = primer_caso.created_at.date()
+            else:
+                fecha_inicio_calc = today - timedelta(days=30)
+        
         for i in range(29, -1, -1):
             fecha_dia = today - timedelta(days=i)
+            # Solo incluir días dentro del rango seleccionado
+            if fecha_inicio_dt and fecha_dia < fecha_inicio_calc:
+                continue
             dia_inicio_dt = timezone.make_aware(datetime.combine(fecha_dia, datetime.min.time()))
             dia_fin_dt = timezone.make_aware(datetime.combine(fecha_dia, datetime.max.time()))
-            # Usar la base sin filtro de tiempo para cada día específico
-            cantidad = Solicitudes.objects.filter(
-                estudiantes__carreras__id__in=carreras_ids,
+            # Usar solicitudes_base filtrado y aplicar filtro adicional por día
+            cantidad = solicitudes_base.filter(
                 created_at__range=(dia_inicio_dt, dia_fin_dt)
             ).distinct().count()
             casos_por_tiempo.append({'fecha': fecha_dia.strftime('%d/%m'), 'cantidad': cantidad})
     elif rango_seleccionado == 'semestre':
-        # Por mes
+        # Por mes - usar solicitudes_base que ya tiene el filtro de tiempo aplicado
+        if fecha_inicio_dt:
+            fecha_inicio_calc = fecha_inicio_dt.date()
+        else:
+            primer_caso = solicitudes_base.order_by('created_at').first()
+            if primer_caso:
+                fecha_inicio_calc = primer_caso.created_at.date()
+            else:
+                fecha_inicio_calc = today - timedelta(days=180)
+        
         for i in range(5, -1, -1):
             fecha_mes = today - timedelta(days=30 * i)
             mes_inicio = fecha_mes.replace(day=1)
+            # Solo incluir meses dentro del rango seleccionado
+            if fecha_inicio_dt and mes_inicio < fecha_inicio_calc:
+                continue
             if i == 0:
                 mes_fin = today
             else:
@@ -5324,16 +5447,28 @@ def estadisticas_director(request):
                 mes_fin = siguiente_mes.replace(day=1) - timedelta(days=1)
             mes_inicio_dt = timezone.make_aware(datetime.combine(mes_inicio, datetime.min.time()))
             mes_fin_dt = timezone.make_aware(datetime.combine(mes_fin, datetime.max.time()))
-            cantidad = Solicitudes.objects.filter(
-                estudiantes__carreras__id__in=carreras_ids,
+            # Usar solicitudes_base filtrado y aplicar filtro adicional por mes
+            cantidad = solicitudes_base.filter(
                 created_at__range=(mes_inicio_dt, mes_fin_dt)
             ).distinct().count()
             casos_por_tiempo.append({'fecha': mes_inicio.strftime('%b %Y'), 'cantidad': cantidad})
     elif rango_seleccionado == 'año':
-        # Por mes
+        # Por mes - usar solicitudes_base que ya tiene el filtro de tiempo aplicado
+        if fecha_inicio_dt:
+            fecha_inicio_calc = fecha_inicio_dt.date()
+        else:
+            primer_caso = solicitudes_base.order_by('created_at').first()
+            if primer_caso:
+                fecha_inicio_calc = primer_caso.created_at.date()
+            else:
+                fecha_inicio_calc = today.replace(month=1, day=1)
+        
         for i in range(11, -1, -1):
             fecha_mes = today - timedelta(days=30 * i)
             mes_inicio = fecha_mes.replace(day=1)
+            # Solo incluir meses dentro del rango seleccionado
+            if fecha_inicio_dt and mes_inicio < fecha_inicio_calc:
+                continue
             if i == 0:
                 mes_fin = today
             else:
@@ -5341,8 +5476,8 @@ def estadisticas_director(request):
                 mes_fin = siguiente_mes.replace(day=1) - timedelta(days=1)
             mes_inicio_dt = timezone.make_aware(datetime.combine(mes_inicio, datetime.min.time()))
             mes_fin_dt = timezone.make_aware(datetime.combine(mes_fin, datetime.max.time()))
-            cantidad = Solicitudes.objects.filter(
-                estudiantes__carreras__id__in=carreras_ids,
+            # Usar solicitudes_base filtrado y aplicar filtro adicional por mes
+            cantidad = solicitudes_base.filter(
                 created_at__range=(mes_inicio_dt, mes_fin_dt)
             ).distinct().count()
             casos_por_tiempo.append({'fecha': mes_inicio.strftime('%b %Y'), 'cantidad': cantidad})
@@ -5358,8 +5493,8 @@ def estadisticas_director(request):
                     año_fin_dt = timezone.make_aware(datetime.combine(today, datetime.max.time()))
                 else:
                     año_fin_dt = timezone.make_aware(datetime(año + 1, 1, 1)) - timedelta(seconds=1)
-                cantidad = Solicitudes.objects.filter(
-                    estudiantes__carreras__id__in=carreras_ids,
+                # Usar solicitudes_base (histórico completo, sin filtro de tiempo adicional)
+                cantidad = solicitudes_base.filter(
                     created_at__range=(año_inicio_dt, año_fin_dt)
                 ).distinct().count()
                 casos_por_tiempo.append({'fecha': str(año), 'cantidad': cantidad})
