@@ -1,0 +1,136 @@
+/* =============================================================
+   ESTILOS PARA ESTADÍSTICAS DEL DIRECTOR DE CARRERA
+   ============================================================= */
+
+/* Asegurar que el texto tachado se muestre en las leyendas de Chart.js cuando está oculto */
+canvas ~ ul li[style*="opacity"] span,
+canvas ~ ul li[style*="opacity"] {
+    text-decoration: line-through !important;
+}
+
+/* Estilos para el selector de rango de tiempo */
+.filters-section {
+    margin-bottom: 30px;
+    margin-top: 20px;
+}
+
+.filters-section form {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 15px;
+}
+
+.filters-section form > div {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.filters-section label {
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.filters-section select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    min-width: 180px;
+}
+
+.filters-section .info-text {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+}
+
+/* Estilos para botones de generación de reportes */
+.report-buttons {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.report-buttons span {
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-right: 5px;
+}
+
+.report-buttons .btn {
+    padding: 8px 16px;
+    border-radius: 6px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.report-buttons .btn-primary {
+    background: #D32F2F;
+    color: white;
+}
+
+.report-buttons .btn-secondary {
+    background: #007bff;
+    color: white;
+}
+
+/* Estilos para contenedores de gráficos */
+.chart-container {
+    padding: 20px;
+}
+
+.chart-container-tendencia {
+    padding: 20px;
+}
+
+.chart-container-ajustes {
+    padding: 20px;
+    min-height: 400px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.chart-container-ajustes canvas {
+    max-width: 400px;
+    max-height: 4000px;
+}
+
+/* Grid de gráficos */
+.charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+/* Grid de tablas */
+.tables-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+/* Estilos para tablas */
+.table-estados th,
+.table-carreras th {
+    text-align: center;
+}
+
+.table-estados td,
+.table-carreras td {
+    text-align: center;
+}
+
+.table-estados td:first-child,
+.table-carreras td:first-child {
+    text-align: left;
+}
+
